@@ -1,14 +1,15 @@
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { clubs, memberships, withTenant, type Tx } from "@rallix/db";
 import { auth } from "./auth";
 import { appDb } from "./db";
 
 export type Role = "admin" | "scorer" | "coach" | "player";
 export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; roles: Role[] };
-export type Ctx = { user: { id: string; name: string; image: string | null }; clubs: MyClub[]; club: MyClub | null };
+export type BlockedClub = { name: string; status: "suspended" | "closed" };
+export type Ctx = { user: { id: string; name: string; image: string | null }; clubs: MyClub[]; club: MyClub | null; blocked: BlockedClub[] };
 
 export const CLUB_COOKIE = "rallix_club";
 
@@ -21,21 +22,24 @@ export const getSessionUser = cache(async () => {
 export const getCtx = cache(async (): Promise<Ctx | null> => {
   const user = await getSessionUser();
   if (!user) return null;
-  const rows = await withTenant(appDb(), { userId: user.id }, (tx) =>
-    tx.select({ clubId: clubs.id, membershipId: memberships.id, name: clubs.name, slug: clubs.slug, logoUrl: clubs.logoUrl, roles: memberships.roles })
+  const { rows, blocked } = await withTenant(appDb(), { userId: user.id }, async (tx) => ({
+    rows: await tx.select({ clubId: clubs.id, membershipId: memberships.id, name: clubs.name, slug: clubs.slug, logoUrl: clubs.logoUrl, roles: memberships.roles })
       .from(memberships).innerJoin(clubs, eq(clubs.id, memberships.clubId))
       .where(and(eq(memberships.userId, user.id), eq(memberships.status, "active")))
-      .orderBy(clubs.name));
+      .orderBy(clubs.name),
+    // Clubs the user belongs to that the platform has suspended or closed (hidden from every other query).
+    blocked: (await tx.execute(sql`select name, status from app.blocked_clubs()`)).rows as BlockedClub[],
+  }));
   const wanted = (await cookies()).get(CLUB_COOKIE)?.value;
   const club = rows.find((c) => c.clubId === wanted) ?? rows[0] ?? null;
-  return { user: { id: user.id, name: user.name, image: user.image ?? null }, clubs: rows as MyClub[], club: club as MyClub | null };
+  return { user: { id: user.id, name: user.name, image: user.image ?? null }, clubs: rows as MyClub[], club: club as MyClub | null, blocked };
 });
 
 /** Page guard: signed in and belongs to a club. New users are sent to create or join one. */
 export async function requireClub(): Promise<Ctx & { club: MyClub }> {
   const ctx = await getCtx();
   if (!ctx) redirect("/sign-in");
-  if (!ctx.club) redirect("/onboarding");
+  if (!ctx.club) redirect(ctx.blocked.length ? "/suspended" : "/onboarding");
   return ctx as Ctx & { club: MyClub };
 }
 

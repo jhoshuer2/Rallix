@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { clubs } from "./tenancy";
-import { invoiceStatus, notificationChannel, subscriptionStatus, planPeriod } from "./enums";
+import { invoiceStatus, issueSeverity, issueStatus, notificationChannel, notificationStatus, planPeriod, subscriptionStatus, templateKind } from "./enums";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -25,10 +25,19 @@ export const platformInvoices = pgTable("platform_invoices", {
   number: text("number").notNull().unique(),
   status: invoiceStatus("status").notNull().default("draft"),
   amountKobo: integer("amount_kobo").notNull(),
+  periodLabel: text("period_label").notNull(),
+  description: text("description"),
   issuedAt: timestamp("issued_at", { withTimezone: true }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  paymentRef: text("payment_ref"),
   pdfUrl: text("pdf_url"),
   createdAt: createdAt(),
-}, (t) => [index("platform_invoices_club_idx").on(t.clubId), check("platform_invoices_amount", sql`${t.amountKobo} >= 0`)]);
+}, (t) => [
+  index("platform_invoices_club_idx").on(t.clubId),
+  unique("platform_invoices_club_period_uq").on(t.clubId, t.periodLabel),
+  check("platform_invoices_amount", sql`${t.amountKobo} >= 0`),
+]);
 
 /* The tables below are console-only. The app role has no privileges on them. */
 export const platformAdmins = pgTable("platform_admins", {
@@ -42,6 +51,9 @@ export const notifications = pgTable("notifications", {
   channel: notificationChannel("channel").notNull(),
   title: text("title").notNull(),
   body: text("body").notNull(),
+  status: notificationStatus("status").notNull().default("draft"),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  failureReason: text("failure_reason"),
   createdBy: text("created_by").references(() => users.id),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -63,3 +75,53 @@ export const globalRatings = pgTable("global_ratings", {
   matchesPlayed: integer("matches_played").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Support and bug tracker for the platform team. */
+export const issues = pgTable("issues", {
+  id: id(),
+  title: text("title").notNull(),
+  body: text("body"),
+  severity: issueSeverity("severity").notNull().default("normal"),
+  status: issueStatus("status").notNull().default("open"),
+  clubId: uuid("club_id").references(() => clubs.id, { onDelete: "set null" }),
+  reportedBy: text("reported_by").references(() => users.id, { onDelete: "set null" }),
+  assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, (t) => [index("issues_status_idx").on(t.status, t.severity), index("issues_club_idx").on(t.clubId)]);
+
+export const issueNotes = pgTable("issue_notes", {
+  id: id(),
+  issueId: uuid("issue_id").notNull().references(() => issues.id, { onDelete: "cascade" }),
+  authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+  body: text("body").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("issue_notes_issue_idx").on(t.issueId)]);
+
+/** Editable message templates. Placeholders look like {{club_name}}. */
+export const templates = pgTable("templates", {
+  id: id(),
+  key: text("key").notNull().unique(),
+  kind: templateKind("kind").notNull(),
+  name: text("name").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Single-row platform settings (id is always 1). Branding and numbering for invoices. */
+export const platformSettings = pgTable("platform_settings", {
+  id: integer("id").primaryKey().default(1),
+  companyName: text("company_name").notNull().default("Rallix"),
+  address: text("address").notNull().default(""),
+  email: text("email").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  invoicePrefix: text("invoice_prefix").notNull().default("RLX"),
+  invoiceNext: integer("invoice_next").notNull().default(1),
+  vatPercent: integer("vat_percent").notNull().default(0),
+  footerNote: text("footer_note").notNull().default("Thank you for using Rallix."),
+  paymentInstructions: text("payment_instructions").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [check("platform_settings_single", sql`${t.id} = 1`), check("platform_settings_vat", sql`${t.vatPercent} BETWEEN 0 AND 100`)]);

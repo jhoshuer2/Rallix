@@ -15,6 +15,20 @@
       "when": 1793482382434,
       "tag": "0001_rls_and_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793483892714,
+      "tag": "0002_console_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793483912507,
+      "tag": "0003_console_rls_and_defaults",
+      "breakpoints": true
     }
   ]
 }

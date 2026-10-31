@@ -14,3 +14,7 @@ export const ratingScope = pgEnum("rating_scope", ["club", "competition"]);
 export const subscriptionStatus = pgEnum("subscription_status", ["trialing", "active", "past_due", "cancelled"]);
 export const invoiceStatus = pgEnum("invoice_status", ["draft", "issued", "paid", "void"]);
 export const notificationChannel = pgEnum("notification_channel", ["push", "email", "sms", "whatsapp"]);
+export const issueSeverity = pgEnum("issue_severity", ["low", "normal", "high", "critical"]);
+export const issueStatus = pgEnum("issue_status", ["open", "investigating", "resolved", "closed"]);
+export const templateKind = pgEnum("template_kind", ["email", "sms", "push", "whatsapp"]);
+export const notificationStatus = pgEnum("notification_status", ["draft", "queued", "sent", "failed"]);

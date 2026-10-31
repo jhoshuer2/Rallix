@@ -1,0 +1,197 @@
+"use server";
+import { sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { normalizePhone } from "@rallix/config/phone";
+import { db } from "./db";
+import { requireAdmin } from "./guard";
+import { audienceCount } from "./queries";
+import { uuid } from "./format";
+
+type Res<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
+const pgCode = (e: unknown) => (e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code;
+
+/** Every mutation records who did what. Called inside each action after requireAdmin(). */
+async function audit(actor: string, action: string, entity: string, entityId: string | null, meta: Record<string, unknown> = {}) {
+  await db().execute(sql`insert into audit_log (actor_id, action, entity, entity_id, meta) values (${actor}, ${action}, ${entity}, ${entityId}, ${JSON.stringify(meta)}::jsonb)`);
+}
+const nairaToKobo = (n: number) => Math.round(n * 100);
+const validMoney = (k: number) => Number.isFinite(k) && k >= 0 && k <= 100_000_000_00;
+
+/* ---------- Clubs ---------- */
+export async function setClubStatus(clubId: string, status: "active" | "suspended" | "closed", reason: string): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(clubId) || !["active", "suspended", "closed"].includes(status)) return fail("Invalid request.");
+  if (status !== "active" && reason.trim().length < 3) return fail("Give a short reason. It is recorded in the audit log.");
+  const r = await db().execute(sql`update clubs set status = ${status}::club_status where id = ${clubId} returning name`);
+  if (!r.rows.length) return fail("Club not found.");
+  await audit(staff.id, `club.${status === "active" ? "reactivate" : status}`, "club", clubId, { reason: reason.trim(), name: (r.rows[0] as { name: string }).name });
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/* ---------- Billing ---------- */
+export async function createSubscription(input: { clubId: string; period: "monthly" | "yearly"; naira: number }): Promise<Res> {
+  const staff = await requireAdmin();
+  const kobo = nairaToKobo(input.naira);
+  if (!uuid.test(input.clubId) || !["monthly", "yearly"].includes(input.period) || !validMoney(kobo)) return fail("Check the club, period and amount.");
+  const end = new Date(); if (input.period === "monthly") end.setMonth(end.getMonth() + 1); else end.setFullYear(end.getFullYear() + 1);
+  const r = await db().execute(sql`insert into club_subscriptions (club_id, period, status, amount_kobo, current_period_end) values (${input.clubId}, ${input.period}::plan_period, 'active', ${kobo}, ${end}) returning id`);
+  await audit(staff.id, "subscription.create", "club_subscription", (r.rows[0] as { id: string }).id, { clubId: input.clubId, period: input.period, kobo });
+  revalidatePath("/billing");
+  return { ok: true };
+}
+export async function setSubscriptionStatus(id: string, status: "trialing" | "active" | "past_due" | "cancelled"): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(id) || !["trialing", "active", "past_due", "cancelled"].includes(status)) return fail("Invalid request.");
+  await db().execute(sql`update club_subscriptions set status = ${status}::subscription_status where id = ${id}`);
+  await audit(staff.id, "subscription.status", "club_subscription", id, { status });
+  revalidatePath("/billing");
+  return { ok: true };
+}
+
+export async function createInvoice(input: { clubId: string; periodLabel: string; naira: number; description: string; issueNow: boolean }): Promise<Res<{ id: string }>> {
+  const staff = await requireAdmin();
+  const kobo = nairaToKobo(input.naira);
+  if (!uuid.test(input.clubId) || !validMoney(kobo) || input.periodLabel.trim().length < 3) return fail("Check the club, period label and amount.");
+  try {
+    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at)
+      values (${input.clubId}, app.next_invoice_number(), ${input.issueNow ? "issued" : "draft"}::invoice_status, ${kobo}, ${input.periodLabel.trim()}, ${input.description.trim() || null},
+              ${input.issueNow ? sql`now()` : null}, ${input.issueNow ? sql`now() + interval '14 days'` : null}) returning id, number`);
+    const row = r.rows[0] as { id: string; number: string };
+    await audit(staff.id, "invoice.create", "invoice", row.id, { number: row.number, kobo, issued: input.issueNow });
+    revalidatePath("/invoices");
+    return { ok: true, id: row.id };
+  } catch (e) {
+    if (pgCode(e) === "23505") return fail("That club already has an invoice for this period.");
+    return fail("Could not create the invoice.");
+  }
+}
+export async function setInvoiceStatus(id: string, status: "issued" | "paid" | "void", paymentRef?: string): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(id) || !["issued", "paid", "void"].includes(status)) return fail("Invalid request.");
+  if (status === "paid" && (paymentRef ?? "").trim().length < 2) return fail("Enter the payment reference (bank transfer or Paystack reference).");
+  const r = await db().execute(sql`update platform_invoices set status = ${status}::invoice_status,
+      issued_at = case when ${status} = 'issued' then coalesce(issued_at, now()) else issued_at end,
+      due_at = case when ${status} = 'issued' then coalesce(due_at, now() + interval '14 days') else due_at end,
+      paid_at = case when ${status} = 'paid' then now() else paid_at end,
+      payment_ref = case when ${status} = 'paid' then ${paymentRef?.trim() ?? null} else payment_ref end
+    where id = ${id} and status <> 'paid' and status <> 'void' returning number`);
+  if (!r.rows.length) return fail("This invoice is already paid or void, so it can no longer change.");
+  await audit(staff.id, `invoice.${status}`, "invoice", id, { number: (r.rows[0] as { number: string }).number, paymentRef: paymentRef?.trim() });
+  revalidatePath("/invoices"); revalidatePath(`/invoices/${id}`); revalidatePath("/billing");
+  return { ok: true };
+}
+/** One invoice per active subscription for the period. Monthly subs get YYYY-MM, yearly subs get YYYY. Safe to run twice. */
+export async function generateInvoices(): Promise<Res<{ created: number }>> {
+  const staff = await requireAdmin();
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, year = String(now.getFullYear());
+  const subs = (await db().execute(sql`select s.club_id, s.period, s.amount_kobo from club_subscriptions s join clubs c on c.id = s.club_id where s.status = 'active' and c.status = 'active'`)).rows as Array<{ club_id: string; period: string; amount_kobo: number }>;
+  let created = 0;
+  for (const s of subs) {
+    const label = s.period === "monthly" ? month : year;
+    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at)
+      select ${s.club_id}, app.next_invoice_number(), 'issued', ${s.amount_kobo}, ${label}, ${`Rallix ${s.period} subscription, ${label}`}, now(), now() + interval '14 days'
+      where not exists (select 1 from platform_invoices where club_id = ${s.club_id} and period_label = ${label}) returning id`);
+    created += r.rows.length;
+  }
+  await audit(staff.id, "invoice.generate", "invoice", null, { created, month, year });
+  revalidatePath("/invoices"); revalidatePath("/billing");
+  return { ok: true, created };
+}
+
+/* ---------- Templates and settings ---------- */
+export async function saveTemplate(input: { id: string; subject: string; body: string }): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(input.id) || input.body.trim().length < 5 || input.body.length > 2000) return fail("The message body must be 5 to 2,000 characters.");
+  const r = await db().execute(sql`update templates set subject = ${input.subject.trim() || null}, body = ${input.body}, updated_by = ${staff.id}, updated_at = now() where id = ${input.id} returning key`);
+  if (!r.rows.length) return fail("Template not found.");
+  await audit(staff.id, "template.update", "template", input.id, { key: (r.rows[0] as { key: string }).key });
+  revalidatePath("/templates");
+  return { ok: true };
+}
+export async function saveSettings(input: { companyName: string; address: string; email: string; phone: string; invoicePrefix: string; vatPercent: number; footerNote: string; paymentInstructions: string }): Promise<Res> {
+  const staff = await requireAdmin();
+  if (input.companyName.trim().length < 2) return fail("Enter the company name.");
+  if (!/^[A-Z0-9]{2,6}$/.test(input.invoicePrefix)) return fail("The invoice prefix must be 2 to 6 capital letters or digits.");
+  if (!Number.isInteger(input.vatPercent) || input.vatPercent < 0 || input.vatPercent > 100) return fail("VAT must be a whole number from 0 to 100.");
+  await db().execute(sql`update platform_settings set company_name = ${input.companyName.trim()}, address = ${input.address}, email = ${input.email.trim()}, phone = ${input.phone.trim()},
+      invoice_prefix = ${input.invoicePrefix}, vat_percent = ${input.vatPercent}, footer_note = ${input.footerNote}, payment_instructions = ${input.paymentInstructions}, updated_at = now() where id = 1`);
+  await audit(staff.id, "settings.update", "settings", "1", { invoicePrefix: input.invoicePrefix, vatPercent: input.vatPercent });
+  revalidatePath("/templates"); revalidatePath("/invoices", "layout");
+  return { ok: true };
+}
+
+/* ---------- Notifications ---------- */
+export async function sendNotification(input: { title: string; body: string; channel: "push" | "email" | "sms" | "whatsapp"; audience: "all_admins" | "all_players" | "clubs"; clubIds: string[] }): Promise<Res<{ recipients: number }>> {
+  const staff = await requireAdmin();
+  if (input.title.trim().length < 3 || input.body.trim().length < 5) return fail("Add a title and a message.");
+  if (!["push", "email", "sms", "whatsapp"].includes(input.channel) || !["all_admins", "all_players", "clubs"].includes(input.audience)) return fail("Invalid request.");
+  const clubIds = input.audience === "clubs" ? input.clubIds.filter((c) => uuid.test(c)) : [];
+  if (input.audience === "clubs" && clubIds.length === 0) return fail("Pick at least one club.");
+  const recipients = await audienceCount({ type: input.audience, clubIds });
+  if (recipients === 0) return fail("No one matches that audience.");
+  // Delivery providers (SMS, email, push, WhatsApp) are not connected yet, so the broadcast is recorded as queued.
+  const r = await db().execute(sql`insert into notifications (audience, channel, title, body, status, recipient_count, created_by) values (${JSON.stringify({ type: input.audience, clubIds })}::jsonb, ${input.channel}::notification_channel, ${input.title.trim()}, ${input.body.trim()}, 'queued', ${recipients}, ${staff.id}) returning id`);
+  await audit(staff.id, "notification.queue", "notification", (r.rows[0] as { id: string }).id, { channel: input.channel, audience: input.audience, recipients });
+  revalidatePath("/notifications");
+  return { ok: true, recipients };
+}
+
+/* ---------- Issues ---------- */
+export async function createIssue(input: { title: string; body: string; severity: "low" | "normal" | "high" | "critical"; clubId: string | null }): Promise<Res<{ id: string }>> {
+  const staff = await requireAdmin();
+  if (input.title.trim().length < 3) return fail("Give the issue a title.");
+  if (!["low", "normal", "high", "critical"].includes(input.severity) || (input.clubId && !uuid.test(input.clubId))) return fail("Invalid request.");
+  const r = await db().execute(sql`insert into issues (title, body, severity, club_id, reported_by, assigned_to) values (${input.title.trim()}, ${input.body.trim() || null}, ${input.severity}::issue_severity, ${input.clubId}, ${staff.id}, ${staff.id}) returning id`);
+  const id = (r.rows[0] as { id: string }).id;
+  await audit(staff.id, "issue.create", "issue", id, { severity: input.severity });
+  revalidatePath("/issues", "layout");
+  return { ok: true, id };
+}
+export async function updateIssue(id: string, patch: { status?: "open" | "investigating" | "resolved" | "closed"; severity?: "low" | "normal" | "high" | "critical"; assignToMe?: boolean }): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(id)) return fail("Invalid request.");
+  if (patch.status && !["open", "investigating", "resolved", "closed"].includes(patch.status)) return fail("Invalid status.");
+  if (patch.severity && !["low", "normal", "high", "critical"].includes(patch.severity)) return fail("Invalid severity.");
+  await db().execute(sql`update issues set status = coalesce(${patch.status ?? null}::issue_status, status), severity = coalesce(${patch.severity ?? null}::issue_severity, severity),
+      assigned_to = case when ${!!patch.assignToMe} then ${staff.id} else assigned_to end,
+      resolved_at = case when ${patch.status ?? null} in ('resolved','closed') then coalesce(resolved_at, now()) when ${patch.status ?? null} in ('open','investigating') then null else resolved_at end where id = ${id}`);
+  await audit(staff.id, "issue.update", "issue", id, patch as Record<string, unknown>);
+  revalidatePath("/issues", "layout");
+  return { ok: true };
+}
+export async function addIssueNote(id: string, body: string): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(id) || body.trim().length < 2) return fail("Write a note first.");
+  await db().execute(sql`insert into issue_notes (issue_id, author_id, body) values (${id}, ${staff.id}, ${body.trim()})`);
+  await db().execute(sql`update issues set updated_at = now() where id = ${id}`);
+  await audit(staff.id, "issue.note", "issue", id);
+  revalidatePath(`/issues/${id}`);
+  return { ok: true };
+}
+
+/* ---------- Team ---------- */
+export async function addTeamMember(phone: string): Promise<Res> {
+  const staff = await requireAdmin();
+  const p = normalizePhone(phone);
+  if (!p) return fail("Enter a valid Nigerian phone number.");
+  const u = (await db().execute(sql`select id, name from users where phone_number = ${p}`)).rows[0] as { id: string; name: string } | undefined;
+  if (!u) return fail("No account has that number yet. They need to sign in to the Rallix app once first.");
+  await db().execute(sql`insert into platform_admins (user_id) values (${u.id}) on conflict do nothing`);
+  await audit(staff.id, "team.add", "user", u.id, { name: u.name });
+  revalidatePath("/team");
+  return { ok: true };
+}
+export async function removeTeamMember(userId: string): Promise<Res> {
+  const staff = await requireAdmin();
+  if (userId === staff.id) return fail("You can’t remove yourself.");
+  const left = Number(((await db().execute(sql`select count(*)::int as n from platform_admins`)).rows[0] as { n: number }).n);
+  if (left <= 1) return fail("The last platform admin can’t be removed.");
+  await db().execute(sql`delete from platform_admins where user_id = ${userId}`);
+  // Existing sessions are left alone on purpose: every request re-checks the platform_admins list, so removal is immediate.
+  await audit(staff.id, "team.remove", "user", userId);
+  revalidatePath("/team");
+  return { ok: true };
+}

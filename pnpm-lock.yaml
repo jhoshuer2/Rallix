@@ -17,6 +17,9 @@ importers:
 
   apps/club:
     dependencies:
+      '@rallix/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@rallix/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -60,12 +63,27 @@ importers:
 
   apps/console:
     dependencies:
+      '@rallix/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@rallix/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@rallix/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      better-auth:
+        specifier: 1.7.14
+        version: 1.7.14(drizzle-kit@0.31.11)(drizzle-orm@0.44.7(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1))(next@15.5.28(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@3.2.7(@types/node@22.20.5)(tsx@4.23.15))
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)
       next:
         specifier: ^15.5.0
         version: 15.5.28(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
       react:
         specifier: ^19.0.0
         version: 19.3.1
@@ -76,6 +94,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.5
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
@@ -86,8 +107,20 @@ importers:
         specifier: ^5.8.0
         version: 5.9.3
 
+  packages/config:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@22.20.5)(tsx@4.23.15)
+
   packages/db:
     dependencies:
+      '@rallix/config':
+        specifier: workspace:*
+        version: link:../config
       drizzle-orm:
         specifier: ^0.44.0
         version: 0.44.7(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)

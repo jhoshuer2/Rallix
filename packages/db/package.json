@@ -14,9 +14,11 @@
     "seed": "tsx src/seed.ts",
     "db:create": "./scripts/create-db.sh",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "make-platform-admin": "tsx src/make-platform-admin.ts"
   },
   "dependencies": {
+    "@rallix/config": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "pg": "^8.13.0"
   },

@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rallix/config": "workspace:*",
     "@rallix/db": "workspace:*",
     "@rallix/stats": "workspace:*",
     "@rallix/ui": "workspace:*",

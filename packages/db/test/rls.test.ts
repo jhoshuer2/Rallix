@@ -223,3 +223,48 @@ describe("club creation and invites", () => {
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into invites (club_id, code) values (${ids.A}, 'MINE')`)))).toBe("42501");
   });
 });
+
+describe("console tables and suspended clubs", () => {
+  it("the app role cannot read or write any console-only table", async () => {
+    for (const t of ["issues", "issue_notes", "templates", "platform_settings", "notifications", "platform_admins", "audit_log"]) {
+      expect(await denied(app.execute(sql.raw(`select * from ${t}`)))).toBe("42501");
+    }
+    expect(await denied(app.execute(sql`select app.next_invoice_number()`))).toBe("42501");
+  });
+
+  it("invoice numbers are sequential, unique and formatted with the prefix and year", async () => {
+    const a = (await svc.execute(sql`select app.next_invoice_number() as n`)).rows[0] as { n: string };
+    const b = (await svc.execute(sql`select app.next_invoice_number() as n`)).rows[0] as { n: string };
+    expect(a.n).toMatch(/^RLX-\d{4}-\d{4}$/);
+    expect(Number(b.n.slice(-4))).toBe(Number(a.n.slice(-4)) + 1);
+  });
+
+  it("default templates and settings exist on a fresh database", async () => {
+    const t = (await svc.execute(sql`select count(*)::int as n from templates`)).rows[0] as { n: number };
+    expect(t.n).toBeGreaterThanOrEqual(4);
+    expect(((await svc.execute(sql`select count(*)::int as n from platform_settings`)).rows[0] as { n: number }).n).toBe(1);
+  });
+
+  it("a suspended club disappears for its members: no reads, no writes, no joins", async () => {
+    await svc.insert(s.users).values({ id: "susp", name: "Susp Admin", email: "susp@x.com" });
+    const [c] = await svc.insert(s.clubs).values({ slug: "susp-club", name: "Susp Club", ownerId: "susp" }).returning();
+    const [m] = await svc.insert(s.memberships).values({ clubId: c!.id, userId: "susp", roles: ["admin", "player"] }).returning();
+    await svc.insert(s.competitions).values({ clubId: c!.id, name: "S Cup", format: "knockout" });
+    await svc.insert(s.invites).values({ clubId: c!.id, code: "SUSPCODE" });
+    const ctx = { userId: "susp", clubId: c!.id };
+    expect(await rows(app, ctx, sql`select name from competitions`)).toHaveLength(1);
+
+    await svc.execute(sql`update clubs set status = 'suspended' where id = ${c!.id}`);
+    expect(await rows(app, ctx, sql`select name from competitions`)).toHaveLength(0);
+    expect(await rows(app, ctx, sql`select name from clubs`)).toHaveLength(0);
+    expect(await denied(withTenant(app, ctx, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${c!.id}, 'New', 'knockout')`)))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "stranger" }, (tx) => tx.execute(sql`select app.join_club('SUSPCODE')`)))).toBe("P0001");
+    const blocked = await rows(app, { userId: "susp" }, sql`select name, status from app.blocked_clubs()`);
+    expect(blocked).toEqual([{ name: "Susp Club", status: "suspended" }]);
+    expect(await rows(app, { userId: "adminA" }, sql`select name from app.blocked_clubs()`)).toHaveLength(0); // other clubs unaffected
+
+    await svc.execute(sql`update clubs set status = 'active' where id = ${c!.id}`);
+    expect(await rows(app, ctx, sql`select name from competitions`)).toHaveLength(1); // reactivation restores access
+    void m;
+  });
+});

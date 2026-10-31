@@ -60,7 +60,25 @@ export async function seed(db: Db) {
   await db.insert(s.ratings).values(members.map((m, i) => ({ clubId: paris.id, membershipId: m.id, scope: "club" as const, rating: 1300 - i * 25 })));
   await db.insert(s.invites).values({ clubId: paris.id, code: "AB12CD", createdBy: adminM[0]!.id });
   await db.insert(s.globalRatings).values(names.map((_, i) => ({ userId: `u_${i}`, rating: 1300 - i * 25 }))).onConflictDoNothing();
-  console.log("seeded Paris Arena (7 players), Lagos Spin Club");
+
+  // ----- Platform console data -----
+  await db.insert(s.users).values({ id: "u_platform", name: "Platform Owner", email: "owner@rallix.app", phoneNumber: "+2348030000200", phoneNumberVerified: true }).onConflictDoNothing();
+  await db.insert(s.platformAdmins).values({ userId: "u_platform" }).onConflictDoNothing();
+  await db.insert(s.clubSubscriptions).values([
+    { clubId: paris.id, period: "monthly", status: "active", amountKobo: 2000000, currentPeriodEnd: new Date(Date.now() + 20 * 86400000) },
+    { clubId: lagos.id, period: "monthly", status: "past_due", amountKobo: 2000000, currentPeriodEnd: new Date(Date.now() - 5 * 86400000) },
+  ]);
+  const inv = async (clubId: string, label: string, status: "issued" | "paid", paid = false) => {
+    const n = ((await db.execute(sql`select app.next_invoice_number() as n`)).rows[0] as { n: string }).n;
+    await db.insert(s.platformInvoices).values({ clubId, number: n, status, amountKobo: 2000000, periodLabel: label, description: `Rallix monthly subscription, ${label}`, issuedAt: new Date(Date.now() - 20 * 86400000), dueAt: new Date(Date.now() - 6 * 86400000), paidAt: paid ? new Date(Date.now() - 18 * 86400000) : null, paymentRef: paid ? "TRF-884210" : null });
+  };
+  await inv(paris.id, "2026-10", "paid", true);
+  await inv(lagos.id, "2026-10", "issued");
+  await db.insert(s.issues).values([
+    { title: "Score sheet freezes after the 5th game", body: "Reported by a scorer at Paris Arena on a low-end Android phone.", severity: "high", status: "investigating", clubId: paris.id, reportedBy: "u_admin", assignedTo: "u_platform" },
+    { title: "Club asked to change their subdomain", severity: "low", status: "open", clubId: lagos.id },
+  ]);
+  console.log("seeded Paris Arena (7 players), Lagos Spin Club, platform admin +2348030000200");
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

@@ -34,6 +34,16 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Club switching is a plain `<a href="/switch/:id">` on purpose: `next/link` would prefetch it and change the active club.
 - `pnpm --filter @rallix/stats test`, `pnpm --filter @rallix/db test`, and `apps/club/e2e/full-flow.cjs` (see its header) should all pass before merging.
 
+## Console (`apps/console`, port 3001)
+- Desktop-first back office for the platform team. Own sign-in (phone OTP, cookie prefix `rallix-console`, 12 h sessions) on the same user tables. Signing in is not enough: `requireAdmin()` (`lib/guard.ts`) checks the `platform_admins` list on every page and action, so removing someone takes effect on their next request.
+- Uses only the service DB role (BYPASSRLS). Every server action in `lib/actions.ts` must call `requireAdmin()` first, validate its input, and write an `audit_log` row. Console-only tables (`issues`, `templates`, `platform_settings`, `notifications`, `audit_log`, `platform_admins`) have no app-role grants.
+- Grant access with `pnpm --filter @rallix/db make-platform-admin 08031234567 "Name"`. Dev seed admin: +2348030000200.
+- Suspending or closing a club (`clubs.status`) is enforced in Postgres (`app.is_member` / `has_role` / `is_self` require an active club), not just in the UI. Members land on `/suspended` in the club app.
+- Delivery is not connected: notifications are stored as `queued`; payments are recorded by hand (mark an invoice paid with its reference). Wire Paystack and SMS/email providers before relying on either.
+- Invoice numbers come from `app.next_invoice_number()` (service role only); one invoice per club per `period_label`.
+- Touch targets: 44px minimum in the club PWA; the desktop console uses at least 36px for buttons and inputs.
+- Console e2e: `apps/console/e2e/full-flow.cjs` (needs both apps running; see its header).
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.
@@ -41,7 +51,7 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - The `points` table exists from day one (nullable data until point-by-point scoring ships). AI video analysis is phase 3.
 - Scoring must work offline and sync later.
 - Visual source of truth is the user's uploaded designs. Extract tokens first and do not invent a new look.
-- Meet WCAG 2.1 AA, respect `prefers-reduced-motion`, and keep touch targets at least 44px.
+- Meet WCAG 2.1 AA, respect `prefers-reduced-motion`, and keep touch targets at least 44px in the club PWA.
 
 ## Skills
 Project skills live in `.claude/skills/`: `rallix-motion`, `figma-to-code`, `rallix-a11y`. Also use `design:design-critique`, `design:accessibility-review`, `design:design-handoff`, `design:design-system` and `design:ux-copy`.

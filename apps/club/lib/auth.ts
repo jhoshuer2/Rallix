@@ -4,7 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { phoneNumber } from "better-auth/plugins";
 import { accounts, sessions, users, verifications } from "@rallix/db/schema";
 import { serviceDb } from "./db";
-import { normalizePhone } from "./phone";
+import { normalizePhone } from "@rallix/config/phone";
 import { sendSms } from "./sms";
 
 /**

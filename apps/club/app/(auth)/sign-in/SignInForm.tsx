@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button, TextField } from "@rallix/ui";
 import { authClient } from "../../../lib/auth-client";
-import { normalizePhone } from "../../../lib/phone";
+import { normalizePhone } from "@rallix/config/phone";
 
 export function SignInForm({ next }: { next: string }) {
   const [step, setStep] = useState<"phone" | "code">("phone");

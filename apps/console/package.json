@@ -9,13 +9,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rallix/config": "workspace:*",
+    "@rallix/db": "workspace:*",
     "@rallix/ui": "workspace:*",
+    "better-auth": "1.7.14",
+    "drizzle-orm": "^0.44.7",
     "next": "^15.5.0",
+    "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.8.0"
