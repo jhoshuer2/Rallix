@@ -1,0 +1,194 @@
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, AnchorHTMLAttributes } from "react";
+import { Icon, type IconName } from "./icons";
+
+const cx = (...a: Array<string | false | undefined | null>) => a.filter(Boolean).join(" ");
+
+/* ---------- Layout ---------- */
+export function Screen({ children, tone = "blue", className }: { children: ReactNode; tone?: "blue" | "cream"; className?: string }) {
+  return <div className={cx("rx-screen", tone === "cream" && "rx-screen--cream", className)}>{children}</div>;
+}
+
+export function Title({ children, as: Tag = "h1" }: { children: ReactNode; as?: "h1" | "h2" | "h3" }) {
+  return <Tag className="rx-title">{children}</Tag>;
+}
+
+export function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {
+  return (
+    <div className="rx-section">
+      <h2 className="rx-section__title">{title}</h2>
+      {linkLabel && href ? <a className="rx-section__link" href={href}>{linkLabel}</a> : null}
+    </div>
+  );
+}
+
+/* ---------- Actions ---------- */
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "surface"; block?: boolean; ball?: boolean };
+export function Button({ variant = "primary", block, ball, className, children, type = "button", ...rest }: ButtonProps) {
+  return (
+    <button type={type} className={cx("rx-btn", variant !== "primary" && `rx-btn--${variant}`, block && "rx-btn--block", className)} {...rest}>
+      {children}
+      {ball ? <span className="rx-btn__ball" aria-hidden="true" /> : null}
+    </button>
+  );
+}
+
+export function IconButton({ icon, label, className, type = "button", ...rest }: { icon: IconName; label: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type={type} aria-label={label} className={cx("rx-iconbtn", className)} {...rest}>
+      <Icon name={icon} size={20} />
+    </button>
+  );
+}
+
+/* ---------- Forms ---------- */
+export function TextField({ label, icon, error, id, ...rest }: { label: string; icon?: IconName; error?: string } & InputHTMLAttributes<HTMLInputElement>) {
+  const inputId = id ?? `rx-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const errId = `${inputId}-error`;
+  return (
+    <div className="rx-field">
+      <label className="rx-label" htmlFor={inputId}>{label}</label>
+      <div className="rx-input" data-invalid={error ? "true" : undefined}>
+        {icon ? <Icon name={icon} size={20} /> : null}
+        <input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined} {...rest} />
+      </div>
+      {error ? <p id={errId} className="rx-error" role="alert">{error}</p> : null}
+    </div>
+  );
+}
+
+export type Option<T extends string> = { value: T; label: string; icon?: IconName };
+
+/** Two-option outlined choice (e.g. No / Yes). Selected option fills white. */
+export function ChoiceToggle<T extends string>({ label, options, value, onChange }: { label: string; options: Option<T>[]; value: T | undefined; onChange: (v: T) => void }) {
+  return (
+    <div className="rx-field" role="radiogroup" aria-label={label}>
+      <span className="rx-label">{label}</span>
+      <div className="rx-choice">
+        {options.map((o) => (
+          <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className="rx-choice__opt" onClick={() => onChange(o.value)}>
+            <span>{o.label}</span>
+            {o.icon ? <Icon name={o.icon} size={20} /> : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Pill segmented control (Monthly/Yearly, Today/Week/Month/Year). */
+export function Segmented<T extends string>({ label, options, value, onChange }: { label: string; options: Option<T>[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div className="rx-seg" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className="rx-seg__opt" onClick={() => onChange(o.value)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return <button type="button" role="switch" aria-label={label} aria-checked={checked} className="rx-switch" onClick={() => onChange(!checked)} />;
+}
+
+export function Checkbox({ label, ...rest }: { label: string } & Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  return <label className="rx-checkwrap"><input type="checkbox" aria-label={label} className="rx-check" {...rest} /></label>;
+}
+
+/* ---------- Display ---------- */
+export function Chip({ children, tone }: { children: ReactNode; tone?: "active" | "warn" | "dark" | "light" }) {
+  return <span className={cx("rx-chip", tone && `rx-chip--${tone}`)}>{children}</span>;
+}
+export const Count = ({ children }: { children: ReactNode }) => <span className="rx-count">{children}</span>;
+
+export function Card({ children, variant, className }: { children: ReactNode; variant?: "outline" | "promo"; className?: string }) {
+  return <div className={cx("rx-card", variant && `rx-card--${variant}`, className)}>{children}</div>;
+}
+
+export function Avatar({ src, name, large }: { src?: string; name: string; large?: boolean }) {
+  const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  return src ? <img className={cx("rx-avatar", large && "rx-avatar--lg")} src={src} alt={name} /> : <span className={cx("rx-avatar", large && "rx-avatar--lg")} role="img" aria-label={name}>{initials}</span>;
+}
+
+export function Ball() { return <span className="rx-ball" aria-hidden="true" />; }
+
+export function StatGrid({ stats }: { stats: Array<{ label: string; value: string }> }) {
+  return (
+    <dl className="rx-stats" style={{ margin: 0 }}>
+      {stats.map((s) => (
+        <div className="rx-stat" key={s.label}>
+          <dt className="rx-stat__label">{s.label}</dt>
+          <dd className="rx-stat__value" style={{ margin: 0 }}>{s.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/* ---------- Members ---------- */
+export function RankCard({ rank, name, points, photo, href }: { rank: number; name: string; points: number; photo?: string; href?: string }) {
+  const body = (
+    <>
+      {photo ? <img className="rx-rank__photo" src={photo} alt="" /> : null}
+      <div className="rx-rank__meta">
+        <span className="rx-rank__label">Rank</span>
+        <span className="rx-rank__num" aria-label={`Rank ${rank}`}>{rank}</span>
+        <span className="rx-rank__pts">{points} Points</span>
+      </div>
+      <span className="rx-rank__name">{name}</span>
+    </>
+  );
+  return href ? <a className="rx-rank" href={href}>{body}</a> : <div className="rx-rank">{body}</div>;
+}
+export const RankGrid = ({ children }: { children: ReactNode }) => <div className="rx-rank-grid">{children}</div>;
+
+export function PlayerRow({ rank, name, photo, checked, onChange }: { rank: number; name: string; photo?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="rx-row">
+      <span className="rx-row__rank" aria-hidden="true">{rank}</span>
+      {photo ? <img className="rx-row__photo" src={photo} alt="" /> : <span className="rx-row__photo" />}
+      <span className="rx-row__name">{name}</span>
+      <Checkbox label={`Include ${name}`} checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    </div>
+  );
+}
+
+/* ---------- Header + navigation ---------- */
+export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick, onSearch }: { clubName: string; clubLogo?: string; userName: string; userPhoto?: string; onClubClick?: () => void; onSearch?: () => void }) {
+  return (
+    <header className="rx-header">
+      <button type="button" className="rx-header__club" onClick={onClubClick} aria-label={`Switch club, current: ${clubName}`}>
+        <Avatar src={clubLogo} name={clubName} />
+        <span>{clubName}</span>
+        <Icon name="chevron-down" size={16} />
+      </button>
+      <span className="rx-header__spacer" />
+      <IconButton icon="search" label="Search" onClick={onSearch} />
+      <Avatar src={userPhoto} name={userName} large />
+    </header>
+  );
+}
+
+export type NavItem = { key: string; label: string; icon: IconName; href: string } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href">;
+export function BottomNav({ items, current, label = "Main" }: { items: NavItem[]; current: string; label?: string }) {
+  return (
+    <nav className="rx-nav" aria-label={label}>
+      {items.map(({ key, label: text, icon, href, ...rest }) => (
+        <a key={key} href={href} className="rx-nav__item" aria-current={current === key ? "page" : undefined} aria-label={text} {...rest}>
+          <span className="rx-nav__icon"><Icon name={icon} size={22} /></span>
+          <span className="rx-nav__label">{text}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+/** Club admin tab set from the designs. Player app will use its own set. */
+export const clubAdminNav = (base = ""): NavItem[] => [
+  { key: "home", label: "Home", icon: "home", href: `${base}/` },
+  { key: "members", label: "Members", icon: "members", href: `${base}/members` },
+  { key: "competition", label: "Competition", icon: "trophy", href: `${base}/competition` },
+  { key: "membership", label: "Membership", icon: "money", href: `${base}/membership` },
+  { key: "profile", label: "Profile", icon: "profile", href: `${base}/profile` },
+];

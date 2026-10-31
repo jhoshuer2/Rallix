@@ -5,9 +5,18 @@
   "exports": {
     "./tokens.css": "./src/tokens.css",
     "./fonts.css": "./src/fonts.css",
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./components.css": "./src/components.css"
   },
-  "peerDependencies": { "react": "^19.0.0" },
-  "devDependencies": { "@types/react": "^19.0.0", "react": "^19.0.0", "typescript": "^5.8.0" },
-  "scripts": { "typecheck": "tsc --noEmit" }
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "typescript": "^5.8.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
 }

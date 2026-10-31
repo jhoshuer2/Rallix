@@ -1,1 +1,2 @@
-export {};
+export * from "./components";
+export { Icon, type IconName } from "./icons";

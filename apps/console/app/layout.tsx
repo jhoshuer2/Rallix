@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import "@rallix/ui/fonts.css";
 import "@rallix/ui/tokens.css";
+import "@rallix/ui/components.css";
 
 export const metadata = { title: "Rallix Console", description: "Rallix platform console" };
 
