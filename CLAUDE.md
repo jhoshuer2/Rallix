@@ -25,6 +25,15 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Any new club-scoped table needs: `club_id`, RLS enabled, policies, composite FKs, least-privilege grants, and a test in `test/rls.test.ts`.
 - Run `pnpm --filter @rallix/db test` after any schema or policy change (needs local Postgres; see `packages/db/README.md`).
 
+## App (`apps/club`)
+- Auth: Better Auth with phone OTP (`lib/auth.ts`), runs on the service DB role. Numbers are normalised to +234 E.164 (`lib/phone.ts`). In development the code is printed to the server log; production needs a real SMS provider in `lib/sms.ts` (it throws until then).
+- Request context: `lib/context.ts`. `requireClub()` / `requireRole()` guard pages, `inClub(ctx, fn)` runs queries as the signed-in user in the active club (cookie `rallix_club`, always re-validated against memberships).
+- Reads live in `lib/queries.ts`, writes are server actions in `lib/actions.ts`. Only export intended actions from that file: every export in a `"use server"` file is a public endpoint.
+- Never use `serviceDb()` for anything scoped by user input unless the app-role checks have already passed (see `saveResult` then `updateRatings`).
+- Pure logic (Elo, records, head to head, score validation, round-robin) lives in `packages/stats` with tests. Keep it free of I/O.
+- Club switching is a plain `<a href="/switch/:id">` on purpose: `next/link` would prefetch it and change the active club.
+- `pnpm --filter @rallix/stats test`, `pnpm --filter @rallix/db test`, and `apps/club/e2e/full-flow.cjs` (see its header) should all pass before merging.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.

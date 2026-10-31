@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { Card, Chip, SectionHeader } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
-import { competitions } from "../../../lib/mock";
+import { inClub, requireRole } from "../../../lib/context";
+import { listCompetitions } from "../../../lib/queries";
 
-export default function Competition() {
-  const latest = competitions[0]!;
+const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "");
+
+export default async function Competition() {
+  const ctx = await requireRole("admin");
+  const comps = await inClub(ctx, (tx) => listCompetitions(tx, ctx.club.clubId));
+  const latest = comps.find((c) => c.status === "active") ?? comps[0];
   return (
     <>
       <ClubHeader />
@@ -15,20 +20,19 @@ export default function Competition() {
       <div style={{ height: 16 }} />
       <Card variant="outline" className="rx-latest">
         <Chip tone="light">Competition</Chip>
-        <p className="rx-title" style={{ fontSize: 22, margin: "16px 0" }}>Latest competition</p>
-        <Link className="rx-btn" href={`/competition/${latest.id}/groups`}>Resume <span className="rx-btn__ball" aria-hidden="true" /></Link>
+        <p className="rx-title" style={{ fontSize: 22, margin: "16px 0" }}>{latest ? latest.name : "No competitions yet"}</p>
+        {latest ? <Link className="rx-btn" href={`/competition/${latest.id}/groups`}>Resume <span className="rx-btn__ball" aria-hidden="true" /></Link> : <Link className="rx-btn" href="/competition/new">Create one</Link>}
       </Card>
-      <SectionHeader title="Competition" linkLabel="View all" href="/competition" linkAs={Link} />
-      <div style={{ display: "flex", gap: 12, overflowX: "auto" }}>
-        {competitions.map((c) => (
-          <Link key={c.id} href={`/competition/${c.id}/groups`} className="rx-card" style={{ flex: "0 0 78%", color: "var(--rx-ink)", textDecoration: "none", minHeight: 130 }}>
-            <Chip tone="active">{c.status}</Chip> <Chip tone={c.level === "Senior" ? "dark" : "warn"}>{c.level}</Chip>
-            <p style={{ fontSize: 11, margin: "24px 0 4px" }}>{c.dates}</p>
-            <p className="rx-title" style={{ fontSize: 14 }}>{c.title}</p>
+      {comps.length > 0 ? <SectionHeader title="All competitions" /> : null}
+      <div style={{ display: "grid", gap: 12 }}>
+        {comps.map((c) => (
+          <Link key={c.id} href={`/competition/${c.id}/groups`} className="rx-card" style={{ color: "var(--rx-ink)", textDecoration: "none", minHeight: 110 }}>
+            <Chip tone={c.status === "active" ? "active" : "dark"}>{c.status}</Chip>{c.level ? <> <Chip tone="warn">{c.level}</Chip></> : null}
+            <p style={{ fontSize: 12, margin: "20px 0 4px" }}>{fmt(c.startsOn)} – {fmt(c.endsOn)}</p>
+            <p className="rx-title" style={{ fontSize: 14 }}>{c.name}</p>
           </Link>
         ))}
       </div>
-      <SectionHeader title="Where players rank" />
     </>
   );
 }

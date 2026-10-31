@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { BackButton, FormatCard, PageHead } from "@rallix/ui";
+import { requireRole } from "../../../../lib/context";
 
-export default function SelectLevel() {
+export default async function SelectLevel() {
+  await requireRole("admin");
   return (
     <>
       <PageHead back={<BackButton href="/competition" linkAs={Link} />} title="Select competition format" />

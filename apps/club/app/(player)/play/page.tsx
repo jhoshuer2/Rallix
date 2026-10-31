@@ -1,29 +1,53 @@
 import Link from "next/link";
 import { Chip, DueCard, MatchCard, SectionHeader, StatGrid } from "@rallix/ui";
+import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
-import { due, me, myComps, myMatches, oppName, oppPhoto } from "../../../lib/mock";
+import { inClub, requireClub } from "../../../lib/context";
+import { listCompetitions, listDues, listMatches, listMembers, memberStats, naira, fmtDate} from "../../../lib/queries";
 
-export default function PlayerHome() {
-  const next = myMatches.find((m) => !m.result)!;
+export default async function PlayerHome() {
+  const ctx = await requireClub();
+  const me = ctx.club.membershipId;
+  const d = await inClub(ctx, async (tx) => ({
+    matches: await listMatches(tx, ctx.club.clubId, { memberId: me }),
+    dues: await listDues(tx, ctx.club.clubId, me),
+    stats: await memberStats(tx, ctx.club.clubId, me),
+    members: await listMembers(tx, ctx.club.clubId),
+    comps: await listCompetitions(tx, ctx.club.clubId, me),
+  }));
+  const next = d.matches.filter((m) => m.status === "scheduled" || m.status === "live").sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity))[0];
+  const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
+  const mine = d.members.find((m) => m.id === me);
+  const r = d.stats.record;
+  const opp = next && (next.p1?.id === me ? next.p2 : next.p1);
   return (
     <>
-      <ClubHeader as="player" currentClub="lagos" />
-      <h1 className="rx-title">Hi, {me.name}</h1>
+      <ClubHeader />
+      <h1 className="rx-title">Hi, {ctx.user.name.split(" ")[0]}</h1>
       <SectionHeader title="Next match" />
-      <MatchCard title={next.comp} when={next.when} opponent={oppName(next.oppId)} opponentPhoto={oppPhoto(next.oppId)} href="/play/compete/demo" linkAs={Link} />
+      {next && opp ? (
+        <MatchCard title={next.competitionName} when={next.scheduledAt ? next.scheduledAt.toLocaleString("en-NG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Date to be confirmed"}
+          opponent={opp.name} opponentPhoto={opp.photo ?? undefined} href={`/play/compete/${next.competitionId}`} linkAs={Link} />
+      ) : <p className="rx-muted">No upcoming matches.</p>}
       <SectionHeader title="Dues" />
-      <DueCard plan={due.plan} amount={due.amount} due={due.due} status={due.status} action={<PayButton amount={due.amount} />} />
+      {due ? <DueCard plan={due.plan} amount={naira(due.amountKobo)} due={fmtDate(due.dueDate)} status={due.status === "overdue" ? "overdue" : "due"} action={<PayButton amount={naira(due.amountKobo)} />} />
+        : <p className="rx-muted">{d.dues.length ? "You’re all paid up." : "No dues yet."}</p>}
       <SectionHeader title="My standing" linkLabel="Stats" href="/play/stats" linkAs={Link} />
-      <StatGrid stats={[{ label: "Club rank", value: String(me.rank) }, { label: "Win rate", value: "47%" }, { label: "Elo", value: "1186" }, { label: "Streak", value: "2 wins" }]} />
+      <StatGrid stats={[
+        { label: "Club rank", value: mine ? String(mine.rank) : "—" },
+        { label: "Win rate", value: r.played ? `${r.winPct}%` : "—" },
+        { label: "Rating", value: mine ? String(mine.rating) : "—" },
+        { label: "Streak", value: streakLabel(r.streak) },
+      ]} />
       <SectionHeader title="My competitions" linkLabel="View all" href="/play/compete" linkAs={Link} />
-      {myComps.filter((c) => c.status === "Active").map((c) => (
-        <Link key={c.id} href={`/play/compete/${c.id === "demo2" ? "demo" : c.id}`} className="rx-card" style={{ display: "block", color: "var(--rx-ink)", textDecoration: "none", marginBottom: 8 }}>
-          <Chip tone="active">{c.status}</Chip> <Chip tone="warn">{c.level}</Chip>
-          <p className="rx-title" style={{ fontSize: 14, margin: "12px 0 0" }}>{c.title}</p>
-          <p style={{ fontSize: 12, margin: "4px 0 0" }}>{c.dates}</p>
+      {d.comps.filter((c) => c.status === "active").map((c) => (
+        <Link key={c.id} href={`/play/compete/${c.id}`} className="rx-card" style={{ display: "block", color: "var(--rx-ink)", textDecoration: "none", marginBottom: 8 }}>
+          <Chip tone="active">Active</Chip>{c.level ? <> <Chip tone="warn">{c.level}</Chip></> : null}
+          <p className="rx-title" style={{ fontSize: 14, margin: "12px 0 0" }}>{c.name}</p>
         </Link>
       ))}
+      {d.comps.filter((c) => c.status === "active").length === 0 ? <p className="rx-muted">You’re not in an active competition.</p> : null}
     </>
   );
 }

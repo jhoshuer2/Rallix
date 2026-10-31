@@ -1,22 +1,27 @@
 import Link from "next/link";
 import { Avatar, Card, Chip, ClubRow, SectionHeader } from "@rallix/ui";
-import { me, myClubs } from "../../../../lib/mock";
+import { inClub, requireClub } from "../../../../lib/context";
+import { ageOf, listMembers } from "../../../../lib/queries";
 
-export default function Me() {
+export default async function Me() {
+  const ctx = await requireClub();
+  const mine = (await inClub(ctx, (tx) => listMembers(tx, ctx.club.clubId))).find((m) => m.id === ctx.club.membershipId);
+  const age = mine ? ageOf(mine.dob) : null;
   return (
     <>
       <h1 className="rx-title" style={{ marginBottom: 16 }}>Me</h1>
       <Card>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <Avatar src={me.photo} name={me.name} large />
-          <div><strong>{me.name}</strong><br /><span>{me.country} · {me.age} yrs · {me.height}</span><br /><Chip tone="warn">{me.level}</Chip></div>
+          <Avatar src={mine?.photo ?? ctx.user.image ?? undefined} name={ctx.user.name} large />
+          <div><strong>{ctx.user.name}</strong><br /><span>{mine?.country ?? "NGR"}{age ? ` · ${age} yrs` : ""}{mine?.heightCm ? ` · ${mine.heightCm} cm` : ""}</span><br />{mine ? <Chip tone="warn">{mine.level}</Chip> : null}</div>
         </div>
       </Card>
       <SectionHeader title="Payments" />
       <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/play/me/payments">Dues, receipts and history</Link>
       <SectionHeader title="My clubs" />
-      {myClubs.map((c) => <ClubRow key={c.id} name={c.name} logo={c.logo} role={c.role} href={c.href} current={c.id === "lagos"} linkAs={Link} />)}
+      {ctx.clubs.map((c) => <ClubRow key={c.clubId} name={c.name} logo={c.logoUrl ?? undefined} role={c.roles.includes("admin") ? "Admin" : "Player"} href={`/switch/${c.clubId}`} current={c.clubId === ctx.club.clubId} />)}
       <p className="rx-muted" style={{ fontSize: 13 }}>Your stats and payments are kept separately for each club.</p>
+      <a className="rx-btn rx-btn--ghost rx-btn--block" href="/sign-out">Sign out</a>
     </>
   );
 }

@@ -1,26 +1,24 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { use, useEffect } from "react";
-import { players } from "../../../../../lib/mock";
+import { notFound } from "next/navigation";
+import { and, eq } from "drizzle-orm";
+import { competitionEntries, memberships, playerProfiles, users } from "@rallix/db";
+import { inClub, requireRole } from "../../../../../lib/context";
+import { getCompetition } from "../../../../../lib/queries";
+import { Shuffle } from "./Shuffle";
 
-const spots = [
-  { left: "58%", top: "0%", r: "3deg" }, { left: "4%", top: "14%", r: "-4deg" }, { left: "50%", top: "24%", r: "2deg" },
-  { left: "10%", top: "58%", r: "-2deg" }, { left: "56%", top: "62%", r: "4deg" }, { left: "6%", top: "84%", r: "-3deg" },
-];
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default function Shuffle({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const router = useRouter();
-  useEffect(() => {
-    const t = setTimeout(() => router.replace(`/competition/${id}/groups`), 2400);
-    return () => clearTimeout(t);
-  }, [id, router]);
-  return (
-    <div className="rx-shuffle" role="status" aria-live="polite">
-      {players.slice(0, 6).map((p, i) => (
-        <img key={p.id} className="rx-shuffle__photo" src={p.photo} alt="" style={{ left: spots[i]!.left, top: spots[i]!.top, ["--r" as string]: spots[i]!.r, animationDelay: `${i * 90}ms` }} />
-      ))}
-      <p className="rx-shuffle__title">Shuffling group</p>
-    </div>
-  );
+export default async function ShufflePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (!uuid.test(id)) notFound();
+  const ctx = await requireRole("admin");
+  const data = await inClub(ctx, async (tx) => {
+    const c = await getCompetition(tx, id);
+    if (!c) return null;
+    const rows = await tx.select({ name: users.name, photo: playerProfiles.photoUrl }).from(competitionEntries)
+      .innerJoin(memberships, eq(memberships.id, competitionEntries.membershipId)).innerJoin(users, eq(users.id, memberships.userId))
+      .leftJoin(playerProfiles, eq(playerProfiles.membershipId, memberships.id)).where(and(eq(competitionEntries.competitionId, id))).limit(6);
+    return rows;
+  });
+  if (!data) notFound();
+  return <Shuffle id={id} players={data.map((p) => ({ name: p.name, photo: p.photo ?? null }))} />;
 }

@@ -8,8 +8,8 @@ export async function seed(db: Db) {
   const names = ["Jide Taiwo", "Pastor", "Sule", "Nurudeen", "Dorathy", "Nathaniel", "Ade"];
   const levels = ["senior", "senior", "senior", "intermediate", "intermediate", "junior", "junior"] as const;
   await db.insert(s.users).values([
-    { id: "u_admin", name: "Innocent Amos", email: "admin@example.com" },
-    ...names.map((n, i) => ({ id: `u_${i}`, name: n, phoneNumber: `+23480300000${i}` })),
+    { id: "u_admin", name: "Innocent Amos", email: "admin@example.com", phoneNumber: "+2348030000100", phoneNumberVerified: true },
+    ...names.map((n, i) => ({ id: `u_${i}`, name: n, phoneNumber: `+234803000000${i}`, phoneNumberVerified: true })),
   ]).onConflictDoNothing();
 
   const [paris] = await db.insert(s.clubs).values({ slug: "paris-arena", name: "Paris Arena", location: "Abuja", ownerId: "u_admin" }).onConflictDoNothing().returning();
@@ -21,7 +21,7 @@ export async function seed(db: Db) {
   await db.insert(s.memberships).values({ clubId: lagos.id, userId: "u_6", roles: ["admin", "player"] });
   await db.insert(s.playerProfiles).values([
     { membershipId: adminM[0]!.id, clubId: paris.id },
-    ...members.map((m, i) => ({ membershipId: m.id, clubId: paris.id, level: levels[i]!, heightCm: 178 })),
+    ...members.map((m, i) => ({ membershipId: m.id, clubId: paris.id, level: levels[i]!, heightCm: 178, dateOfBirth: "1991-04-12", photoUrl: `/players/${names[i]!.split(" ")[0]!.toLowerCase()}.png` })),
   ]);
 
   const [monthly, pro, yearly] = await db.insert(s.plans).values([
@@ -37,10 +37,26 @@ export async function seed(db: Db) {
 
   const [comp] = await db.insert(s.competitions).values({ clubId: paris.id, name: "Paris Arena Group Stage", level: "junior", format: "group_stage", status: "active", startsOn: "2026-08-28", endsOn: "2026-10-16" }).returning();
   await db.insert(s.competitionEntries).values(members.map((m, i) => ({ clubId: paris.id, competitionId: comp!.id, membershipId: m.id, seed: i + 1 })));
-  const ade = members[6]!, sule = members[2]!, pastor = members[1]!;
-  const [m1] = await db.insert(s.matches).values({ clubId: paris.id, competitionId: comp!.id, round: "Group A", player1Id: ade.id, player2Id: sule.id, status: "completed", winnerId: ade.id, gamesP1: 3, gamesP2: 1, scorerId: adminM[0]!.id, confirmedAt: sql`now()` as never }).returning();
-  await db.insert(s.games).values([[11, 7], [9, 11], [11, 8], [11, 6]].map(([a, b], i) => ({ clubId: paris.id, matchId: m1!.id, gameNo: i + 1, p1Points: a!, p2Points: b! })));
+  const at = (i: number) => members[i]!;
+  const jide = at(0), pastor = at(1), sule = at(2), nurudeen = at(3), dorathy = at(4), ade = at(6);
+  const result = async (p1: string, p2: string, winner: string, day: string, g: Array<[number, number]>, round = "Group A") => {
+    const g1 = g.filter(([a, b]) => a > b).length, g2 = g.length - g1;
+    const [mt] = await db.insert(s.matches).values({ clubId: paris.id, competitionId: comp!.id, round, player1Id: p1, player2Id: p2, status: "completed", winnerId: winner, gamesP1: g1, gamesP2: g2, scorerId: adminM[0]!.id, confirmedAt: new Date(`${day}T16:00:00Z`) }).returning();
+    await db.insert(s.games).values(g.map(([a, b], i) => ({ clubId: paris.id, matchId: mt!.id, gameNo: i + 1, p1Points: a, p2Points: b })));
+  };
+  await result(ade.id, dorathy.id, dorathy.id, "2026-10-03", [[11, 9], [9, 11], [11, 8], [7, 11], [8, 11]]);
+  await result(ade.id, jide.id, jide.id, "2026-10-10", [[5, 11], [7, 11], [9, 11]]);
+  await result(ade.id, nurudeen.id, ade.id, "2026-10-21", [[11, 9], [8, 11], [11, 7], [9, 11], [11, 8]]);
+  await result(ade.id, sule.id, ade.id, "2026-10-28", [[11, 7], [9, 11], [11, 8], [11, 6]]);
+  await result(jide.id, pastor.id, jide.id, "2026-10-29", [[11, 6], [11, 8], [11, 9]]);
   await db.insert(s.matches).values({ clubId: paris.id, competitionId: comp!.id, round: "Group A", player1Id: ade.id, player2Id: pastor.id, status: "scheduled", scheduledAt: new Date("2026-11-07T15:00:00Z") });
+  const paidAt = (d: string) => new Date(`${d}T10:00:00Z`);
+  await db.insert(s.payments).values([
+    { clubId: paris.id, membershipId: ade.id, amountKobo: 600000, status: "paid", providerRef: "seed-1", method: "card", paidAt: paidAt("2026-10-28") },
+    { clubId: paris.id, membershipId: ade.id, amountKobo: 600000, status: "paid", providerRef: "seed-2", method: "card", paidAt: paidAt("2026-09-28") },
+    { clubId: paris.id, membershipId: jide.id, amountKobo: 600000, status: "paid", providerRef: "seed-3", method: "transfer", paidAt: paidAt("2026-10-30") },
+    { clubId: paris.id, membershipId: pastor.id, amountKobo: 600000, status: "paid", providerRef: "seed-4", method: "card", paidAt: new Date() },
+  ]);
   await db.insert(s.ratings).values(members.map((m, i) => ({ clubId: paris.id, membershipId: m.id, scope: "club" as const, rating: 1300 - i * 25 })));
   await db.insert(s.invites).values({ clubId: paris.id, code: "AB12CD", createdBy: adminM[0]!.id });
   await db.insert(s.globalRatings).values(names.map((_, i) => ({ userId: `u_${i}`, rating: 1300 - i * 25 }))).onConflictDoNothing();
