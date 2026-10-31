@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, AnchorHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, AnchorHTMLAttributes, ElementType } from "react";
 import { Icon, type IconName } from "./icons";
 
 const cx = (...a: Array<string | false | undefined | null>) => a.filter(Boolean).join(" ");
@@ -12,11 +12,11 @@ export function Title({ children, as: Tag = "h1" }: { children: ReactNode; as?: 
   return <Tag className="rx-title">{children}</Tag>;
 }
 
-export function SectionHeader({ title, linkLabel, href }: { title: string; linkLabel?: string; href?: string }) {
+export function SectionHeader({ title, linkLabel, href, linkAs: L = "a" }: { title: string; linkLabel?: string; href?: string; linkAs?: ElementType }) {
   return (
     <div className="rx-section">
       <h2 className="rx-section__title">{title}</h2>
-      {linkLabel && href ? <a className="rx-section__link" href={href}>{linkLabel}</a> : null}
+      {linkLabel && href ? <L className="rx-section__link" href={href}>{linkLabel}</L> : null}
     </div>
   );
 }
@@ -76,9 +76,9 @@ export function ChoiceToggle<T extends string>({ label, options, value, onChange
 }
 
 /** Pill segmented control (Monthly/Yearly, Today/Week/Month/Year). */
-export function Segmented<T extends string>({ label, options, value, onChange }: { label: string; options: Option<T>[]; value: T; onChange: (v: T) => void }) {
+export function Segmented<T extends string>({ label, options, value, onChange, scroll }: { label: string; options: Option<T>[]; value: T; onChange: (v: T) => void; scroll?: boolean }) {
   return (
-    <div className="rx-seg" role="radiogroup" aria-label={label}>
+    <div className={cx("rx-seg", scroll && "rx-seg--scroll")} role="radiogroup" aria-label={label}>
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value} className="rx-seg__opt" onClick={() => onChange(o.value)}>
           {o.label}
@@ -127,7 +127,7 @@ export function StatGrid({ stats }: { stats: Array<{ label: string; value: strin
 }
 
 /* ---------- Members ---------- */
-export function RankCard({ rank, name, points, photo, href }: { rank: number; name: string; points: number; photo?: string; href?: string }) {
+export function RankCard({ rank, name, points, photo, href, linkAs: L = "a" }: { rank: number; name: string; points: number; photo?: string; href?: string; linkAs?: ElementType }) {
   const body = (
     <>
       {photo ? <img className="rx-rank__photo" src={photo} alt="" /> : null}
@@ -139,7 +139,7 @@ export function RankCard({ rank, name, points, photo, href }: { rank: number; na
       <span className="rx-rank__name">{name}</span>
     </>
   );
-  return href ? <a className="rx-rank" href={href}>{body}</a> : <div className="rx-rank">{body}</div>;
+  return href ? <L className="rx-rank" href={href}>{body}</L> : <div className="rx-rank">{body}</div>;
 }
 export const RankGrid = ({ children }: { children: ReactNode }) => <div className="rx-rank-grid">{children}</div>;
 
@@ -171,14 +171,14 @@ export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick
 }
 
 export type NavItem = { key: string; label: string; icon: IconName; href: string } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href">;
-export function BottomNav({ items, current, label = "Main" }: { items: NavItem[]; current: string; label?: string }) {
+export function BottomNav({ items, current, label = "Main", linkAs: L = "a" }: { items: NavItem[]; current: string; label?: string; linkAs?: ElementType }) {
   return (
     <nav className="rx-nav" aria-label={label}>
       {items.map(({ key, label: text, icon, href, ...rest }) => (
-        <a key={key} href={href} className="rx-nav__item" aria-current={current === key ? "page" : undefined} aria-label={text} {...rest}>
+        <L key={key} href={href} className="rx-nav__item" aria-current={current === key ? "page" : undefined} aria-label={text} {...rest}>
           <span className="rx-nav__icon"><Icon name={icon} size={22} /></span>
           <span className="rx-nav__label">{text}</span>
-        </a>
+        </L>
       ))}
     </nav>
   );

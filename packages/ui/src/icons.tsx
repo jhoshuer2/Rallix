@@ -3,7 +3,7 @@ import type { SVGProps } from "react";
 export type IconName =
   | "home" | "members" | "trophy" | "money" | "profile"
   | "search" | "plus" | "back" | "chevron-down" | "check" | "close"
-  | "pin" | "thumb" | "edit" | "tag";
+  | "pin" | "thumb" | "edit" | "tag" | "calendar" | "trend" | "grid" | "share" | "wallet";
 
 const paths: Record<IconName, string> = {
   home: "M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10",
@@ -21,6 +21,11 @@ const paths: Record<IconName, string> = {
   thumb: "M7 11v9H4v-9h3ZM7 11l4-8c2 0 3 1 3 3l-1 4h6a2 2 0 0 1 2 2l-1.5 6A2 2 0 0 1 17.5 20H7",
   edit: "M4 20h4L19 9l-4-4L4 16v4ZM13 7l4 4",
   tag: "M3 12V4h8l10 10-8 8L3 12ZM7.5 8v.01",
+  calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
+  trend: "M3 17l6-6 4 4 8-9M15 6h6v6",
+  grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  share: "M12 3v12M7 8l5-5 5 5M5 14v6h14v-6",
+  wallet: "M3 7h15a3 3 0 0 1 3 3v8H6a3 3 0 0 1-3-3V7ZM3 7l12-3v3M16 13h2",
 };
 
 export function Icon({ name, size = 24, ...rest }: { name: IconName; size?: number } & Omit<SVGProps<SVGSVGElement>, "name">) {
