@@ -2,6 +2,14 @@
 
 Mobile-first PWA for table tennis clubs in Nigeria. Slack-style multi-tenancy: one platform, many clubs, each on its own subdomain. A player account can belong to several clubs, and each club's data is separate.
 
+## Layout (pnpm + Turborepo monorepo)
+- `apps/club`: club PWA (admin and player, role-based routes), on `{club}.rallix.app`
+- `apps/console`: Rallix platform console (desktop-first, platform owner only): usage, payments, invoices and templates, notifications, issues
+- `packages/ui`: design tokens, fonts, shared components. `packages/db`, `stats`, `payments`, `config`
+- `design/admin-screens/`: source design frames (440x956 SVG, club admin side). Text is outlined, so render to PNG to read them.
+
+Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), General Sans Variable (body). Files go in `packages/ui/fonts/`.
+
 ## Stack
 - Next.js (App Router, TypeScript), PWA via serwist
 - Postgres (Supabase by default) with Drizzle ORM

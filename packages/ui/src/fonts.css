@@ -1,0 +1,18 @@
+/* Add font files to packages/ui/fonts/, then uncomment the matching block.
+   General Sans Variable: free from Fontshare (https://www.fontshare.com/fonts/general-sans),
+   save as GeneralSans-Variable.woff2.
+   Spotlight: license/source pending, save as Spotlight.woff2.
+   Until then the fallbacks in tokens.css are used. */
+/*
+@font-face {
+  font-family: "General Sans";
+  src: url("../fonts/GeneralSans-Variable.woff2") format("woff2");
+  font-weight: 200 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Spotlight";
+  src: url("../fonts/Spotlight.woff2") format("woff2");
+  font-display: swap;
+}
+*/

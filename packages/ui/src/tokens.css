@@ -1,0 +1,48 @@
+/* Rallix design tokens. Extracted from design/admin-screens (club admin frames, 440x956). */
+:root {
+  /* Brand */
+  --rx-blue: #3b6ca7;        /* app background */
+  --rx-rust: #b54829;        /* primary action, active tab, splash */
+  --rx-rust-strong: #c05722;
+  --rx-cream: #e3dfd3;       /* cards, sheets */
+  --rx-cream-2: #e5e2d7;
+  --rx-cream-3: #d9d6ca;
+  --rx-ink: #141414;         /* primary text */
+  --rx-ink-2: #333333;       /* secondary text */
+  --rx-white: #ffffff;
+
+  /* Status */
+  --rx-green: #008919;       /* Active chip, toggle on */
+  --rx-green-soft: #e7f5d1;
+  --rx-orange: #e0922d;      /* Intermediate chip, promo */
+  --rx-red: #fb0004;
+  --rx-yellow: #f6e139;
+
+  /* Semantic */
+  --rx-bg: var(--rx-blue);
+  --rx-surface: var(--rx-cream);
+  --rx-text-on-bg: var(--rx-white);
+  --rx-text-on-surface: var(--rx-ink);
+  --rx-action: var(--rx-rust);
+  --rx-focus: var(--rx-yellow);
+
+  /* Type */
+  --rx-font-display: "Spotlight", "Archivo Black", "Arial Black", system-ui, sans-serif;
+  --rx-font-body: "General Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Space, radius, motion */
+  --rx-space-1: 4px; --rx-space-2: 8px; --rx-space-3: 12px; --rx-space-4: 16px;
+  --rx-space-5: 24px; --rx-space-6: 32px;
+  --rx-radius-sm: 4px; --rx-radius-md: 8px; --rx-radius-pill: 999px;
+  --rx-tap: 44px;
+  --rx-dur-fast: 120ms; --rx-dur-base: 200ms; --rx-dur-slow: 320ms;
+  --rx-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --rx-dur-fast: 0ms; --rx-dur-base: 0ms; --rx-dur-slow: 0ms; }
+}
+
+body { background: var(--rx-bg); color: var(--rx-text-on-bg); font-family: var(--rx-font-body); }
+h1, h2, h3, .rx-display { font-family: var(--rx-font-display); font-style: italic; text-transform: uppercase; }
+:focus-visible { outline: 3px solid var(--rx-focus); outline-offset: 2px; }
