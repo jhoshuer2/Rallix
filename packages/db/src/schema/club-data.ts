@@ -1,0 +1,228 @@
+import { sql } from "drizzle-orm";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { clubs, memberships } from "./tenancy";
+import { competitionFormat, competitionStatus, dueStatus, level, matchStatus, paymentStatus, planPeriod, ratingScope } from "./enums";
+
+const id = () => uuid("id").primaryKey().defaultRandom();
+const clubId = () => uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" });
+const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
+
+/* Every table below carries club_id, and every reference to another club-scoped row is a
+   composite foreign key (id, club_id), so a row can never point into another club. */
+
+export const playerProfiles = pgTable("player_profiles", {
+  membershipId: uuid("membership_id").primaryKey(),
+  clubId: clubId(),
+  level: level("level").notNull().default("junior"),
+  dateOfBirth: date("date_of_birth"),
+  heightCm: smallint("height_cm"),
+  country: text("country").notNull().default("NGR"),
+  bio: text("bio"),
+  photoUrl: text("photo_url"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "player_profiles_membership_fk" }).onDelete("cascade"),
+  check("player_profiles_height", sql`${t.heightCm} IS NULL OR ${t.heightCm} BETWEEN 80 AND 260`),
+]);
+
+export const plans = pgTable("plans", {
+  id: id(),
+  clubId: clubId(),
+  name: text("name").notNull(),
+  priceKobo: integer("price_kobo").notNull(),
+  currency: text("currency").notNull().default("NGN"),
+  period: planPeriod("period").notNull(),
+  perks: text("perks").array().notNull().default(sql`ARRAY[]::text[]`),
+  active: boolean("active").notNull().default(true),
+  paystackPlanCode: text("paystack_plan_code"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("plans_id_club_uq").on(t.id, t.clubId),
+  unique("plans_club_name_period_uq").on(t.clubId, t.name, t.period),
+  check("plans_price_nonneg", sql`${t.priceKobo} >= 0`),
+]);
+
+export const dues = pgTable("dues", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  planId: uuid("plan_id").notNull(),
+  amountKobo: integer("amount_kobo").notNull(),
+  periodLabel: text("period_label").notNull(),
+  dueDate: date("due_date").notNull(),
+  status: dueStatus("status").notNull().default("due"),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("dues_id_club_uq").on(t.id, t.clubId),
+  unique("dues_member_plan_period_uq").on(t.membershipId, t.planId, t.periodLabel),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "dues_membership_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.planId, t.clubId], foreignColumns: [plans.id, plans.clubId], name: "dues_plan_fk" }),
+  index("dues_club_status_idx").on(t.clubId, t.status),
+  check("dues_amount_nonneg", sql`${t.amountKobo} >= 0`),
+]);
+
+export const payments = pgTable("payments", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  dueId: uuid("due_id"),
+  amountKobo: integer("amount_kobo").notNull(),
+  status: paymentStatus("status").notNull().default("pending"),
+  provider: text("provider").notNull().default("paystack"),
+  providerRef: text("provider_ref").notNull().unique(),
+  method: text("method"),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  raw: jsonb("raw"),
+  createdAt: createdAt(),
+}, (t) => [
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "payments_membership_fk" }),
+  foreignKey({ columns: [t.dueId, t.clubId], foreignColumns: [dues.id, dues.clubId], name: "payments_due_fk" }),
+  index("payments_club_status_idx").on(t.clubId, t.status),
+  check("payments_amount_pos", sql`${t.amountKobo} > 0`),
+]);
+
+export const competitions = pgTable("competitions", {
+  id: id(),
+  clubId: clubId(),
+  name: text("name").notNull(),
+  level: level("level"), // null = combined levels
+  format: competitionFormat("format").notNull(),
+  status: competitionStatus("status").notNull().default("draft"),
+  startsOn: date("starts_on"),
+  endsOn: date("ends_on"),
+  createdBy: uuid("created_by"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("competitions_id_club_uq").on(t.id, t.clubId),
+  index("competitions_club_status_idx").on(t.clubId, t.status),
+  check("competitions_dates", sql`${t.endsOn} IS NULL OR ${t.startsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
+]);
+
+export const competitionEntries = pgTable("competition_entries", {
+  id: id(),
+  clubId: clubId(),
+  competitionId: uuid("competition_id").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  seed: smallint("seed"),
+  groupLabel: text("group_label"),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("competition_entries_uq").on(t.competitionId, t.membershipId),
+  foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "entries_competition_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "entries_membership_fk" }),
+]);
+
+/** A scheduled pairing and its result in one row. Bracket progression via feeds_match_id. */
+export const matches = pgTable("matches", {
+  id: id(),
+  clubId: clubId(),
+  competitionId: uuid("competition_id").notNull(),
+  round: text("round").notNull(), // "Group A", "Round of 16", "Final"
+  roundOrder: smallint("round_order").notNull().default(1),
+  slot: smallint("slot").notNull().default(1),
+  player1Id: uuid("player1_id"),
+  player2Id: uuid("player2_id"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  status: matchStatus("status").notNull().default("scheduled"),
+  bestOf: smallint("best_of").notNull().default(5),
+  winnerId: uuid("winner_id"),
+  gamesP1: smallint("games_p1").notNull().default(0),
+  gamesP2: smallint("games_p2").notNull().default(0),
+  scorerId: uuid("scorer_id"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  feedsMatchId: uuid("feeds_match_id"),
+  feedsSlot: smallint("feeds_slot"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("matches_id_club_uq").on(t.id, t.clubId),
+  foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "matches_competition_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.player1Id, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_p1_fk" }),
+  foreignKey({ columns: [t.player2Id, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_p2_fk" }),
+  foreignKey({ columns: [t.winnerId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_winner_fk" }),
+  foreignKey({ columns: [t.scorerId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_scorer_fk" }),
+  index("matches_competition_idx").on(t.competitionId, t.roundOrder, t.slot),
+  index("matches_p1_idx").on(t.player1Id),
+  index("matches_p2_idx").on(t.player2Id),
+  check("matches_distinct_players", sql`${t.player1Id} IS NULL OR ${t.player2Id} IS NULL OR ${t.player1Id} <> ${t.player2Id}`),
+  check("matches_winner_is_player", sql`${t.winnerId} IS NULL OR ${t.winnerId} = ${t.player1Id} OR ${t.winnerId} = ${t.player2Id}`),
+  check("matches_best_of_odd", sql`${t.bestOf} > 0 AND ${t.bestOf} % 2 = 1`),
+  check("matches_completed_has_winner", sql`${t.status} NOT IN ('completed','walkover') OR ${t.winnerId} IS NOT NULL`),
+]);
+
+export const games = pgTable("games", {
+  id: id(),
+  clubId: clubId(),
+  matchId: uuid("match_id").notNull(),
+  gameNo: smallint("game_no").notNull(),
+  p1Points: smallint("p1_points").notNull().default(0),
+  p2Points: smallint("p2_points").notNull().default(0),
+}, (t) => [
+  unique("games_id_club_uq").on(t.id, t.clubId),
+  unique("games_match_no_uq").on(t.matchId, t.gameNo),
+  foreignKey({ columns: [t.matchId, t.clubId], foreignColumns: [matches.id, matches.clubId], name: "games_match_fk" }).onDelete("cascade"),
+  check("games_points_nonneg", sql`${t.p1Points} >= 0 AND ${t.p2Points} >= 0`),
+  check("games_no_pos", sql`${t.gameNo} > 0`),
+]);
+
+/** Point-by-point log (phase 2). Empty until the scorer UI records individual points. */
+export const points = pgTable("points", {
+  id: id(),
+  clubId: clubId(),
+  gameId: uuid("game_id").notNull(),
+  seq: smallint("seq").notNull(),
+  winnerSide: smallint("winner_side").notNull(), // 1 or 2
+  serverSide: smallint("server_side"),
+  tag: text("tag"), // e.g. service_winner, unforced_error (only when a human recorded it)
+}, (t) => [
+  unique("points_game_seq_uq").on(t.gameId, t.seq),
+  foreignKey({ columns: [t.gameId, t.clubId], foreignColumns: [games.id, games.clubId], name: "points_game_fk" }).onDelete("cascade"),
+  check("points_sides", sql`${t.winnerSide} IN (1,2) AND (${t.serverSide} IS NULL OR ${t.serverSide} IN (1,2))`),
+]);
+
+export const ratings = pgTable("ratings", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  scope: ratingScope("scope").notNull(),
+  competitionId: uuid("competition_id"),
+  rating: integer("rating").notNull().default(1200),
+  matchesPlayed: integer("matches_played").notNull().default(0),
+  updatedAt: updatedAt(),
+}, (t) => [
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "ratings_membership_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "ratings_competition_fk" }).onDelete("cascade"),
+  uniqueIndex("ratings_member_scope_uq").on(t.membershipId, t.scope, sql`coalesce(${t.competitionId}, '00000000-0000-0000-0000-000000000000'::uuid)`),
+  check("ratings_scope_competition", sql`(${t.scope} = 'competition') = (${t.competitionId} IS NOT NULL)`),
+]);
+
+export const ratingEvents = pgTable("rating_events", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  matchId: uuid("match_id").notNull(),
+  scope: ratingScope("scope").notNull().default("club"),
+  before: integer("before").notNull(),
+  after: integer("after").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("rating_events_uq").on(t.membershipId, t.matchId, t.scope),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "rating_events_membership_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.matchId, t.clubId], foreignColumns: [matches.id, matches.clubId], name: "rating_events_match_fk" }).onDelete("cascade"),
+]);
+
+export const statSnapshots = pgTable("stat_snapshots", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  period: text("period").notNull().default("all"), // "all" or a year like "2026"
+  stats: jsonb("stats").notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique("stat_snapshots_uq").on(t.membershipId, t.period),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "stat_snapshots_membership_fk" }).onDelete("cascade"),
+]);

@@ -1,0 +1,225 @@
+import { eq, sql } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { makeDb, urls, withTenant, type Db } from "../src";
+import * as s from "../src/schema";
+
+let svc: Db, app: Db;
+const ids = {} as {
+  A: string; B: string; planA: string; compA: string; compB: string; matchA: string;
+  mAdminA: string; mP1: string; mP2: string; mMultiA: string; mAdminB: string; mMultiB: string;
+};
+
+/** Run a query that must be rejected, returning the Postgres error code. */
+async function denied(p: Promise<unknown>): Promise<string> {
+  try { await p; } catch (e) { return (e as { cause?: { code?: string }; code?: string }).cause?.code ?? (e as { code?: string }).code ?? "unknown"; }
+  throw new Error("expected the query to be denied but it succeeded");
+}
+const rows = async (db: Db, ctx: { userId: string; clubId?: string }, q: ReturnType<typeof sql>) =>
+  (await withTenant(db, ctx, (tx) => tx.execute(q))).rows as Array<Record<string, unknown>>;
+
+beforeAll(async () => {
+  svc = makeDb(urls.service(), 2);
+  app = makeDb(urls.app(), 4);
+  await svc.insert(s.users).values([
+    { id: "adminA", name: "Admin A", email: "a@x.com", phoneNumber: "+2340000001" },
+    { id: "scorerA", name: "Scorer A", email: "sa@x.com" },
+    { id: "playerA1", name: "Player A1", email: "p1@x.com" },
+    { id: "playerA2", name: "Player A2", email: "p2@x.com" },
+    { id: "adminB", name: "Admin B", email: "b@x.com" },
+    { id: "multi", name: "Multi", email: "m@x.com" },
+    { id: "stranger", name: "Stranger", email: "st@x.com" },
+  ]);
+  const [A, B] = await svc.insert(s.clubs).values([
+    { slug: "club-a", name: "Club A", ownerId: "adminA" }, { slug: "club-b", name: "Club B", ownerId: "adminB" },
+  ]).returning();
+  ids.A = A!.id; ids.B = B!.id;
+  const ma = await svc.insert(s.memberships).values([
+    { clubId: A!.id, userId: "adminA", roles: ["admin"] }, { clubId: A!.id, userId: "scorerA", roles: ["scorer"] },
+    { clubId: A!.id, userId: "playerA1" }, { clubId: A!.id, userId: "playerA2" }, { clubId: A!.id, userId: "multi" },
+  ]).returning();
+  const mb = await svc.insert(s.memberships).values([
+    { clubId: B!.id, userId: "adminB", roles: ["admin"] }, { clubId: B!.id, userId: "multi" },
+  ]).returning();
+  const byUser = (arr: typeof ma, u: string) => arr.find((m) => m.userId === u)!.id;
+  Object.assign(ids, { mAdminA: byUser(ma, "adminA"), mP1: byUser(ma, "playerA1"), mP2: byUser(ma, "playerA2"), mMultiA: byUser(ma, "multi"), mAdminB: byUser(mb, "adminB"), mMultiB: byUser(mb, "multi") });
+  const [pl] = await svc.insert(s.plans).values([{ clubId: A!.id, name: "Monthly", priceKobo: 600000, period: "monthly" }, { clubId: B!.id, name: "B plan", priceKobo: 100, period: "monthly" }]).returning();
+  ids.planA = pl!.id;
+  const [cA, cB] = await svc.insert(s.competitions).values([
+    { clubId: A!.id, name: "A Cup", format: "group_stage" }, { clubId: B!.id, name: "B Cup", format: "knockout" },
+  ]).returning();
+  ids.compA = cA!.id; ids.compB = cB!.id;
+  const [mt] = await svc.insert(s.matches).values({ clubId: A!.id, competitionId: cA!.id, round: "R1", player1Id: ids.mP1, player2Id: ids.mP2 }).returning();
+  ids.matchA = mt!.id;
+  await svc.insert(s.matches).values({ clubId: B!.id, competitionId: cB!.id, round: "R1", player1Id: ids.mAdminB, player2Id: ids.mMultiB });
+  await svc.insert(s.dues).values([
+    { clubId: A!.id, membershipId: ids.mP1, planId: pl!.id, amountKobo: 600000, periodLabel: "2026-11", dueDate: "2026-11-28" },
+    { clubId: A!.id, membershipId: ids.mP2, planId: pl!.id, amountKobo: 600000, periodLabel: "2026-11", dueDate: "2026-11-28" },
+  ]);
+  await svc.insert(s.invites).values([
+    { clubId: A!.id, code: "GOOD", createdBy: ids.mAdminA },
+    { clubId: A!.id, code: "EXPIRED", expiresAt: new Date(Date.now() - 1000) },
+    { clubId: A!.id, code: "ONCE", maxUses: 1 },
+  ]);
+  await svc.insert(s.globalRatings).values({ userId: "playerA1", rating: 1250 });
+});
+afterAll(async () => { await svc.pool.end(); await app.pool.end(); });
+
+describe("tenant isolation", () => {
+  it("a member of club A sees only club A rows and nothing of club B", async () => {
+    const own = await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select name from competitions`);
+    expect(own.map((r) => r.name)).toEqual(["A Cup"]);
+    const other = await rows(app, { userId: "playerA1", clubId: ids.B }, sql`select name from competitions`);
+    expect(other).toHaveLength(0); // claims club B but is not a member
+    expect(await rows(app, { userId: "playerA1", clubId: ids.B }, sql`select id from matches`)).toHaveLength(0);
+  });
+
+  it("a user in two clubs sees each club's data only under that club's context", async () => {
+    const a = await rows(app, { userId: "multi", clubId: ids.A }, sql`select name from competitions`);
+    const b = await rows(app, { userId: "multi", clubId: ids.B }, sql`select name from competitions`);
+    expect(a.map((r) => r.name)).toEqual(["A Cup"]);
+    expect(b.map((r) => r.name)).toEqual(["B Cup"]);
+    const clubs = await rows(app, { userId: "multi" }, sql`select name from clubs order by name`);
+    expect(clubs.map((r) => r.name)).toEqual(["Club A", "Club B"]); // club switcher works with no club context
+  });
+
+  it("no context returns nothing", async () => {
+    expect(await rows(app, { userId: "" }, sql`select id from competitions`)).toHaveLength(0);
+    expect(await rows(app, { userId: "stranger" }, sql`select id from memberships`)).toHaveLength(0);
+  });
+
+  it("cannot write into another club, even with that club in context", async () => {
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.B }, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.B}, 'Hack', 'knockout')`)))).toBe("42501");
+    const upd = await withTenant(app, { userId: "adminA", clubId: ids.B }, (tx) => tx.execute(sql`update competitions set name = 'Owned' where id = ${ids.compB}`));
+    expect(upd.rowCount).toBe(0);
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.B}, 'Hack', 'knockout')`)))).toBe("42501");
+  });
+});
+
+describe("roles", () => {
+  it("players cannot write scores or matches; scorers can score but not create matches; admins can do both", async () => {
+    const setWin = sql`update matches set status = 'live' where id = ${ids.matchA}`;
+    expect((await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(setWin))).rowCount).toBe(0);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no) values (${ids.A}, ${ids.matchA}, 1)`)))).toBe("42501");
+    expect((await withTenant(app, { userId: "scorerA", clubId: ids.A }, (tx) => tx.execute(setWin))).rowCount).toBe(1);
+    await withTenant(app, { userId: "scorerA", clubId: ids.A }, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no, p1_points, p2_points) values (${ids.A}, ${ids.matchA}, 1, 11, 7)`));
+    expect(await denied(withTenant(app, { userId: "scorerA", clubId: ids.A }, (tx) => tx.execute(sql`insert into matches (club_id, competition_id, round) values (${ids.A}, ${ids.compA}, 'R2')`)))).toBe("42501");
+    await withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`insert into matches (club_id, competition_id, round) values (${ids.A}, ${ids.compA}, 'R2')`));
+  });
+
+  it("players cannot create competitions, plans or change roles", async () => {
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.A}, 'Mine', 'knockout')`)))).toBe("42501");
+    expect((await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update memberships set roles = ARRAY['admin']::member_role[] where id = ${ids.mP1}`))).rowCount).toBe(0);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into memberships (club_id, user_id) values (${ids.A}, 'stranger')`)))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`insert into clubs (slug, name, owner_id) values ('direct', 'Direct', 'adminA')`)))).toBe("42501");
+  });
+});
+
+describe("money privacy", () => {
+  it("a player sees only their own dues; an admin sees all", async () => {
+    const mine = await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select membership_id from dues`);
+    expect(mine.map((r) => r.membership_id)).toEqual([ids.mP1]);
+    expect(await rows(app, { userId: "adminA", clubId: ids.A }, sql`select id from dues`)).toHaveLength(2);
+  });
+
+  it("a player may start a pending payment for themselves only", async () => {
+    const ins = (member: string, status: string, ref: string) => sql`insert into payments (club_id, membership_id, amount_kobo, status, provider_ref) values (${ids.A}, ${member}, 600000, ${status}::payment_status, ${ref})`;
+    await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(ins(ids.mP1, "pending", "ref-1")));
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(ins(ids.mP1, "paid", "ref-2"))))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(ins(ids.mP2, "pending", "ref-3"))))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update payments set status = 'paid' where provider_ref = 'ref-1'`)))).toBe("42501");
+  });
+});
+
+describe("integrity", () => {
+  it("composite foreign keys reject cross-club references", async () => {
+    // match in club A pointing at a competition from club B
+    expect(await denied(svc.execute(sql`insert into matches (club_id, competition_id, round) values (${ids.A}, ${ids.compB}, 'X')`))).toBe("23503");
+    // match in club A with a player from club B
+    expect(await denied(svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id) values (${ids.A}, ${ids.compA}, 'X', ${ids.mAdminB})`))).toBe("23503");
+    // game in club B pointing at a match from club A
+    expect(await denied(svc.execute(sql`insert into games (club_id, match_id, game_no) values (${ids.B}, ${ids.matchA}, 9)`))).toBe("23503");
+  });
+
+  it("check constraints hold: distinct players, winner must be a player, odd best-of, slug format", async () => {
+    expect(await denied(svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id) values (${ids.A}, ${ids.compA}, 'X', ${ids.mP1}, ${ids.mP1})`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id, winner_id) values (${ids.A}, ${ids.compA}, 'X', ${ids.mP1}, ${ids.mP2}, ${ids.mAdminA})`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into matches (club_id, competition_id, round, best_of) values (${ids.A}, ${ids.compA}, 'X', 4)`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into clubs (slug, name, owner_id) values ('Bad Slug!', 'x', 'adminA')`))).toBe("23514");
+  });
+});
+
+describe("the app role cannot bypass security", () => {
+  it("has no superuser or BYPASSRLS, cannot assume the service role, cannot touch auth secrets", async () => {
+    const r = await rows(app, { userId: "adminA" }, sql`select rolsuper, rolbypassrls from pg_roles where rolname = current_user`);
+    expect(r[0]).toEqual({ rolsuper: false, rolbypassrls: false });
+    expect(await denied(app.execute(sql`set role rallix_service`))).toBe("42501");
+    expect(await denied(app.execute(sql`select * from sessions`))).toBe("42501");
+    expect(await denied(app.execute(sql`select * from accounts`))).toBe("42501");
+    expect(await denied(app.execute(sql`select * from audit_log`))).toBe("42501");
+    expect(await denied(app.execute(sql`select * from global_ratings`))).toBe("42501");
+    expect(await denied(app.execute(sql`alter table clubs disable row level security`))).toBe("42501");
+  });
+
+  it("members can see co-members' names, but never email or phone, and nobody else", async () => {
+    const names = await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select name from users where id = 'playerA2'`);
+    expect(names).toHaveLength(1);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select email from users`)))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select phone_number from users`)))).toBe("42501");
+    expect(await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select name from users where id = 'adminB'`)).toHaveLength(0);
+  });
+
+  it("the global leaderboard exposes only id, name and rating", async () => {
+    const r = await rows(app, { userId: "stranger" }, sql`select * from app.global_leaderboard`);
+    expect(r).toHaveLength(1);
+    expect(Object.keys(r[0]!).sort()).toEqual(["matches_played", "name", "rating", "user_id"]);
+  });
+});
+
+describe("typed queries", () => {
+  it("drizzle parses enum arrays and respects RLS through withTenant", async () => {
+    const out = await withTenant(app, { userId: "scorerA", clubId: ids.A }, (tx) =>
+      tx.select({ roles: s.memberships.roles, status: s.memberships.status }).from(s.memberships).where(eq(s.memberships.userId, "scorerA")));
+    expect(out).toEqual([{ roles: ["scorer"], status: "active" }]);
+  });
+});
+
+describe("club creation and invites", () => {
+  it("create_club makes the caller an admin and player with a profile", async () => {
+    const r = await withTenant(app, { userId: "stranger" }, (tx) => tx.execute(sql`select app.create_club('New Club', 'new-club', 'Abuja') as id`));
+    const clubId = (r.rows[0] as { id: string }).id;
+    const m = await rows(app, { userId: "stranger", clubId }, sql`select roles::text[] as roles from memberships where club_id = ${clubId}`);
+    expect(m[0]!.roles).toEqual(["admin", "player"]);
+    expect(await rows(app, { userId: "stranger", clubId }, sql`select 1 from player_profiles`)).toHaveLength(1);
+  });
+
+  it("create_club requires a signed-in user and a valid slug", async () => {
+    expect(await denied(app.execute(sql`select app.create_club('x', 'y', null)`))).toBe("28000");
+    expect(await denied(withTenant(app, { userId: "stranger" }, (tx) => tx.execute(sql`select app.create_club('x', 'Bad Slug', null)`)))).toBe("23514");
+  });
+
+  it("join_club adds a player once, counts uses, and rejects expired, exhausted, revoked and suspended", async () => {
+    await svc.insert(s.users).values([{ id: "j1", name: "J1" }, { id: "j2", name: "J2" }, { id: "j3", name: "J3" }]);
+    await withTenant(app, { userId: "j1" }, (tx) => tx.execute(sql`select app.join_club('GOOD', 'senior')`));
+    const again = await withTenant(app, { userId: "j1" }, (tx) => tx.execute(sql`select app.join_club('GOOD')`));
+    expect(again.rows).toHaveLength(1); // idempotent for an active member
+    const inv = await svc.execute(sql`select uses from invites where code = 'GOOD'`);
+    expect((inv.rows[0] as { uses: number }).uses).toBe(1);
+    const prof = await rows(app, { userId: "j1", clubId: ids.A }, sql`select level from player_profiles p join memberships m on m.id = p.membership_id where m.user_id = 'j1'`);
+    expect(prof[0]!.level).toBe("senior");
+
+    expect(await denied(withTenant(app, { userId: "j2" }, (tx) => tx.execute(sql`select app.join_club('EXPIRED')`)))).toBe("P0001");
+    expect(await denied(withTenant(app, { userId: "j2" }, (tx) => tx.execute(sql`select app.join_club('NOPE')`)))).toBe("P0001");
+    await withTenant(app, { userId: "j2" }, (tx) => tx.execute(sql`select app.join_club('ONCE')`));
+    expect(await denied(withTenant(app, { userId: "j3" }, (tx) => tx.execute(sql`select app.join_club('ONCE')`)))).toBe("P0001");
+
+    await svc.execute(sql`update memberships set status = 'suspended' where user_id = 'j1'`);
+    expect(await denied(withTenant(app, { userId: "j1" }, (tx) => tx.execute(sql`select app.join_club('GOOD')`)))).toBe("P0001");
+    await svc.execute(sql`update invites set revoked_at = now() where code = 'GOOD'`);
+    expect(await denied(withTenant(app, { userId: "j3" }, (tx) => tx.execute(sql`select app.join_club('GOOD')`)))).toBe("P0001");
+  });
+
+  it("players cannot read or create invites", async () => {
+    expect(await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select code from invites`)).toHaveLength(0);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into invites (club_id, code) values (${ids.A}, 'MINE')`)))).toBe("42501");
+  });
+});

@@ -1,0 +1,16 @@
+import { pgEnum } from "drizzle-orm/pg-core";
+
+export const memberRole = pgEnum("member_role", ["admin", "scorer", "coach", "player"]);
+export const memberStatus = pgEnum("member_status", ["invited", "active", "suspended", "left"]);
+export const level = pgEnum("player_level", ["junior", "intermediate", "senior"]);
+export const clubStatus = pgEnum("club_status", ["active", "suspended", "closed"]);
+export const planPeriod = pgEnum("plan_period", ["monthly", "yearly"]);
+export const dueStatus = pgEnum("due_status", ["due", "paid", "overdue", "waived"]);
+export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "refunded"]);
+export const competitionFormat = pgEnum("competition_format", ["group_stage", "one_on_one", "knockout", "round_robin"]);
+export const competitionStatus = pgEnum("competition_status", ["draft", "active", "completed", "cancelled"]);
+export const matchStatus = pgEnum("match_status", ["scheduled", "live", "completed", "walkover", "cancelled"]);
+export const ratingScope = pgEnum("rating_scope", ["club", "competition"]);
+export const subscriptionStatus = pgEnum("subscription_status", ["trialing", "active", "past_due", "cancelled"]);
+export const invoiceStatus = pgEnum("invoice_status", ["draft", "issued", "paid", "void"]);
+export const notificationChannel = pgEnum("notification_channel", ["push", "email", "sms", "whatsapp"]);

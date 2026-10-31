@@ -16,6 +16,15 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Paystack for club subscriptions and player dues, behind a `PaymentProvider` interface
 - Vitest for unit tests, Playwright (mobile viewport) for E2E
 
+## Database (`packages/db`)
+- Drizzle schema in `src/schema/`, migrations in `drizzle/`. RLS, helper functions and grants are hand-written in `0001_rls_and_functions.sql`.
+- Three roles: `rallix_owner` (migrations only), `rallix_app` (web app, subject to RLS), `rallix_service` (console, auth, stats engine, webhooks; BYPASSRLS, server-only).
+- The app must query only through `withTenant(db, { userId, clubId }, fn)`. Club and membership rows are created only via `app.create_club()` and `app.join_club()`.
+- All club data points at `memberships.id` (a user's identity inside one club), never `users.id`. Cross-table references are composite `(id, club_id)` foreign keys.
+- Money is stored in kobo (integers). `app` role can read only `id, name, image, created_at` from `users`.
+- Any new club-scoped table needs: `club_id`, RLS enabled, policies, composite FKs, least-privilege grants, and a test in `test/rls.test.ts`.
+- Run `pnpm --filter @rallix/db test` after any schema or policy change (needs local Postgres; see `packages/db/README.md`).
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.
