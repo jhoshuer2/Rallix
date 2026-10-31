@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Button, Card, Chip, SectionHeader, StatGrid, Title } from "@rallix/ui";
-import { ClubHeader } from "../../components/Header";
+import { Card, Chip, SectionHeader, StatGrid, Title } from "@rallix/ui";
+import { ClubHeader } from "../../components/ClubHeader";
 import { competitions, payments, players } from "../../lib/mock";
 
 export default function Home() {
@@ -28,7 +28,6 @@ export default function Home() {
         <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/competition/new">New competition</Link>
         <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/profile">Invite players</Link>
       </div>
-      <span hidden><Button>unused</Button></span>
     </>
   );
 }

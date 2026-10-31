@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, Chip, SectionHeader } from "@rallix/ui";
-import { ClubHeader } from "../../../components/Header";
+import { ClubHeader } from "../../../components/ClubHeader";
 import { competitions } from "../../../lib/mock";
 
 export default function Competition() {

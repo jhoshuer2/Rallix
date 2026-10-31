@@ -192,3 +192,12 @@ export const clubAdminNav = (base = ""): NavItem[] => [
   { key: "membership", label: "Membership", icon: "money", href: `${base}/membership` },
   { key: "profile", label: "Profile", icon: "profile", href: `${base}/profile` },
 ];
+
+/** Player app tab set. */
+export const playerNav = (base = "/play"): NavItem[] => [
+  { key: "home", label: "Home", icon: "home", href: base },
+  { key: "compete", label: "Compete", icon: "trophy", href: `${base}/compete` },
+  { key: "stats", label: "Stats", icon: "trend", href: `${base}/stats` },
+  { key: "ranks", label: "Ranks", icon: "members", href: `${base}/ranks` },
+  { key: "me", label: "Me", icon: "profile", href: `${base}/me` },
+];

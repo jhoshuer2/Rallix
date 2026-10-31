@@ -121,12 +121,12 @@ export function ScoreTile({ name, score, dim, onPoint }: { name: string; score: 
 /* ---------- Charts ---------- */
 export type Series = { label: string; color: string; points: number[] };
 /** Rank history. Lower rank number is better, so the axis is inverted. Includes a table alternative. */
-export function RankChart({ years, series, caption }: { years: string[]; series: Series[]; caption: string }) {
+export function RankChart({ years, series, caption, invert }: { years: string[]; series: Series[]; caption: string; invert?: boolean }) {
   const W = 360, H = 220, pad = 28;
   const all = series.flatMap((s) => s.points);
   const min = Math.min(...all), max = Math.max(...all);
   const x = (i: number) => pad + (i * (W - pad * 2)) / Math.max(1, years.length - 1);
-  const y = (v: number) => pad + ((v - min) / Math.max(1, max - min)) * (H - pad * 2);
+  const y = (v: number) => { const t = (v - min) / Math.max(1, max - min); return pad + (invert ? 1 - t : t) * (H - pad * 2); };
   return (
     <figure className="rx-chart">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={caption}>
@@ -157,5 +157,80 @@ export function ProfileHero({ name, photo }: { name: string; photo?: string }) {
       <span className="rx-hero__name" aria-hidden="true">{name.toUpperCase()}</span>
       {photo ? <img className="rx-hero__photo" src={photo} alt={name} /> : null}
     </div>
+  );
+}
+
+/* ---------- Player side ---------- */
+export function RankRow({ rank, name, photo, points, you }: { rank: number; name: string; photo?: string; points: number; you?: boolean }) {
+  return (
+    <li className={cx("rx-pay", "rx-rankrow", you && "rx-rankrow--you")} aria-current={you ? "true" : undefined}>
+      <span className="rx-pay__rank" aria-hidden="true">{rank}</span>
+      {photo ? <img className="rx-pay__photo" src={photo} alt="" /> : <span className="rx-pay__photo" />}
+      <span className="rx-pay__who">
+        <span className="rx-pay__name">{name}{you ? " (you)" : ""}</span>
+        <span className="rx-pay__detail">Rank {rank}</span>
+      </span>
+      <span className="rx-pay__amt"><span className="rx-pay__money">{points} pts</span></span>
+    </li>
+  );
+}
+
+export function FormChips({ results }: { results: Array<"W" | "L"> }) {
+  return (
+    <ul className="rx-form" aria-label={`Last ${results.length} matches: ${results.map((r) => (r === "W" ? "win" : "loss")).join(", ")}`}>
+      {results.map((r, i) => <li key={i} className={cx("rx-form__chip", r === "W" ? "rx-form__chip--w" : "rx-form__chip--l")}><span aria-hidden="true">{r}</span></li>)}
+    </ul>
+  );
+}
+
+export function MatchCard({ title, when, opponent, opponentPhoto, result, href, linkAs: L = "a" }: { title: string; when: string; opponent: string; opponentPhoto?: string; result?: { won: boolean; score: string }; href?: string; linkAs?: LinkAs }) {
+  const body = (
+    <>
+      <span className="rx-match__meta">{title} · {when}</span>
+      <span className="rx-match__row">
+        {opponentPhoto ? <img className="rx-match__photo" src={opponentPhoto} alt="" /> : <span className="rx-match__photo" />}
+        <span className="rx-match__vs">vs <strong>{opponent}</strong></span>
+        {result ? <span className={cx("rx-match__res", result.won ? "is-win" : "is-loss")}>{result.won ? "Won" : "Lost"} {result.score}</span> : <span className="rx-match__res">Upcoming</span>}
+      </span>
+    </>
+  );
+  return href ? <L href={href} className="rx-match">{body}</L> : <div className="rx-match">{body}</div>;
+}
+
+export function DueCard({ plan, amount, due, status, action }: { plan: string; amount: string; due: string; status: "due" | "paid" | "overdue"; action?: ReactNode }) {
+  const label = status === "paid" ? "Paid" : status === "overdue" ? "Overdue" : "Due soon";
+  return (
+    <section className="rx-due" aria-label="Membership dues">
+      <div className="rx-due__top">
+        <span>{plan}</span>
+        <span className={cx("rx-pay__status", status === "paid" ? "rx-pay__status--paid" : status === "overdue" ? "rx-pay__status--failed" : "rx-pay__status--pending")}>{label}</span>
+      </div>
+      <p className="rx-due__amt">{amount}</p>
+      <p className="rx-due__date">{status === "paid" ? `Next due ${due}` : `Due ${due}`}</p>
+      {status !== "paid" ? action : null}
+    </section>
+  );
+}
+
+/** Two-sided bar, e.g. games won vs lost. */
+export function StatBar({ label, left, right }: { label: string; left: number; right: number }) {
+  const total = Math.max(1, left + right);
+  return (
+    <div className="rx-sbar">
+      <div className="rx-sbar__top"><span>{left}</span><span>{label}</span><span>{right}</span></div>
+      <div className="rx-sbar__track" role="img" aria-label={`${label}: ${left} for, ${right} against`}>
+        <span style={{ width: `${(left / total) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export function ClubRow({ name, logo, role, href, current, linkAs: L = "a" }: { name: string; logo?: string; role: string; href: string; current?: boolean; linkAs?: LinkAs }) {
+  return (
+    <L href={href} className="rx-clubrow" aria-current={current ? "true" : undefined}>
+      {logo ? <img className="rx-avatar" src={logo} alt="" /> : <span className="rx-avatar">{name[0]}</span>}
+      <span className="rx-clubrow__name">{name}</span>
+      <span className="rx-chip rx-chip--light">{role}</span>
+    </L>
   );
 }

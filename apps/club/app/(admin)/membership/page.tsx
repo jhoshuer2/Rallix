@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PromoCard } from "@rallix/ui";
-import { ClubHeader } from "../../../components/Header";
+import { ClubHeader } from "../../../components/ClubHeader";
 import { Revenue } from "./Revenue";
 
 export default function Membership() {
