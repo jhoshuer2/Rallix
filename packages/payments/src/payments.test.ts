@@ -175,3 +175,47 @@ describe("isPaymentError", () => {
     for (const e of [new Error("x"), new TypeError("y"), { name: "PaymentError" }, null, undefined, "PaymentError", Object.assign(new Error("z"), { name: "PaymentError" })]) expect(isPaymentError(e)).toBe(false);
   });
 });
+
+import { generatePayToken, isPayTokenShape, shouldReactivate } from "./index";
+
+describe("pay tokens", () => {
+  it("are 24 plain characters with no look-alikes, and never repeat", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 5000; i++) { const t = generatePayToken(); expect(t).toMatch(/^[A-HJKMNP-Za-hjkmnp-z2-9]{24}$/); seen.add(t); }
+    expect(seen.size).toBe(5000);
+  });
+  it("use every symbol roughly evenly (no modulo bias)", () => {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < 4000; i++) for (const c of generatePayToken()) counts.set(c, (counts.get(c) ?? 0) + 1);
+    expect(counts.size).toBe(54);
+    const values = [...counts.values()], mean = values.reduce((a, b) => a + b, 0) / values.length;
+    for (const v of values) expect(Math.abs(v - mean) / mean).toBeLessThan(0.1);
+  });
+  it("shape check rejects anything that is not a plausible token", () => {
+    expect(isPayTokenShape(generatePayToken())).toBe(true);
+    for (const bad of ["", "short", "a".repeat(23), "a".repeat(65), "has space 123456789012345", "../../etc/passwd/aaaaaaaa", "a'; drop table x;--aaaaaaaa", null, undefined, 123, {}]) expect(isPayTokenShape(bad)).toBe(false);
+  });
+});
+
+describe("shouldReactivate", () => {
+  const now = new Date("2026-11-10T12:00:00Z"), past = new Date("2026-11-01T00:00:00Z"), future = new Date("2026-11-20T00:00:00Z");
+  const base = { clubStatus: "suspended" as const, suspensionReason: "non_payment" as const, otherUnpaidInvoices: [], now };
+  it("reactivates a non-payment suspension once nothing else is overdue", () => { expect(shouldReactivate(base)).toBe(true); });
+  it("never reactivates a suspension for any other reason, or with no recorded reason", () => {
+    expect(shouldReactivate({ ...base, suspensionReason: "other" })).toBe(false);
+    expect(shouldReactivate({ ...base, suspensionReason: null })).toBe(false);
+  });
+  it("never touches active or closed clubs", () => {
+    expect(shouldReactivate({ ...base, clubStatus: "active" })).toBe(false);
+    expect(shouldReactivate({ ...base, clubStatus: "closed" })).toBe(false);
+  });
+  it("waits while another invoice is overdue, but not while one is merely upcoming", () => {
+    expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: past }] })).toBe(false);
+    expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: future }] })).toBe(true);
+    expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: future }, { dueAt: past }] })).toBe(false);
+  });
+  it("treats an invoice with no due date as overdue, and the due instant itself as overdue", () => {
+    expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: null }] })).toBe(false);
+    expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: now }] })).toBe(false);
+  });
+});

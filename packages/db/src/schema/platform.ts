@@ -31,6 +31,9 @@ export const platformInvoices = pgTable("platform_invoices", {
   dueAt: timestamp("due_at", { withTimezone: true }),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   paymentRef: text("payment_ref"),
+  /* Unguessable token for the public pay-by-link page. Service-only. Null until a link is first created. */
+  payToken: text("pay_token").unique(),
+  payTokenRevokedAt: timestamp("pay_token_revoked_at", { withTimezone: true }),
   pdfUrl: text("pdf_url"),
   createdAt: createdAt(),
 }, (t) => [
@@ -135,6 +138,9 @@ export const invoicePayments = pgTable("invoice_payments", {
   amountKobo: integer("amount_kobo").notNull(),
   status: text("status").notNull().default("pending"),
   initiatedBy: text("initiated_by").references(() => users.id, { onDelete: "set null" }),
+  /** True when paid through the public pay link (no signed-in user). */
+  viaLink: boolean("via_link").notNull().default(false),
+  payerEmail: text("payer_email"),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   raw: jsonb("raw"),
   createdAt: createdAt(),

@@ -1,6 +1,7 @@
 import { Badge, Empty, Kpi, PageHead } from "../../../components/ui";
 import { dateTime, naira } from "../../../lib/format";
-import { ATTENTION, paymentEvents, paymentsSummary } from "../../../lib/queries";
+import Link from "next/link";
+import { ATTENTION, paidButSuspended, paymentEvents, paymentsSummary } from "../../../lib/queries";
 
 const tone = (o: string) => (o === "credited" ? "ok" : ATTENTION.includes(o) ? "bad" : undefined) as "ok" | "bad" | undefined;
 const hint: Record<string, string> = {
@@ -12,7 +13,7 @@ const hint: Record<string, string> = {
 };
 
 export default async function Payments() {
-  const [events, s] = await Promise.all([paymentEvents(), paymentsSummary()]);
+  const [events, s, stuck] = await Promise.all([paymentEvents(), paymentsSummary(), paidButSuspended()]);
   const attention = events.filter((e) => ATTENTION.includes(e.outcome) && e.event !== "return.verify");
   return (
     <>
@@ -23,6 +24,17 @@ export default async function Payments() {
         <Kpi label="Clubs accepting online dues" value={`${s!.clubs_with_payouts} of ${s!.clubs_total}`} note="Active clubs with a payout account" />
         <Kpi label="Stuck payments" value={s!.pending_old} note="Started over a day ago, never completed" />
       </div>
+      {stuck.length ? (
+        <>
+          <h2 className="cs-h2">Paid but still locked out</h2>
+          <div className="cs-tablewrap"><table className="cs-table"><tbody>
+            {stuck.map((c) => (
+              <tr key={c.club_id}><td><Link className="cs-rowlink" href={`/clubs/${c.club_id}`}>{c.club_name}</Link></td><td><Badge tone="bad">{c.status}</Badge></td>
+                <td>Paid {c.number}. {c.reason === "non_payment" ? "Other invoices are still overdue, so it has not come back automatically." : "It was suspended for another reason, so only staff can reactivate it."}</td></tr>
+            ))}
+          </tbody></table></div>
+        </>
+      ) : null}
       <h2 className="cs-h2">Needs attention (last 7 days)</h2>
       {attention.length === 0 ? <Empty>Nothing needs attention.</Empty> : (
         <div className="cs-tablewrap"><table className="cs-table"><tbody>

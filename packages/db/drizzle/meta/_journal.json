@@ -43,6 +43,34 @@
       "when": 1793497973737,
       "tag": "0005_payments_rls_and_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793504856927,
+      "tag": "0006_pay_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793504857715,
+      "tag": "0007_pay_links_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793504889724,
+      "tag": "0008_invoice_column_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793505023965,
+      "tag": "0009_paylink_template_text",
+      "breakpoints": true
     }
   ]
 }

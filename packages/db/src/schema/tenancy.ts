@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
-import { clubStatus, memberRole, memberStatus } from "./enums";
+import { clubStatus, memberRole, memberStatus, suspensionReason } from "./enums";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -15,6 +15,8 @@ export const clubs = pgTable("clubs", {
   location: text("location"),
   timezone: text("timezone").notNull().default("Africa/Lagos"),
   status: clubStatus("status").notNull().default("active"),
+  /* Why the platform suspended this club. Console-written, service-only: decides whether paying an overdue invoice reactivates it. */
+  suspensionReason: suspensionReason("suspension_reason"),
   ownerId: text("owner_id").notNull().references(() => users.id),
   /* Online dues payouts. Written only by the service role after the account is verified with the provider;
      the app role cannot read the subaccount code or bank details and cannot write any of these columns. */

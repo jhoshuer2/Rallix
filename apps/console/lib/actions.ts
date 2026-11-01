@@ -6,6 +6,7 @@ import { db } from "./db";
 import { requireAdmin } from "./guard";
 import { audienceCount } from "./queries";
 import { uuid } from "./format";
+import { newPayToken, payLinkUrl } from "./pay-link";
 
 type Res<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -19,13 +20,15 @@ const nairaToKobo = (n: number) => Math.round(n * 100);
 const validMoney = (k: number) => Number.isFinite(k) && k >= 0 && k <= 100_000_000_00;
 
 /* ---------- Clubs ---------- */
-export async function setClubStatus(clubId: string, status: "active" | "suspended" | "closed", reason: string): Promise<Res> {
+export async function setClubStatus(clubId: string, status: "active" | "suspended" | "closed", reason: string, reasonType: "non_payment" | "other" = "other"): Promise<Res> {
   const staff = await requireAdmin();
-  if (!uuid.test(clubId) || !["active", "suspended", "closed"].includes(status)) return fail("Invalid request.");
+  if (!uuid.test(clubId) || !["active", "suspended", "closed"].includes(status) || !["non_payment", "other"].includes(reasonType)) return fail("Invalid request.");
   if (status !== "active" && reason.trim().length < 3) return fail("Give a short reason. It is recorded in the audit log.");
-  const r = await db().execute(sql`update clubs set status = ${status}::club_status where id = ${clubId} returning name`);
+  // The reason type decides whether paying an overdue invoice brings the club back automatically. Only a non-payment suspension does.
+  const stored = status === "suspended" ? reasonType : null;
+  const r = await db().execute(sql`update clubs set status = ${status}::club_status, suspension_reason = ${stored}::suspension_reason where id = ${clubId} returning name`);
   if (!r.rows.length) return fail("Club not found.");
-  await audit(staff.id, `club.${status === "active" ? "reactivate" : status}`, "club", clubId, { reason: reason.trim(), name: (r.rows[0] as { name: string }).name });
+  await audit(staff.id, `club.${status === "active" ? "reactivate" : status}`, "club", clubId, { reason: reason.trim(), reasonType: stored, name: (r.rows[0] as { name: string }).name });
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -55,9 +58,9 @@ export async function createInvoice(input: { clubId: string; periodLabel: string
   const kobo = nairaToKobo(input.naira);
   if (!uuid.test(input.clubId) || !validMoney(kobo) || input.periodLabel.trim().length < 3) return fail("Check the club, period label and amount.");
   try {
-    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at)
+    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at, pay_token)
       values (${input.clubId}, app.next_invoice_number(), ${input.issueNow ? "issued" : "draft"}::invoice_status, ${kobo}, ${input.periodLabel.trim()}, ${input.description.trim() || null},
-              ${input.issueNow ? sql`now()` : null}, ${input.issueNow ? sql`now() + interval '14 days'` : null}) returning id, number`);
+              ${input.issueNow ? sql`now()` : null}, ${input.issueNow ? sql`now() + interval '14 days'` : null}, ${input.issueNow ? newPayToken() : null}) returning id, number`);
     const row = r.rows[0] as { id: string; number: string };
     await audit(staff.id, "invoice.create", "invoice", row.id, { number: row.number, kobo, issued: input.issueNow });
     revalidatePath("/invoices");
@@ -74,6 +77,7 @@ export async function setInvoiceStatus(id: string, status: "issued" | "paid" | "
   const r = await db().execute(sql`update platform_invoices set status = ${status}::invoice_status,
       issued_at = case when ${status} = 'issued' then coalesce(issued_at, now()) else issued_at end,
       due_at = case when ${status} = 'issued' then coalesce(due_at, now() + interval '14 days') else due_at end,
+      pay_token = case when ${status} = 'issued' then coalesce(pay_token, ${newPayToken()}) else pay_token end,
       paid_at = case when ${status} = 'paid' then now() else paid_at end,
       payment_ref = case when ${status} = 'paid' then ${paymentRef?.trim() ?? null} else payment_ref end
     where id = ${id} and status <> 'paid' and status <> 'void' returning number`);
@@ -91,8 +95,8 @@ export async function generateInvoices(): Promise<Res<{ created: number }>> {
   let created = 0;
   for (const s of subs) {
     const label = s.period === "monthly" ? month : year;
-    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at)
-      select ${s.club_id}, app.next_invoice_number(), 'issued', ${s.amount_kobo}, ${label}, ${`Rallix ${s.period} subscription, ${label}`}, now(), now() + interval '14 days'
+    const r = await db().execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, description, issued_at, due_at, pay_token)
+      select ${s.club_id}, app.next_invoice_number(), 'issued', ${s.amount_kobo}, ${label}, ${`Rallix ${s.period} subscription, ${label}`}, now(), now() + interval '14 days', ${newPayToken()}
       where not exists (select 1 from platform_invoices where club_id = ${s.club_id} and period_label = ${label}) returning id`);
     created += r.rows.length;
   }
@@ -193,5 +197,38 @@ export async function removeTeamMember(userId: string): Promise<Res> {
   // Existing sessions are left alone on purpose: every request re-checks the platform_admins list, so removal is immediate.
   await audit(staff.id, "team.remove", "user", userId);
   revalidatePath("/team");
+  return { ok: true };
+}
+
+/* ---------- Pay links ---------- */
+/** Get (creating if needed) the public pay link for an issued invoice. */
+export async function ensurePayLink(invoiceId: string): Promise<Res<{ url: string }>> {
+  const staff = await requireAdmin();
+  if (!uuid.test(invoiceId)) return fail("Invalid request.");
+  const r = await db().execute(sql`update platform_invoices set pay_token = coalesce(pay_token, ${newPayToken()}), pay_token_revoked_at = null where id = ${invoiceId} and status = 'issued' returning pay_token, number`);
+  const row = r.rows[0] as { pay_token: string; number: string } | undefined;
+  if (!row) return fail("Only issued invoices can have a pay link.");
+  await audit(staff.id, "invoice.paylink_view", "invoice", invoiceId, { number: row.number });
+  return { ok: true, url: payLinkUrl(row.pay_token) };
+}
+/** Replace the link: the old one stops working immediately. */
+export async function replacePayLink(invoiceId: string): Promise<Res<{ url: string }>> {
+  const staff = await requireAdmin();
+  if (!uuid.test(invoiceId)) return fail("Invalid request.");
+  const r = await db().execute(sql`update platform_invoices set pay_token = ${newPayToken()}, pay_token_revoked_at = null where id = ${invoiceId} and status = 'issued' returning pay_token, number`);
+  const row = r.rows[0] as { pay_token: string; number: string } | undefined;
+  if (!row) return fail("Only issued invoices can have a pay link.");
+  await audit(staff.id, "invoice.paylink_replace", "invoice", invoiceId, { number: row.number });
+  revalidatePath(`/invoices/${invoiceId}`);
+  return { ok: true, url: payLinkUrl(row.pay_token) };
+}
+/** Turn the link off without replacing it. */
+export async function disablePayLink(invoiceId: string): Promise<Res> {
+  const staff = await requireAdmin();
+  if (!uuid.test(invoiceId)) return fail("Invalid request.");
+  const r = await db().execute(sql`update platform_invoices set pay_token = null, pay_token_revoked_at = now() where id = ${invoiceId} returning number`);
+  if (!r.rows.length) return fail("Invoice not found.");
+  await audit(staff.id, "invoice.paylink_disable", "invoice", invoiceId, { number: (r.rows[0] as { number: string }).number });
+  revalidatePath(`/invoices/${invoiceId}`);
   return { ok: true };
 }

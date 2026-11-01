@@ -320,3 +320,43 @@ describe("payout and payment tables", () => {
     expect(await denied(svc.execute(sql`insert into invoice_payments (invoice_id, club_id, reference, amount_kobo, status) values (${inv.id}, ${ids.A}, 'RLX-I-T2', 100, 'hacked')`))).toBe("23514");
   });
 });
+
+describe("pay links and suspension reasons", () => {
+  const adminCtx = () => ({ userId: "adminA", clubId: ids.A });
+  let invId: string;
+  beforeAll(async () => {
+    invId = ((await svc.execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, pay_token) values (${ids.A}, 'PL-1', 'issued', 100000, 'pl-1', 'AbCdEfGhIjKlMnOpQrStUvWx') returning id`)).rows[0] as { id: string }).id;
+  });
+
+  it("an admin can read their club's invoices but never the pay token", async () => {
+    const ok = await rows(app, adminCtx(), sql`select number, status from platform_invoices where id = ${invId}`);
+    expect(ok).toEqual([{ number: "PL-1", status: "issued" }]);
+    expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql`select pay_token from platform_invoices`)))).toBe("42501");
+    expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql`select * from platform_invoices`)))).toBe("42501");
+  });
+
+  it("the app role cannot read or write the suspension reason", async () => {
+    expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql`select suspension_reason from clubs`)))).toBe("42501");
+    expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql`update clubs set suspension_reason = 'other' where id = ${ids.A}`)))).toBe("42501");
+  });
+
+  it("pay tokens are unique and must be long, plain alphanumerics", async () => {
+    const dup = svc.execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, pay_token) values (${ids.A}, 'PL-2', 'issued', 100, 'pl-2', 'AbCdEfGhIjKlMnOpQrStUvWx')`);
+    expect(await denied(dup)).toBe("23505");
+    for (const bad of ["short", "has spaces in it 1234567890", "has-dashes-1234567890abcdef", "x".repeat(65)]) {
+      expect(await denied(svc.execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, pay_token) values (${ids.A}, ${"PL-" + bad.length}, 'issued', 100, ${"b" + bad.length}, ${bad})`))).toBe("23514");
+    }
+  });
+
+  it("a reason can only be set while the club is not active, and the enum is closed", async () => {
+    expect(await denied(svc.execute(sql`update clubs set suspension_reason = 'non_payment' where id = ${ids.B}`))).toBe("23514");
+    await svc.execute(sql`update clubs set status = 'suspended', suspension_reason = 'non_payment' where id = ${ids.B}`);
+    expect(await denied(svc.execute(sql`update clubs set suspension_reason = 'because' where id = ${ids.B}`))).toBe("22P02");
+    expect(await denied(svc.execute(sql`update clubs set status = 'active' where id = ${ids.B}`))).toBe("23514"); // must clear the reason in the same update
+    await svc.execute(sql`update clubs set status = 'active', suspension_reason = null where id = ${ids.B}`);
+  });
+
+  it("the app role can't touch invoice payments made through links", async () => {
+    expect(await denied(app.execute(sql`select via_link, payer_email from invoice_payments`))).toBe("42501");
+  });
+});

@@ -70,7 +70,7 @@ export async function seed(db: Db) {
   ]);
   const inv = async (clubId: string, label: string, status: "issued" | "paid", paid = false) => {
     const n = ((await db.execute(sql`select app.next_invoice_number() as n`)).rows[0] as { n: string }).n;
-    await db.insert(s.platformInvoices).values({ clubId, number: n, status, amountKobo: 2000000, periodLabel: label, description: `Rallix monthly subscription, ${label}`, issuedAt: new Date(Date.now() - 20 * 86400000), dueAt: new Date(Date.now() - 6 * 86400000), paidAt: paid ? new Date(Date.now() - 18 * 86400000) : null, paymentRef: paid ? "TRF-884210" : null });
+    await db.insert(s.platformInvoices).values({ clubId, number: n, status, amountKobo: 2000000, periodLabel: label, description: `Rallix monthly subscription, ${label}`, issuedAt: new Date(Date.now() - 20 * 86400000), dueAt: new Date(Date.now() - 6 * 86400000), paidAt: paid ? new Date(Date.now() - 18 * 86400000) : null, paymentRef: paid ? "TRF-884210" : null, payToken: status === "issued" ? `SeedToken${clubId.replace(/-/g, "").slice(0, 15)}` : null });
   };
   await inv(paris.id, "2026-10", "paid", true);
   await inv(lagos.id, "2026-10", "issued");

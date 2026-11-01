@@ -101,10 +101,11 @@ export async function listInvoices(status?: string) {
         from platform_invoices i join clubs c on c.id = i.club_id where (${st}::text is null or i.status::text = ${st}) order by i.created_at desc limit 300`);
 }
 export async function getInvoice(id: string) {
-  const inv = await one<{ id: string; number: string; status: string; amount_kobo: number; period_label: string; description: string | null; issued_at: Date | null; due_at: Date | null; paid_at: Date | null; payment_ref: string | null; created_at: Date; club_id: string; club_name: string; club_location: string | null; owner_name: string; owner_phone: string | null; owner_email: string | null; paid_online: boolean }>(
+  const inv = await one<{ id: string; number: string; status: string; amount_kobo: number; period_label: string; description: string | null; issued_at: Date | null; due_at: Date | null; paid_at: Date | null; payment_ref: string | null; created_at: Date; club_id: string; club_name: string; club_location: string | null; owner_name: string; owner_phone: string | null; owner_email: string | null; paid_online: boolean; has_pay_link: boolean }>(
     sql`select i.id, i.number, i.status, i.amount_kobo, i.period_label, i.description, i.issued_at, i.due_at, i.paid_at, i.payment_ref, i.created_at, c.id as club_id, c.name as club_name, c.location as club_location,
         u.name as owner_name, u.phone_number as owner_phone, u.email as owner_email,
-        exists (select 1 from invoice_payments p where p.invoice_id = i.id and p.status = 'paid') as paid_online
+        exists (select 1 from invoice_payments p where p.invoice_id = i.id and p.status = 'paid') as paid_online,
+        (i.pay_token is not null) as has_pay_link
         from platform_invoices i join clubs c on c.id = i.club_id join users u on u.id = c.owner_id where i.id = ${id}`);
   if (!inv) return null;
   return { inv, settings: (await one<{ company_name: string; address: string; email: string; phone: string; vat_percent: number; footer_note: string; payment_instructions: string }>(sql`select company_name, address, email, phone, vat_percent, footer_note, payment_instructions from platform_settings where id = 1`))! };
@@ -163,3 +164,9 @@ export const paymentsSummary = () => one<{ dues_online_30d: string; dues_online_
   (select count(*)::int from clubs where payouts_enabled_at is not null) clubs_with_payouts,
   (select count(*)::int from clubs where status = 'active') clubs_total,
   (select count(*)::int from payments where status = 'pending' and created_at < now() - interval '1 day') pending_old`);
+
+/** Clubs that paid recently but are still locked out: a human has to decide. */
+export const paidButSuspended = () => q<{ club_id: string; club_name: string; status: string; reason: string | null; paid_at: Date; number: string }>(
+  sql`select c.id as club_id, c.name as club_name, c.status::text as status, c.suspension_reason::text as reason, p.paid_at, i.number
+      from invoice_payments p join clubs c on c.id = p.club_id join platform_invoices i on i.id = p.invoice_id
+      where p.status = 'paid' and p.paid_at > now() - interval '14 days' and c.status <> 'active' order by p.paid_at desc`);

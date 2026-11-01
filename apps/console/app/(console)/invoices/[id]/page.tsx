@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, PageHead } from "../../../../components/ui";
-import { MarkPaidForm, PrintButton, RunButton } from "../../../../components/Forms";
+import { MarkPaidForm, PayLinkCard, PrintButton, RunButton } from "../../../../components/Forms";
 import { setInvoiceStatus } from "../../../../lib/actions";
 import { date, naira, uuid } from "../../../../lib/format";
 import { getInvoice } from "../../../../lib/queries";
+import { payLinkUrl } from "../../../../lib/pay-link";
+import { db } from "../../../../lib/db";
+import { sql } from "drizzle-orm";
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,6 +18,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const total = Number(inv.amount_kobo);
   const vat = s.vat_percent > 0 ? Math.round(total - total / (1 + s.vat_percent / 100)) : 0;
   const final = inv.status === "paid" || inv.status === "void";
+  const tokenRow = inv.status === "issued" ? ((await db().execute(sql`select pay_token from platform_invoices where id = ${inv.id}`)).rows[0] as { pay_token: string | null } | undefined) : undefined;
   return (
     <>
       <div className="cs-noprint">
@@ -25,6 +29,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             {inv.status === "draft" ? <RunButton action={setInvoiceStatus.bind(null, inv.id, "issued")} success="Invoice issued.">Issue invoice</RunButton> : null}
             {!final ? <RunButton tone="danger" confirmText={`Void invoice ${inv.number}? This cannot be undone.`} action={setInvoiceStatus.bind(null, inv.id, "void")} success="Invoice voided.">Void</RunButton> : null}
           </>} />
+        {inv.status === "issued" ? <PayLinkCard invoiceId={inv.id} url={tokenRow?.pay_token ? payLinkUrl(tokenRow.pay_token) : null} club={inv.club_name} number={inv.number} amount={naira(total)} /> : null}
         {inv.status === "issued" ? <section className="cs-card" style={{ marginBottom: 20 }}><h2 className="cs-h2" style={{ marginTop: 0 }}>Record payment</h2><MarkPaidForm invoiceId={inv.id} /></section> : null}
         <p><Link href="/invoices">← All invoices</Link></p>
       </div>

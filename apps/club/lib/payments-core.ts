@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { auditLog, clubSubscriptions, dues, invoicePayments, paymentEvents, payments, platformInvoices } from "@rallix/db";
-import { reconcile, referenceKind } from "@rallix/payments";
+import { auditLog, clubSubscriptions, clubs, dues, invoicePayments, paymentEvents, payments, platformInvoices } from "@rallix/db";
+import { reconcile, referenceKind, shouldReactivate } from "@rallix/payments";
 import { serviceDb } from "./db";
 import { provider } from "./payments";
 
@@ -82,7 +82,17 @@ async function finalizeInvoice(reference: string): Promise<Finalised> {
       .where(and(eq(platformInvoices.id, locked.invoiceId), eq(platformInvoices.status, "issued"))).returning({ id: platformInvoices.id, number: platformInvoices.number });
     if (!closed.length) return { outcome: "duplicate_payment", kind: "invoice", detail: "invoice was already paid or void" } as Finalised;
     await tx.update(clubSubscriptions).set({ status: "active" }).where(and(eq(clubSubscriptions.clubId, locked.clubId), eq(clubSubscriptions.status, "past_due")));
-    await tx.insert(auditLog).values({ actorId: null, action: "invoice.paid_online", entity: "invoice", entityId: locked.invoiceId, meta: { number: closed[0]!.number, reference, provider: provider().name } });
+    await tx.insert(auditLog).values({ actorId: null, action: "invoice.paid_online", entity: "invoice", entityId: locked.invoiceId, meta: { number: closed[0]!.number, reference, provider: provider().name, viaLink: locked.viaLink } });
+
+    // A club suspended for NON-PAYMENT comes back on its own once nothing else is overdue. Any other suspension waits for a human.
+    const [club] = await tx.select({ status: clubs.status, reason: clubs.suspensionReason }).from(clubs).where(eq(clubs.id, locked.clubId)).for("update");
+    if (club) {
+      const others = await tx.select({ dueAt: platformInvoices.dueAt }).from(platformInvoices).where(and(eq(platformInvoices.clubId, locked.clubId), eq(platformInvoices.status, "issued")));
+      if (shouldReactivate({ clubStatus: club.status, suspensionReason: club.reason, otherUnpaidInvoices: others, now: new Date() })) {
+        await tx.update(clubs).set({ status: "active", suspensionReason: null }).where(eq(clubs.id, locked.clubId));
+        await tx.insert(auditLog).values({ actorId: null, action: "club.reactivated_on_payment", entity: "club", entityId: locked.clubId, meta: { invoiceId: locked.invoiceId, reference } });
+      }
+    }
     return { outcome: "credited", kind: "invoice" } as Finalised;
   });
 }

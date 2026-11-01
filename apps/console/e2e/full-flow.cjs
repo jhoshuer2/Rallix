@@ -58,7 +58,7 @@ async function signIn(page, base, phone) {
   ok(/HOME/i.test(await text(A)), 'before: Paris Arena admin can use the club app');
   await O.getByRole('button', { name: 'Suspend club' }).click(); await O.waitForTimeout(600);
   ok(!(await O.getByText(/Club suspended/).count()), 'suspending without a reason is refused (browser validation)');
-  await O.getByLabel('Reason').fill('Unpaid subscription'); await O.getByRole('button', { name: 'Suspend club' }).click();
+  await O.getByLabel('Details').fill('Unpaid subscription'); await O.getByRole('button', { name: 'Suspend club' }).click();
   await O.getByText(/Club suspended/).waitFor({ timeout: 10000 }); ok(true, 'club suspended with a reason');
   ok(sql(`select status from clubs where id='${parisId}'`) === 'suspended', 'database shows status = suspended');
   await A.goto(CLUB + '/'); await A.waitForURL(/suspended/, { timeout: 15000 });

@@ -4,9 +4,12 @@ import { revalidatePath } from "next/cache";
 import { auditLog, clubs, dues, invoicePayments, payments, platformInvoices, users } from "@rallix/db";
 import { generateReference, isPaymentError } from "@rallix/payments";
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
+import { attemptsLastHour, ipAllowed, lookupPayLink, ownerEmail } from "./pay-link";
 import { inClub, isAdmin, requireClub } from "./context";
 import { serviceDb } from "./db";
 import { appUrl, provider } from "./payments";
+import { invoiceCols } from "./payment-queries";
 import { recentAttempts } from "./payments-core";
 
 type Res<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -82,7 +85,7 @@ export async function startInvoicePayment(invoiceId: string): Promise<Res<{ url:
   const ctx = await requireClub();
   if (!isAdmin(ctx.club)) return fail("Only club admins can pay invoices.");
   if (!UUID.test(invoiceId)) return fail("Invalid request.");
-  const [inv] = await inClub(ctx, (tx) => tx.select().from(platformInvoices).where(and(eq(platformInvoices.id, invoiceId), eq(platformInvoices.clubId, ctx.club.clubId))));
+  const [inv] = await inClub(ctx, (tx) => tx.select(invoiceCols).from(platformInvoices).where(and(eq(platformInvoices.id, invoiceId), eq(platformInvoices.clubId, ctx.club.clubId))));
   if (!inv) return fail("That invoice was not found.");
   if (inv.status !== "issued") return fail(inv.status === "paid" ? "This invoice is already paid." : "This invoice can't be paid right now.");
   const svc = serviceDb();
@@ -134,4 +137,33 @@ export async function savePayoutAccount(input: { bankCode: string; accountNumber
     revalidatePath("/membership", "layout");
     return { ok: true };
   } catch (e) { return fail(isPaymentError(e) && e.code === "not_found" ? "We could not find that account." : friendly(e)); }
+}
+
+/* ---------- Public pay link (no sign-in) ---------- */
+
+const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+
+/** Start paying an issued Rallix invoice from its public link. The amount comes from the database, never from the page. */
+export async function startInvoicePaymentByToken(token: string, email: string): Promise<Res<{ url: string }>> {
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "unknown").split(",")[0]!.trim();
+  if (!ipAllowed(ip)) return fail("Too many attempts. Please wait a while and try again.");
+  const cleanEmail = email.trim();
+  if (cleanEmail && !EMAIL.test(cleanEmail)) return fail("That email address doesn't look right.");
+  const link = await lookupPayLink(token);
+  if (link.state === "paid") return fail("This invoice has already been paid. Thank you!");
+  if (link.state !== "payable" || !link.invoiceId || !link.clubId || !link.amountKobo) return fail("This payment link is no longer valid. Please ask Rallix for a new one.");
+  if ((await attemptsLastHour(link.invoiceId)) >= 5) return fail("Too many attempts for this invoice. Please wait an hour or contact Rallix.");
+
+  const svc = serviceDb();
+  const reference = generateReference("I");
+  const payer = cleanEmail || (await ownerEmail(link.clubId));
+  await svc.insert(invoicePayments).values({ invoiceId: link.invoiceId, clubId: link.clubId, reference, amountKobo: link.amountKobo, viaLink: true, payerEmail: cleanEmail || null });
+  try {
+    const r = await provider().initializeTransaction({ reference, amountKobo: link.amountKobo, email: payer, callbackUrl: `${appUrl()}/pay/invoice/${token}/return?reference=${reference}`, metadata: { kind: "invoice", invoiceId: link.invoiceId, clubId: link.clubId, viaLink: 1 } });
+    return { ok: true, url: r.authorizationUrl };
+  } catch (e) {
+    await svc.update(invoicePayments).set({ status: "failed" }).where(eq(invoicePayments.reference, reference));
+    return fail(friendly(e));
+  }
 }

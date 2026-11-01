@@ -16,9 +16,12 @@ export async function payoutDetails(ctx: C) {
   return r?.enabledAt ? r : null;
 }
 
+/** Columns the app role may read. pay_token is deliberately absent: the database denies it. */
+export const invoiceCols = { id: platformInvoices.id, clubId: platformInvoices.clubId, number: platformInvoices.number, status: platformInvoices.status, amountKobo: platformInvoices.amountKobo, periodLabel: platformInvoices.periodLabel, description: platformInvoices.description, issuedAt: platformInvoices.issuedAt, dueAt: platformInvoices.dueAt, paidAt: platformInvoices.paidAt };
+
 export async function rallixBilling(ctx: C) {
   return inClub(ctx, async (tx) => ({
     subscription: (await tx.select().from(clubSubscriptions).where(eq(clubSubscriptions.clubId, ctx.club.clubId)).orderBy(desc(clubSubscriptions.createdAt)).limit(1))[0] ?? null,
-    invoices: await tx.select().from(platformInvoices).where(and(eq(platformInvoices.clubId, ctx.club.clubId))).orderBy(desc(platformInvoices.createdAt)).limit(24),
+    invoices: await tx.select(invoiceCols).from(platformInvoices).where(and(eq(platformInvoices.clubId, ctx.club.clubId))).orderBy(desc(platformInvoices.createdAt)).limit(24),
   }));
 }

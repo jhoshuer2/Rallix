@@ -18,3 +18,4 @@ export const issueSeverity = pgEnum("issue_severity", ["low", "normal", "high", 
 export const issueStatus = pgEnum("issue_status", ["open", "investigating", "resolved", "closed"]);
 export const templateKind = pgEnum("template_kind", ["email", "sms", "push", "whatsapp"]);
 export const notificationStatus = pgEnum("notification_status", ["draft", "queued", "sent", "failed"]);
+export const suspensionReason = pgEnum("suspension_reason", ["non_payment", "other"]);

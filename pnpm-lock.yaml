@@ -72,6 +72,9 @@ importers:
       '@rallix/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@rallix/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       '@rallix/ui':
         specifier: workspace:*
         version: link:../../packages/ui

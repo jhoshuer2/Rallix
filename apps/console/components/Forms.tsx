@@ -40,10 +40,20 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 export function ClubStatusForm({ clubId, status }: { clubId: string; status: string }) {
   const { run, pending, note } = useRun();
   const [reason, setReason] = useState("");
+  const [type, setType] = useState<"non_payment" | "other">("non_payment");
   const next = status === "active" ? "suspended" : "active";
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.setClubStatus(clubId, next, reason), next === "active" ? "Club reactivated." : "Club suspended. Members lose access immediately.", () => setReason("")); }}>
-      {next === "suspended" ? <Field label="Reason" hint="Recorded in the audit log. Members cannot open the club while it is suspended."><input value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} /></Field> : null}
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.setClubStatus(clubId, next, reason, type), next === "active" ? "Club reactivated." : "Club suspended. Members lose access immediately.", () => setReason("")); }}>
+      {next === "suspended" ? (
+        <>
+          <fieldset style={{ border: 0, padding: 0, margin: "0 0 14px" }}>
+            <legend style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Why is it being suspended?</legend>
+            <label style={{ display: "flex", gap: 8, minHeight: 44, alignItems: "center" }}><input type="radio" name="reasonType" checked={type === "non_payment"} onChange={() => setType("non_payment")} style={{ width: 20, height: 20 }} /> Non-payment <span className="cs-hint">(comes back automatically when overdue invoices are paid)</span></label>
+            <label style={{ display: "flex", gap: 8, minHeight: 44, alignItems: "center" }}><input type="radio" name="reasonType" checked={type === "other"} onChange={() => setType("other")} style={{ width: 20, height: 20 }} /> Something else <span className="cs-hint">(only staff can reactivate)</span></label>
+          </fieldset>
+          <Field label="Details" hint="Recorded in the audit log. Members cannot open the club while it is suspended."><input value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} /></Field>
+        </>
+      ) : null}
       <button className={`cs-btn${next === "suspended" ? " cs-btn--danger" : ""}`} disabled={pending}>{next === "suspended" ? "Suspend club" : "Reactivate club"}</button>
       {note}
     </form>
@@ -219,6 +229,32 @@ export function TeamForm() {
       <Field label="Phone number" hint="They must have signed in to a Rallix app once."><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0803 000 0000" required /></Field>
       <button className="cs-btn" disabled={pending}>Add to team</button>{note}
     </form>
+  );
+}
+
+export function PayLinkCard({ invoiceId, url, club, number, amount }: { invoiceId: string; url: string | null; club: string; number: string; amount: string }) {
+  const { run, pending, note } = useRun();
+  const [link, setLink] = useState<string | null>(url);
+  const [copied, setCopied] = useState(false);
+  const message = (l: string) => `Hello, this is Rallix. Invoice ${number} for ${club} (${amount}) is ready. You can pay securely online here: ${l}`;
+  const need = async (fn: () => Promise<Res>) => { const r = await fn(); if (r.ok && typeof r.url === "string") setLink(r.url); return r; };
+  return (
+    <section className="cs-card cs-noprint" style={{ marginBottom: 20 }} aria-label="Pay link">
+      <h2 className="cs-h2" style={{ marginTop: 0 }}>Pay link</h2>
+      <p className="cs-muted">Anyone with this link can pay this invoice, even a club that is suspended or can’t sign in. It shows only the club name, invoice number and amount.</p>
+      {link ? <p style={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: 13 }}>{link}</p> : null}
+      <div className="cs-actions">
+        {!link ? <button className="cs-btn" disabled={pending} onClick={() => run(() => need(() => A.ensurePayLink(invoiceId)), "Link created.")}>Create pay link</button> : (
+          <>
+            <button className="cs-btn" onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); } catch { setCopied(false); } }}>{copied ? "Copied" : "Copy link"}</button>
+            <a className="cs-btn cs-btn--ghost" href={`https://wa.me/?text=${encodeURIComponent(message(link))}`} target="_blank" rel="noreferrer">Share on WhatsApp</a>
+            <button className="cs-btn cs-btn--ghost" disabled={pending} onClick={() => { if (window.confirm("Replace the link? The old one stops working immediately.")) run(() => need(() => A.replacePayLink(invoiceId)), "Link replaced. The old one no longer works."); }}>Replace link</button>
+            <button className="cs-btn cs-btn--danger" disabled={pending} onClick={() => { if (window.confirm("Turn this link off? Nobody will be able to pay with it.")) run(async () => { const r = await A.disablePayLink(invoiceId); if (r.ok) { setLink(null); setCopied(false); } return r; }, "Link turned off."); }}>Turn off</button>
+          </>
+        )}
+      </div>
+      {note}
+    </section>
   );
 }
 

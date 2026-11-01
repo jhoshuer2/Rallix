@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { FakeProvider, FAKE_SECRET, signBody } from "@rallix/payments";
-import { getCtx } from "../../../../lib/context";
 import { appUrl, provider } from "../../../../lib/payments";
 import { naira } from "../../../../lib/queries";
 
@@ -10,7 +9,6 @@ export const dynamic = "force-dynamic";
 export default async function FakeCheckout({ searchParams }: { searchParams: Promise<{ reference?: string; callback?: string }> }) {
   if (provider().name !== "fake") notFound();
   const { reference = "", callback = "" } = await searchParams;
-  if (!(await getCtx())) redirect("/sign-in");
   const tx = FakeProvider.get(reference);
   if (!tx) notFound();
   const safeCallback = callback.startsWith(appUrl() + "/") ? callback : `${appUrl()}/pay/return?reference=${reference}`;

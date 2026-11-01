@@ -51,7 +51,10 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Do not use `instanceof PaymentError` across bundles; use `isPaymentError()`.
 - Do not pass JS arrays to `= any(...)` in raw SQL; expand into `IN (...)` (see `list()` in the console queries).
 - Before real money: run `pnpm --filter @rallix/payments smoke` with a TEST key and follow `packages/payments/README.md`.
-- Tests: `pnpm --filter @rallix/payments test`, `apps/club/e2e/payments.cjs` (needs both apps and a fresh seeded DB).
+- Public pay links: `/pay/invoice/[token]` (club app, no sign-in). `lookupPayLink` in `lib/pay-link.ts` is the only reader; it returns club name, number, period, amount and nothing personal. Tokens (`platform_invoices.pay_token`) are service-only: the app role has column grants that exclude them. Shape-check tokens (`isPayTokenShape`) before any DB lookup. A return page must verify the reference belongs to the token's invoice.
+- Reactivation lives inside `finalizeInvoice` (same transaction as the credit): only a club suspended with `suspension_reason = non_payment` and no other overdue invoice comes back; the rule is the pure `shouldReactivate()`. Setting a reason without a suspension is blocked by a CHECK; clear it in the same UPDATE as the status.
+- Never grant `SELECT` on a whole table when it holds secrets: use column grants (`platform_invoices`, `clubs`). When adding a column, decide whether the app role may read it.
+- Tests: `pnpm --filter @rallix/payments test`, `apps/club/e2e/payments.cjs` and `apps/club/e2e/pay-link.cjs` (both need both apps and a fresh seeded DB).
 
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
