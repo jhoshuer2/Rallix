@@ -26,6 +26,7 @@ export default async function ClubDetail({ params }: { params: Promise<{ id: str
           <h2 className="cs-h2" style={{ marginTop: 0 }}>Owner and staff</h2>
           <dl className="cs-kv">
             <dt>Owner</dt><dd>{c.owner_name}</dd><dt>Phone</dt><dd>{c.owner_phone ?? "—"}</dd><dt>Email</dt><dd>{c.owner_email ?? "—"}</dd>
+            <dt>Online dues payments</dt><dd>{c.payouts_enabled_at ? <Badge tone="ok">Active</Badge> : <Badge>Not set up</Badge>}{c.payout_bank ? ` ${c.payout_bank} ••${c.payout_last4}` : ""}</dd>
             <dt>Admins and scorers</dt><dd>{d.staff.map((s) => `${s.name} (${s.roles.filter((r) => r !== "player").join(", ")})`).join("; ") || "—"}</dd>
           </dl>
         </section>

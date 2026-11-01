@@ -103,6 +103,8 @@ async function signIn(page, base, phone) {
   await O.getByText(/Queued for 2 recipients/).waitFor({ timeout: 10000 }); ok(true, 'broadcast to all club admins counts the 2 distinct admins');
   await O.getByLabel('Audience').selectOption('clubs'); await O.getByLabel('Title').fill('Hello clubs'); await O.getByLabel('Message').fill('A note for specific clubs.'); await O.getByRole('button', { name: 'Queue notification' }).click();
   await O.getByText('Pick at least one club.').waitFor({ timeout: 10000 }); ok(true, 'a club broadcast with no clubs picked is refused');
+  await O.getByLabel('Audience').selectOption('clubs'); await O.getByLabel('Paris Arena').check(); await O.getByRole('button', { name: 'Queue notification' }).click();
+  await O.getByText(/Queued for 8 recipients\./).waitFor({ timeout: 10000 }); ok(true, 'a broadcast to one chosen club reaches only that club’s 8 members (7 players + admin), not other clubs');
   ok(sql(`select status from notifications order by created_at desc limit 1`) === 'queued', 'notification is stored as queued (no delivery provider yet)');
 
   console.log('8. issues');

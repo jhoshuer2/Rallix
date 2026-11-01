@@ -11,7 +11,7 @@ export default async function PaymentsPage() {
   return (
     <>
       <div style={{ marginBottom: 16 }}><BackButton href="/membership" linkAs={Link} /></div>
-      <Payments rows={dues.map((d, i) => ({ rank: i + 1, name: d.name, photo: d.photo ?? undefined, detail: `${d.plan} • ${d.periodLabel} • due ${fmtDate(d.dueDate)}`, amount: naira(d.amountKobo), status: map[d.status] }))} />
+      <Payments rows={dues.map((d, i) => ({ rank: i + 1, name: d.name, photo: d.photo ?? undefined, detail: `${d.plan} • ${d.periodLabel} • due ${fmtDate(d.dueDate)}`, amount: naira(d.amountKobo), status: map[d.status], dueId: d.id, unpaid: d.status === "due" || d.status === "overdue" }))} />
     </>
   );
 }

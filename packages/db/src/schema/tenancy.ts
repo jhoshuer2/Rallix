@@ -16,9 +16,18 @@ export const clubs = pgTable("clubs", {
   timezone: text("timezone").notNull().default("Africa/Lagos"),
   status: clubStatus("status").notNull().default("active"),
   ownerId: text("owner_id").notNull().references(() => users.id),
+  /* Online dues payouts. Written only by the service role after the account is verified with the provider;
+     the app role cannot read the subaccount code or bank details and cannot write any of these columns. */
+  paystackSubaccountCode: text("paystack_subaccount_code"),
+  payoutBankName: text("payout_bank_name"),
+  payoutBankCode: text("payout_bank_code"),
+  payoutAccountName: text("payout_account_name"),
+  payoutAccountLast4: text("payout_account_last4"),
+  payoutsEnabledAt: timestamp("payouts_enabled_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  check("clubs_payouts_need_subaccount", sql`${t.payoutsEnabledAt} IS NULL OR ${t.paystackSubaccountCode} IS NOT NULL`),
   // Slug becomes the subdomain, so keep it DNS-safe.
   check("clubs_slug_format", sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$'`),
 ]);

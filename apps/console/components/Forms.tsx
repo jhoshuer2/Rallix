@@ -148,7 +148,7 @@ export function NotificationForm({ clubs }: { clubs: Array<{ id: string; name: s
       <Field label="Message"><textarea value={body} onChange={(e) => setBody(e.target.value)} required minLength={5} /></Field>
       <div className="cs-grid cs-grid--2">
         <Field label="Channel"><select value={channel} onChange={(e) => setChannel(e.target.value as typeof channel)}><option value="push">Push</option><option value="email">Email</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option></select></Field>
-        <Field label="Audience"><select value={audience} onChange={(e) => setAudience(e.target.value as typeof audience)}><option value="all_admins">All club admins</option><option value="all_players">All players</option><option value="clubs">Specific clubs</option></select></Field>
+        <Field label="Audience"><select value={audience} onChange={(e) => setAudience(e.target.value as typeof audience)}><option value="all_admins">All club admins</option><option value="all_players">All players</option><option value="clubs">Everyone in specific clubs</option></select></Field>
       </div>
       {audience === "clubs" ? (
         <fieldset style={{ border: "1px solid #bdb8a8", borderRadius: 6, margin: "0 0 14px", padding: 12 }}>

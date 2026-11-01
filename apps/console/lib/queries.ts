@@ -3,6 +3,8 @@ import { db } from "./db";
 
 type Row = Record<string, unknown>;
 const q = async <T = Row>(query: SQL): Promise<T[]> => (await db().execute(query)).rows as T[];
+/** Expands a JS array into `$1, $2, ...` for use inside IN (...). Passing an array straight to `= any(...)` does not work with this driver. */
+const list = (values: string[]) => (values.length ? sql.join(values.map((v) => sql`${v}`), sql`, `) : sql`NULL`);
 const one = async <T = Row>(query: SQL): Promise<T | null> => (await q<T>(query))[0] ?? null;
 
 export type Overview = {
@@ -60,7 +62,7 @@ export function health(c: Pick<ClubRow, "status" | "members" | "matches_30d" | "
 }
 
 export async function getClub(id: string) {
-  const club = await one<ClubRow & { timezone: string; owner_id: string; owner_email: string | null }>(sql`select c.id, c.slug, c.name, c.location, c.status, c.created_at, c.timezone, c.owner_id,
+  const club = await one<ClubRow & { timezone: string; owner_id: string; owner_email: string | null; payout_bank: string | null; payout_last4: string | null; payouts_enabled_at: Date | null }>(sql`select c.payout_bank_name as payout_bank, c.payout_account_last4 as payout_last4, c.payouts_enabled_at, c.id, c.slug, c.name, c.location, c.status, c.created_at, c.timezone, c.owner_id,
       u.name as owner_name, u.phone_number as owner_phone, u.email as owner_email,
       (select count(*)::int from memberships m where m.club_id = c.id and m.status = 'active') as members,
       (select count(*)::int from matches mt where mt.club_id = c.id and mt.confirmed_at > now() - interval '30 days') as matches_30d,
@@ -99,9 +101,10 @@ export async function listInvoices(status?: string) {
         from platform_invoices i join clubs c on c.id = i.club_id where (${st}::text is null or i.status::text = ${st}) order by i.created_at desc limit 300`);
 }
 export async function getInvoice(id: string) {
-  const inv = await one<{ id: string; number: string; status: string; amount_kobo: number; period_label: string; description: string | null; issued_at: Date | null; due_at: Date | null; paid_at: Date | null; payment_ref: string | null; created_at: Date; club_id: string; club_name: string; club_location: string | null; owner_name: string; owner_phone: string | null; owner_email: string | null }>(
+  const inv = await one<{ id: string; number: string; status: string; amount_kobo: number; period_label: string; description: string | null; issued_at: Date | null; due_at: Date | null; paid_at: Date | null; payment_ref: string | null; created_at: Date; club_id: string; club_name: string; club_location: string | null; owner_name: string; owner_phone: string | null; owner_email: string | null; paid_online: boolean }>(
     sql`select i.id, i.number, i.status, i.amount_kobo, i.period_label, i.description, i.issued_at, i.due_at, i.paid_at, i.payment_ref, i.created_at, c.id as club_id, c.name as club_name, c.location as club_location,
-        u.name as owner_name, u.phone_number as owner_phone, u.email as owner_email
+        u.name as owner_name, u.phone_number as owner_phone, u.email as owner_email,
+        exists (select 1 from invoice_payments p where p.invoice_id = i.id and p.status = 'paid') as paid_online
         from platform_invoices i join clubs c on c.id = i.club_id join users u on u.id = c.owner_id where i.id = ${id}`);
   if (!inv) return null;
   return { inv, settings: (await one<{ company_name: string; address: string; email: string; phone: string; vat_percent: number; footer_note: string; payment_instructions: string }>(sql`select company_name, address, email, phone, vat_percent, footer_note, payment_instructions from platform_settings where id = 1`))! };
@@ -143,7 +146,20 @@ export const listTeam = () => q<{ user_id: string; name: string; phone: string |
 /** Distinct people a broadcast would reach. Only active members of active clubs. */
 export async function audienceCount(a: { type: "all_admins" | "all_players" | "clubs"; clubIds?: string[] }) {
   const roleFilter = a.type === "all_admins" ? sql`'admin' = any(m.roles)` : sql`true`;
-  const clubFilter = a.type === "clubs" ? sql`and m.club_id = any(${a.clubIds ?? []}::uuid[])` : sql``;
+  const clubFilter = a.type === "clubs" ? sql`and m.club_id::text in (${list(a.clubIds ?? [])})` : sql``;
   const r = await one<{ n: number }>(sql`select count(distinct m.user_id)::int as n from memberships m join clubs c on c.id = m.club_id where m.status = 'active' and c.status = 'active' and ${roleFilter} ${clubFilter}`);
   return r?.n ?? 0;
 }
+
+export type PaymentEvent = { id: string; event: string; reference: string | null; signature_valid: boolean; outcome: string; detail: string | null; received_at: Date };
+/** Outcomes a human should look at. Routine ones (credited, already_processed, ignored) are not in this list. */
+export const ATTENTION = ["rejected_signature", "rejected_mismatch", "duplicate_payment", "unknown_reference", "error"];
+export const paymentEvents = () => q<PaymentEvent>(sql`select id, event, reference, signature_valid, outcome, detail, received_at from payment_events order by received_at desc limit 150`);
+export const attentionCount = async () => Number((await one<{ n: number }>(sql`select count(*)::int as n from payment_events where outcome in (${list(ATTENTION)}) and received_at > now() - interval '7 days' and event <> 'return.verify'`))?.n ?? 0);
+export const paymentsSummary = () => one<{ dues_online_30d: string; dues_online_count: number; invoices_online_30d: string; clubs_with_payouts: number; clubs_total: number; pending_old: number }>(sql`select
+  (select coalesce(sum(amount_kobo),0)::bigint from payments where status = 'paid' and provider <> 'manual' and paid_at > now() - interval '30 days') dues_online_30d,
+  (select count(*)::int from payments where status = 'paid' and provider <> 'manual' and paid_at > now() - interval '30 days') dues_online_count,
+  (select coalesce(sum(amount_kobo),0)::bigint from invoice_payments where status = 'paid' and paid_at > now() - interval '30 days') invoices_online_30d,
+  (select count(*)::int from clubs where payouts_enabled_at is not null) clubs_with_payouts,
+  (select count(*)::int from clubs where status = 'active') clubs_total,
+  (select count(*)::int from payments where status = 'pending' and created_at < now() - interval '1 day') pending_old`);

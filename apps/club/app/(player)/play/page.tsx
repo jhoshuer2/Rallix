@@ -4,6 +4,7 @@ import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
 import { inClub, requireClub } from "../../../lib/context";
+import { payoutsEnabled } from "../../../lib/payment-queries";
 import { listCompetitions, listDues, listMatches, listMembers, memberStats, naira, fmtDate} from "../../../lib/queries";
 
 export default async function PlayerHome() {
@@ -16,6 +17,7 @@ export default async function PlayerHome() {
     members: await listMembers(tx, ctx.club.clubId),
     comps: await listCompetitions(tx, ctx.club.clubId, me),
   }));
+  const payOn = await payoutsEnabled(ctx);
   const next = d.matches.filter((m) => m.status === "scheduled" || m.status === "live").sort((a, b) => (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity))[0];
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
   const mine = d.members.find((m) => m.id === me);
@@ -31,7 +33,7 @@ export default async function PlayerHome() {
           opponent={opp.name} opponentPhoto={opp.photo ?? undefined} href={`/play/compete/${next.competitionId}`} linkAs={Link} />
       ) : <p className="rx-muted">No upcoming matches.</p>}
       <SectionHeader title="Dues" />
-      {due ? <DueCard plan={due.plan} amount={naira(due.amountKobo)} due={fmtDate(due.dueDate)} status={due.status === "overdue" ? "overdue" : "due"} action={<PayButton amount={naira(due.amountKobo)} />} />
+      {due ? <DueCard plan={due.plan} amount={naira(due.amountKobo)} due={fmtDate(due.dueDate)} status={due.status === "overdue" ? "overdue" : "due"} action={<PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />} />
         : <p className="rx-muted">{d.dues.length ? "You’re all paid up." : "No dues yet."}</p>}
       <SectionHeader title="My standing" linkLabel="Stats" href="/play/stats" linkAs={Link} />
       <StatGrid stats={[

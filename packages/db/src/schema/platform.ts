@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { clubs } from "./tenancy";
 import { invoiceStatus, issueSeverity, issueStatus, notificationChannel, notificationStatus, planPeriod, subscriptionStatus, templateKind } from "./enums";
@@ -125,3 +125,34 @@ export const platformSettings = pgTable("platform_settings", {
   paymentInstructions: text("payment_instructions").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [check("platform_settings_single", sql`${t.id} = 1`), check("platform_settings_vat", sql`${t.vatPercent} BETWEEN 0 AND 100`)]);
+
+/** Attempts to pay a Rallix invoice online. Service role only. */
+export const invoicePayments = pgTable("invoice_payments", {
+  id: id(),
+  invoiceId: uuid("invoice_id").notNull().references(() => platformInvoices.id, { onDelete: "cascade" }),
+  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  reference: text("reference").notNull().unique(),
+  amountKobo: integer("amount_kobo").notNull(),
+  status: text("status").notNull().default("pending"),
+  initiatedBy: text("initiated_by").references(() => users.id, { onDelete: "set null" }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  raw: jsonb("raw"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("invoice_payments_invoice_idx").on(t.invoiceId),
+  check("invoice_payments_status", sql`${t.status} IN ('pending','paid','failed')`),
+  check("invoice_payments_amount", sql`${t.amountKobo} > 0`),
+]);
+
+/** Every webhook delivery we receive, valid or not. Service role only. Used for troubleshooting, never for crediting decisions. */
+export const paymentEvents = pgTable("payment_events", {
+  id: id(),
+  provider: text("provider").notNull(),
+  event: text("event").notNull(),
+  reference: text("reference"),
+  signatureValid: boolean("signature_valid").notNull(),
+  outcome: text("outcome").notNull(), // credited | already_processed | duplicate_payment | rejected_signature | rejected_mismatch | unknown_reference | ignored | error
+  detail: text("detail"),
+  raw: jsonb("raw"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("payment_events_ref_idx").on(t.reference), index("payment_events_received_idx").on(t.receivedAt)]);

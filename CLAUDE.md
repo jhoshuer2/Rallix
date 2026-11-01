@@ -39,10 +39,19 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Uses only the service DB role (BYPASSRLS). Every server action in `lib/actions.ts` must call `requireAdmin()` first, validate its input, and write an `audit_log` row. Console-only tables (`issues`, `templates`, `platform_settings`, `notifications`, `audit_log`, `platform_admins`) have no app-role grants.
 - Grant access with `pnpm --filter @rallix/db make-platform-admin 08031234567 "Name"`. Dev seed admin: +2348030000200.
 - Suspending or closing a club (`clubs.status`) is enforced in Postgres (`app.is_member` / `has_role` / `is_self` require an active club), not just in the UI. Members land on `/suspended` in the club app.
-- Delivery is not connected: notifications are stored as `queued`; payments are recorded by hand (mark an invoice paid with its reference). Wire Paystack and SMS/email providers before relying on either.
+- Notification delivery is not connected (stored as `queued`). Invoices can be paid online (the club app webhook credits them) or recorded by hand with a reference.
 - Invoice numbers come from `app.next_invoice_number()` (service role only); one invoice per club per `period_label`.
 - Touch targets: 44px minimum in the club PWA; the desktop console uses at least 36px for buttons and inputs.
 - Console e2e: `apps/console/e2e/full-flow.cjs` (needs both apps running; see its header).
+
+## Payments (`packages/payments`, `apps/club/lib/payments*.ts`)
+- `PaymentProvider` interface with `PaystackProvider` and a `FakeProvider` (dev/tests; production refuses it). Money is integer kobo and always comes from the database.
+- ONE crediting routine: `finalizeByReference` in `lib/payments-core.ts`. Webhook (`/api/webhooks/paystack`) and return page (`/pay/return`) both call it. It verifies with the provider and reconciles reference, amount, currency and status against what we recorded BEFORE the customer paid; credit is transactional and idempotent. Never credit from a request body.
+- Club bank details (`clubs.paystack_subaccount_code`, `payout_*`) are service-role only; the app role has column-level grants and cannot read or change them. Only `savePayoutAccount` writes them, after re-resolving the account with the provider.
+- Do not use `instanceof PaymentError` across bundles; use `isPaymentError()`.
+- Do not pass JS arrays to `= any(...)` in raw SQL; expand into `IN (...)` (see `list()` in the console queries).
+- Before real money: run `pnpm --filter @rallix/payments smoke` with a TEST key and follow `packages/payments/README.md`.
+- Tests: `pnpm --filter @rallix/payments test`, `apps/club/e2e/payments.cjs` (needs both apps and a fresh seeded DB).
 
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.

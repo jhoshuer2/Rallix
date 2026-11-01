@@ -29,6 +29,20 @@
       "when": 1793483912507,
       "tag": "0003_console_rls_and_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793497973013,
+      "tag": "0004_payments_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793497973737,
+      "tag": "0005_payments_rls_and_grants",
+      "breakpoints": true
     }
   ]
 }

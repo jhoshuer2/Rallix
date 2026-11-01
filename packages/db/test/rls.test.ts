@@ -268,3 +268,55 @@ describe("console tables and suspended clubs", () => {
     void m;
   });
 });
+
+describe("payout and payment tables", () => {
+  const adminCtx = () => ({ userId: "adminA", clubId: ids.A });
+  it("the app role cannot read bank or subaccount details, even an admin reading their own club", async () => {
+    for (const col of ["paystack_subaccount_code", "payout_bank_name", "payout_bank_code", "payout_account_name", "payout_account_last4"]) {
+      expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql.raw(`select ${col} from clubs`))))).toBe("42501");
+    }
+    expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql`select * from clubs`)))).toBe("42501");
+  });
+
+  it("an admin cannot change where money is paid out, nor mark payouts enabled", async () => {
+    for (const set of ["paystack_subaccount_code = 'ACCT_evil'", "payouts_enabled_at = now()", "payout_account_last4 = '9999'"]) {
+      expect(await denied(withTenant(app, adminCtx(), (tx) => tx.execute(sql.raw(`update clubs set ${set} where id = '${ids.A}'`))))).toBe("42501");
+    }
+  });
+
+  it("an admin can still edit the ordinary club details, and players cannot", async () => {
+    const r = await withTenant(app, adminCtx(), (tx) => tx.execute(sql`update clubs set location = 'Abuja' where id = ${ids.A}`));
+    expect(r.rowCount).toBe(1);
+    const p = await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set location = 'Hacked' where id = ${ids.A}`));
+    expect(p.rowCount).toBe(0);
+  });
+
+  it("members can see whether online payments are on, and nothing else about payouts", async () => {
+    await svc.execute(sql`update clubs set paystack_subaccount_code = 'ACCT_test', payout_bank_name = 'Test Bank', payout_account_last4 = '6789', payouts_enabled_at = now() where id = ${ids.A}`);
+    const r = await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select payouts_enabled_at is not null as enabled from clubs`);
+    expect(r).toEqual([{ enabled: true }]);
+  });
+
+  it("payouts cannot be marked enabled without a subaccount", async () => {
+    expect(await denied(svc.execute(sql`update clubs set paystack_subaccount_code = null, payouts_enabled_at = now() where id = ${ids.B}`))).toBe("23514");
+  });
+
+  it("the app role cannot read, write or even see invoice payments and webhook events", async () => {
+    for (const t of ["invoice_payments", "payment_events"]) {
+      expect(await denied(app.execute(sql.raw(`select * from ${t}`)))).toBe("42501");
+      expect(await denied(app.execute(sql.raw(`insert into ${t} default values`)))).toBe("42501");
+    }
+  });
+
+  it("payment references are unique, so one reference can never credit two payments", async () => {
+    const ins = sql`insert into payments (club_id, membership_id, amount_kobo, status, provider_ref) values (${ids.A}, ${ids.mP2}, 600000, 'pending', 'dup-ref-1')`;
+    await svc.execute(ins);
+    expect(await denied(svc.execute(ins))).toBe("23505");
+  });
+
+  it("invoice payment amounts must be positive and statuses valid", async () => {
+    const inv = (await svc.execute(sql`insert into platform_invoices (club_id, number, status, amount_kobo, period_label) values (${ids.A}, 'T-1', 'issued', 100, 'p1') returning id`)).rows[0] as { id: string };
+    expect(await denied(svc.execute(sql`insert into invoice_payments (invoice_id, club_id, reference, amount_kobo) values (${inv.id}, ${ids.A}, 'RLX-I-T1', 0)`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into invoice_payments (invoice_id, club_id, reference, amount_kobo, status) values (${inv.id}, ${ids.A}, 'RLX-I-T2', 100, 'hacked')`))).toBe("23514");
+  });
+});

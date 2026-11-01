@@ -34,7 +34,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div><strong>{s.company_name}</strong><br /><span className="cs-pre">{s.address}</span>{s.email ? <><br />{s.email}</> : null}{s.phone ? <><br />{s.phone}</> : null}</div>
           <div style={{ textAlign: "right" }}>
             <strong>{inv.number}</strong><br />Issued: {date(inv.issued_at ?? inv.created_at)}<br />Due: {date(inv.due_at)}
-            {inv.status === "paid" ? <><br /><strong>PAID {date(inv.paid_at)}</strong>{inv.payment_ref ? <><br />Ref: {inv.payment_ref}</> : null}</> : null}
+            {inv.status === "paid" ? <><br /><strong>PAID {date(inv.paid_at)}</strong>{inv.paid_online ? <><br />Paid online via Paystack</> : null}{inv.payment_ref ? <><br />Ref: {inv.payment_ref}</> : null}</> : null}
             {inv.status === "void" ? <><br /><strong>VOID</strong></> : null}
           </div>
         </div>
