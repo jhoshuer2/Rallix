@@ -82,7 +82,7 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Meet WCAG 2.1 AA, respect `prefers-reduced-motion`, and keep touch targets at least 44px in the club PWA.
 
 ## Skills
-Project skills live in `.claude/skills/`: `rallix-motion`, `figma-to-code`, `rallix-a11y`. Also use `design:design-critique`, `design:accessibility-review`, `design:design-handoff`, `design:design-system` and `design:ux-copy`.
+Project skills live in `.claude/skills/`: `rallix-motion`, `figma-to-code`, `rallix-a11y`, `rallix-premium-ui` (use it for any club-app screen: photo-led, low text, stories, placeholders). Also use `design:design-critique`, `design:accessibility-review`, `design:design-handoff`, `design:design-system` and `design:ux-copy`.
 
 ## Phases
 0 design intake and foundation, 1 MVP (clubs, invites, profiles, dues, competitions, scoring, club leaderboard), 2 point-by-point and Elo and global leaderboard, 3 AI video analysis, 4 coach, spectator and inter-club features.
