@@ -1,0 +1,33 @@
+/**
+ * Design-system crawler: signs in as a player and as the admin of the seeded club, visits every listed route at phone width,
+ * and checks the rules from .claude/skills/rallix-premium-ui: no sideways page scroll, 44px targets, text diet, no console errors.
+ * Screenshots go to $OUT/screen_<role>_<name>.png.
+ * Needs a freshly seeded DB and the club app running:  OUT=/tmp DEV_LOG=/tmp/club.log node apps/club/e2e/screens.cjs
+ */
+const {chromium}=require('playwright');const fs=require('fs');const {execSync}=require('child_process');
+const SC=process.env.OUT||'/tmp', LOG=process.env.DEV_LOG, B='http://localhost:3000';
+const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
+let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAIL',m)};
+function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...log.matchAll(re)];return a.length?a[a.length-1][1]:null}
+async function signIn(p,email){await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()),{timeout:25000});await p.goto(B+'/switch/'+sql("select id from clubs where name='Paris Arena'"))}
+const ids={comp:()=>sql("select id from competitions limit 1"),match:()=>sql("select id from matches where status='completed' limit 1"),member:()=>sql("select m.id from memberships m join users u on u.id=m.user_id where u.email='sule@example.com' and m.club_id=(select id from clubs where name='Paris Arena')")};
+const PLAYER=[['home','/play'],['compete','/play/compete'],['ranks','/play/ranks'],['stats','/play/stats'],['me','/play/me'],['payments','/play/me/payments'],['comp','/play/compete/{comp}'],['match','/play/compete/{comp}/match/{match}']];
+const ADMIN=[['home','/'],['members','/members'],['competition','/competition'],['membership','/membership'],['profile','/profile']];
+async function crawl(p,role,routes,errs,max){
+  for(const [name,path0] of routes){
+    const path=path0.replace('{comp}',ids.comp()).replace('{match}',ids.match()).replace('{member}',ids.member());
+    await p.goto(B+path);await p.waitForLoadState('networkidle');await p.waitForTimeout(250);
+    const words=(await p.locator('body').innerText()).split(/\s+/).filter(Boolean).length;
+    const noscroll=await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth);
+    const small=await p.evaluate(()=>[...document.querySelectorAll('a,button,input,select')].filter(e=>{const r=e.getBoundingClientRect();const cs=getComputedStyle(e);return r.width>0&&r.height>0&&r.height<44&&!e.closest('.rx-carousel')&&!e.classList.contains('rx-btn--small')&&cs.visibility!=='hidden'&&e.type!=='checkbox'&&e.type!=='hidden'}).map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,22)+' '+Math.round(e.getBoundingClientRect().height)));
+    const legacy=await p.evaluate(()=>['rx-card','rx-format','rx-promo','rx-rank','rx-stats','rx-match','rx-pays','rx-pay'].filter(c=>document.querySelector('.'+c+':not(.rx-lgroup)')));
+    ok(noscroll,`${role}/${name}: no sideways scroll`);ok(small.length===0,`${role}/${name}: 44px targets ${JSON.stringify(small)}`);ok(words<=max,`${role}/${name}: ${words} words (max ${max})`);ok(legacy.length===0,`${role}/${name}: no legacy card classes ${JSON.stringify(legacy)}`);
+    await p.screenshot({path:`${SC}/screen_${role}_${name}.png`,fullPage:true});
+  }
+}
+(async()=>{const b=await chromium.launch();
+for(const [role,email,routes,max] of [['player','ade@example.com',PLAYER,150],['admin','admin@example.com',ADMIN,150]]){
+  const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning/.test(m.text()))errs.push(m.text())});
+  await signIn(p,email);await crawl(p,role,routes,errs,max);ok(errs.length===0,`${role}: no console errors ${JSON.stringify(errs.slice(0,2))}`);await c.close();
+}
+console.log(`\n${pass} passed, ${fail} failed`);await b.close()})().catch(e=>{console.log('CRASH',e.message);process.exit(1)});

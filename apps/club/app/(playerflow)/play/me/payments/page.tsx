@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { BackButton, DueCard, PageHead, PaymentRow, SectionHeader } from "@rallix/ui";
+import { BackButton, IconBadge, ListGroup, ListRow, PageShell, Panel, Pill, SectionTitle } from "@rallix/ui";
 import { PayButton } from "../../../../../components/PayButton";
 import { inClub, requireClub } from "../../../../../lib/context";
 import { payoutsEnabled } from "../../../../../lib/payment-queries";
 import { ownEmailOptOut } from "../../../../../lib/contact";
-import { listDues, listPayments, naira, fmtDate} from "../../../../../lib/queries";
+import { listDues, listPayments, naira, fmtDate } from "../../../../../lib/queries";
 
 export default async function PlayerPayments() {
   const ctx = await requireClub();
@@ -14,16 +14,29 @@ export default async function PlayerPayments() {
   const optedOut = await ownEmailOptOut(ctx.user.id);
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
   return (
-    <>
-      <PageHead back={<BackButton href="/play/me" linkAs={Link} />} title="Payments" />
-      {due ? <DueCard plan={due.plan} amount={naira(due.amountKobo)} due={fmtDate(due.dueDate)} status={due.status === "overdue" ? "overdue" : "due"} action={<PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />} /> : <p className="rx-muted">You’re all paid up.</p>}
+    <PageShell back={<BackButton href="/play/me" linkAs={Link} />} title="Payments">
+      {due ? (
+        <Panel>
+          <p className="rx-muted" style={{ margin: 0 }}>{due.plan} · due {fmtDate(due.dueDate)}</p>
+          <p className="rx-metric__value" style={{ margin: "4px 0 16px", fontSize: 40 }}>{naira(due.amountKobo)}</p>
+          {due.status === "overdue" ? <p style={{ margin: "0 0 12px" }}><Pill tone="warning">Overdue</Pill></p> : null}
+          <PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />
+        </Panel>
+      ) : <Panel><p style={{ margin: 0 }}>{d.dues.length ? "You’re all paid up." : "No dues yet."}</p></Panel>}
       {optedOut ? <p className="rx-muted" style={{ fontSize: 14 }}>You’ve turned off reminder emails, so check here for what’s due. <Link href="/play/me" style={{ textDecoration: "underline" }}>Change this</Link></p> : null}
-      <SectionHeader title="History" />
-      {d.pays.length === 0 ? <p className="rx-muted">No payments yet.</p> : (
-        <ul className="rx-pays">
-          {d.pays.map((p, i) => <PaymentRow key={p.id} rank={i + 1} name={p.method ? `Payment · ${p.method}` : "Payment"} detail={(p.paidAt ?? p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) + (p.status === "pending" && Date.now() - p.createdAt.getTime() > 3600_000 ? " · not completed" : "")} amount={naira(p.amountKobo)} status={p.status} />)}
-        </ul>
-      )}
-    </>
+      {d.pays.length > 0 ? (
+        <>
+          <SectionTitle title="History" />
+          <ListGroup label="Payment history">
+            {d.pays.map((p) => {
+              const notDone = p.status === "pending" && Date.now() - p.createdAt.getTime() > 3600_000;
+              const date = (p.paidAt ?? p.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+              return <ListRow key={p.id} media={<IconBadge icon="money" />} title={p.method ? `Payment · ${p.method}` : "Payment"} subtitle={`${date}${notDone ? " · not completed" : ""}`}
+                trailing={<>{naira(p.amountKobo)} {p.status !== "paid" ? <Pill tone={p.status === "failed" ? "warning" : "neutral"}>{p.status}</Pill> : null}</>} tone={p.status === "paid" ? "good" : undefined} />;
+            })}
+          </ListGroup>
+        </>
+      ) : null}
+    </PageShell>
   );
 }

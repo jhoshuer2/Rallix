@@ -6,7 +6,7 @@ import { requireClub } from "../../lib/context";
 export default async function PlayerLayout({ children }: { children: ReactNode }) {
   await requireClub();
   return (
-    <Screen>
+    <Screen tone="canvas">
       {children}
       <PlayerNav />
     </Screen>

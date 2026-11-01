@@ -3,61 +3,84 @@ name: rallix-premium-ui
 description: Rules for making Rallix screens feel premium and low on text: photo-led cards, one hero per screen, Instagram-style story highlights, carousels, skeleton loading, and placeholders for player and club pictures. Use when designing or reviewing any club-app screen, and before shipping UI.
 ---
 
-# Rallix premium UI
+# Rallix premium UI: the design system
 
-Reference: high-end sports club apps. What makes them feel expensive is **not decoration**. It is restraint: big images, few words, one clear focus per screen, calm motion. Keep Rallix's own colours and fonts (`packages/ui/src/tokens.css`). Never copy another brand's look.
+Goal: every screen in the club app looks like it came from one premium product: a blue band with the title and highlights, a clean light canvas, photos where there are people, one family of cards. Reference: high-end sports club apps. What makes them feel expensive is restraint: big images, few words, one focus per screen, calm motion. Keep Rallix's own colours and fonts. Never copy another brand's look.
 
-## The seven rules
-1. **One hero per screen.** A single large element (live or next match, the player's rank, a competition cover) owns the top. Everything else is quieter and smaller.
-2. **Image first, words second.** A card is a picture plus at most two short lines (a title of up to about 6 words, and one detail). No paragraphs, no stacked chips. If a card needs a third line, the information belongs on a detail screen.
-3. **Every picture slot uses `<Photo>`.** Real upload when present; otherwise a generated brand placeholder (colour from a hash of the name, monogram or ball motif). Never a grey box, a broken image, or empty space. Players and clubs upload pictures later; the layout must already look finished without them.
-4. **Stories row for what is happening now.** Round highlights at the top of Home: the live match first, then recent results. Ring = unseen, muted ring = seen, red LIVE tag for live. Tapping opens the full-screen viewer.
-5. **Sections are swipe rows, not lists.** A section is an editorial title with a small arrow ("Latest results →") over a horizontal scroll-snap carousel with the next card peeking. Use a vertical list only for dense, scannable data (the rankings table).
-6. **Type hierarchy.** Spotlight (display, italic, uppercase) only for the hero number or name and for section titles, kept short. All other text is General Sans in sentence case, 16px minimum for body. No all-caps paragraphs. Numbers that matter (rank, score, countdown) are big.
-7. **Calm, intentional motion.** Transform and opacity only, 120 to 320 ms from the motion tokens. Skeleton placeholders that match the final layout instead of spinners. Honour `prefers-reduced-motion`: no auto-advance, no pulse, fades only.
+Living style guide: open `/kit` in the club app. Source: `packages/ui/src` (`tokens.css`, `components.css`, `premium.tsx`, `stories.tsx`).
 
-## Text diet (check every screen)
-- Count the words visible on first load. If the screen shows more than about 40, cut or move detail one tap deeper.
-- Replace labels with icons or pictures where the meaning is obvious, but keep an accessible name.
-- Prefer "Sun 3 Nov, 4:00 pm" over "Scheduled for Sunday the 3rd of November at 4:00 pm".
-- Hide empty sections instead of showing "No X yet" lines, unless the empty state is the main content (then use a friendly picture and one action).
-- One primary action per screen.
+## Page anatomy (every content screen)
+Use `PageShell`. Do not build your own page structure.
+```
+<PageShell header={<ClubHeader />} title="Members" action={...} band={<Stories/>} flat?>
+  ...cards...
+</PageShell>
+```
+- **Band** (blue, rounded bottom): club header, one display title (or back button + title on detail screens), optional story highlights.
+- **Canvas** (light grey `--rx-canvas`): the first card overlaps the band. If the page starts with plain content (search box, tabs), pass `flat`.
+- Layouts use `<Screen tone="canvas">`. Auth, splash and onboarding keep the full blue `Screen`.
+- Loading: a `loading.tsx` with `Skeleton` blocks in the same shape. Never a spinner.
 
-## Story highlights pattern
-- Row: horizontal scroll, 72px circles, 12px gap, caption under each (max 2 short lines, truncated).
-- Ring: gradient from existing rust to yellow when unseen; 2px muted ring when seen. Seen state is saved per viewer in `localStorage` inside try/catch (private windows throw), and the row must work without it.
-- Content for now: the live match first, then the last results. The circle shows the two players' faces (placeholders allowed) or the score.
-- Viewer: native `<dialog>`, progress bars on top, auto-advance after 5 s, hold to pause, tap right or left edge for next or previous, swipe or button to close, Esc closes. The caption is in an `aria-live="polite"` region. With reduced motion there is no auto-advance.
-- Never blocks the app: closing returns focus to the ring that opened it.
+## The six card kinds. Nothing else.
+All share: white surface, 16px radius, one soft shadow, 16px padding, 44px touch targets, the same title (16px, 600) and subtitle (14px, `--rx-ink-3`) styles.
 
-## Placeholders for uploaded pictures
-- `Photo` has `kind="person" | "club" | "cover"`. The same name always produces the same placeholder colour. Person: circle with initials. Club: rounded square with monogram. Cover: wide gradient with the ball motif.
-- Always pass `alt` or mark the image decorative. Do not stretch: `object-fit: cover`.
-- Do not claim a picture exists. Uploading comes later (needs storage); design as if it will arrive.
+| You are showing | Use | Notes |
+|---|---|---|
+| A competition, anything with a cover picture | `MediaCard` | Wide picture, one title line, one detail line, optional tag. Carousel size by default; `className="rx-ccard--wide"` for stacks |
+| A finished match | `ResultCard` | Both faces, the score, "X won 3–1" |
+| A person, payment, fixture, setting, club | `ListRow` inside `ListGroup` | Photo or `IconBadge`, title, one subtitle, value or chevron on the right |
+| One number that matters | `MetricCard` inside `MetricGrid` | Max 4 per screen |
+| A shortcut to another screen | `TileLink` (2 columns) or `ActionButton` (round, 3 in a row) | Icon plus 1 or 2 words |
+| A form, free text, a chart, anything else | `Panel` | Optional `title`. Use `className="rx-panel--night"` for dark media bands |
 
-## Spacing and rhythm
-- Page gutter 16px. Section gap 32px. Card gap 12px. Hero gets 24px of air above.
-- Alternate surfaces for rhythm: blue app background, a cream band for data sections, a dark band for media. Never more than three surface colours on one screen.
-- Corner radius from tokens; cards in carousels are about 75% of the screen width so the next one peeks.
+Hero pieces (one per screen): `HeroMatch` (player), `ClubBanner` (admin), the revenue card (membership), a `MediaCard` (competition). Status pills use `Pill` (neutral, success, warning, live) and nothing else.
+
+### Forbidden in pages
+- Raw `rx-card`, `rx-promo`, `rx-format`, `rx-rank`, `rx-stats`, `rx-match`, `rx-pays` classes, or inline-styled boxes that look like cards.
+- The legacy components `Card`, `Chip`, `FormatCard`, `PromoCard`, `PaymentRow`, `PlayerRow`, `RankRow`, `RankCard`, `DueCard`, `MatchCard`, `StatGrid`, `ClubRow`, `PageHead` in converted screens (a test enforces this).
+- More than two lines of text on a card, stacked chips, or a paragraph inside a list row.
+- A second hero, or two primary buttons.
+- Local helper components that style a card inside a page file. Add it to `packages/ui` and to `/kit` first.
+
+## Type
+- **Spotlight display** (italic, uppercase): the band title, section titles, hero numbers. Short.
+- **General Sans**: everything else, sentence case. Body 16px minimum, captions 13px, never below 12.
+- No all-caps paragraphs.
+
+## Colour
+- Blue (band, hero, active states), rust (the single action colour), night `#0F2038` (dark bands, hero cards), canvas `#F3F4F7`, white surface, line `#E2E4EA`, ink `#141414`, secondary text `--rx-ink-3` (never lighter).
+- Green, orange, red only to say good, warning, bad or live. Never colour alone: add text or an icon.
+
+## Pictures and placeholders
+Every picture slot uses `Photo` (`kind` person, club, cover). With no upload it shows a designed placeholder: brand gradient from the name, initials or the ball motif. Never a grey box, a broken image or empty space. Pass `alt=""` when the name is written next to it.
+
+## Story highlights (in the band)
+Live match first, then the latest results. Ring means unseen, muted ring means seen, red LIVE tag for live. Viewer is a native `<dialog>`: progress bars, 5 s auto-advance, hold to pause, tap left or right, Esc closes and focus returns to the ring. With reduced motion there is no auto-advance. Seen state lives in `localStorage` inside try/catch.
+
+## Screen recipes
+- **Dashboard (Home):** band with stories, one hero, one attention strip or due notice, 2 metrics, 1 to 2 carousels.
+- **List (Members, Ranks):** `flat` page, search or segmented control, `ListGroup` or photo grid.
+- **Detail (competition, match):** `back` + title in the band, a hero or a `ListGroup`, sections with `SectionTitle`.
+- **Form (profile, payouts):** `Panel` per group, one primary button at the bottom.
+- **Settings and menus:** `TileLink` grid or `ListGroup` with chevrons.
+- **Empty:** one sentence and one button. **Error:** what happened, what to do, one button. **Loading:** skeleton in the same shape.
+- **Live scoring** stays a dark, high-contrast scoreboard: instant feedback, no motion, targets 44px or larger.
+
+## Text diet
+Under about 150 visible words per screen, including the tab bar. Prefer "Sat 3 Nov, 4:00 pm". Hide empty sections instead of showing "No X yet", unless the empty state is the main content. One primary action per screen.
+
+## Motion
+Transform and opacity only, 120 to 320 ms (`--rx-dur-*`). Skeleton shimmer, LIVE pulse and story progress stop under `prefers-reduced-motion`.
+
+## Browser-only code
+Never read `window` or `localStorage` while rendering. Do it in an effect so server rendering cannot crash. Active-tab matching is exact or with a trailing slash.
 
 ## Before shipping
-- [ ] One hero, one primary action, under about 40 visible words.
-- [ ] Every image slot shows a good placeholder with no uploads.
-- [ ] Contrast 4.5:1 for text, 3:1 for large text and icons; never colour alone for meaning (LIVE has text).
-- [ ] 44px minimum touch targets, including rings and carousel cards.
-- [ ] Keyboard: everything reachable, visible focus, Esc closes viewers and sheets.
-- [ ] Reduced motion tested; skeleton, empty, error and offline states exist.
-- [ ] No horizontal page scroll (only inside carousels); phone width 360 to 440px checked.
+- [ ] Uses `PageShell` and only the six card kinds. `/kit` updated if you added a component.
+- [ ] One hero, one primary action, under about 150 words.
+- [ ] Every image slot looks finished with no uploads.
+- [ ] Contrast 4.5:1 (3:1 for large text and icons); the contrast test passes.
+- [ ] 44px targets, visible focus, Esc closes viewers and sheets.
+- [ ] Reduced motion tested; skeleton, empty, error states exist.
+- [ ] No sideways page scroll at 360 to 440px; `apps/club/e2e/screens.cjs` passes.
 - [ ] Run `rallix-a11y` and `design:design-critique`.
-
-## Admin screens
-The admin's job is "what needs attention, and how is the club doing". Same rules, different hero.
-- **Home hero:** `ClubBanner` (cover and logo placeholders from the club name, one big revenue figure, member count).
-- **Needs attention:** up to three `AttentionTile`s (a count and 2 to 3 words, e.g. "4 unpaid dues"), shown only when there is something to do. With nothing to do, show nothing, not "all good" text.
-- **Quick actions:** a row of three round `ActionButton`s with one-word labels. Never a stack of full-width ghost buttons.
-- **Lists of people:** `MemberCard` photo grid (rank badge, name, rating) with a sticky search box; never a text table on a phone.
-- **Settings and menus:** `TileLink` 2-column tiles with an icon and one or two words, not promo banners with sentences.
-- **Status rows:** one slim row with a coloured edge (green on, orange off) and one action button.
-- **Empty states:** one sentence and one button. Never an empty grid or a blank screen.
-- **Active tab:** match routes exactly or with a trailing slash (`/members` must not light up on `/membership`).
-- **Browser-only code:** never read `window` or `localStorage` while rendering; do it in an effect so server rendering cannot crash.

@@ -42,7 +42,7 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
 type Side = { name: string; photo?: string | null };
 /** The one big moment at the top of Home: live or next match. */
 export function HeroMatch({ competition, whenLabel, startsAt, live, a, b, scoreA, scoreB, href, linkAs: L = "a", cta }: {
-  competition: string; whenLabel: string; startsAt?: Date | null; live?: boolean; a: Side; b: Side; scoreA?: number | null; scoreB?: number | null; href: string; linkAs?: ElementType; cta: string;
+  competition: string; whenLabel: string; startsAt?: Date | null; live?: boolean; a: Side; b: Side; scoreA?: number | null; scoreB?: number | null; href?: string; linkAs?: ElementType; cta?: string;
 }) {
   const showScore = live || (scoreA != null && scoreB != null);
   return (
@@ -57,7 +57,7 @@ export function HeroMatch({ competition, whenLabel, startsAt, live, a, b, scoreA
         <div className="rx-mhero__side"><Photo src={b.photo} name={b.name} alt="" className="rx-mhero__face" /><span className="rx-mhero__name">{b.name}</span></div>
       </div>
       <p className="rx-mhero__when">{whenLabel}</p>
-      <L href={href} className="rx-btn rx-btn--block">{cta}</L>
+      {href && cta ? <L href={href} className="rx-btn rx-btn--block">{cta}</L> : null}
     </section>
   );
 }
@@ -75,19 +75,17 @@ export function ResultCard({ a, b, scoreA, scoreB, winner, competition, when, hr
         <Photo src={b.photo} name={b.name} alt="" className={cx("rx-rcard__face", winner === "a" && "is-dim")} />
         <span className="rx-rcard__score">{scoreLine(scoreA, scoreB)}</span>
       </div>
-      <p className="rx-rcard__title">{summary}</p>
-      <p className="rx-rcard__sub">{when}</p>
+      <div className="rx-cardtext"><p className="rx-rcard__title">{summary}</p><p className="rx-rcard__sub">{when}</p></div>
     </L>
   );
 }
 
-/** A competition: wide cover (placeholder until the club uploads one), name and one detail. */
-export function CoverCard({ name, detail, cover, href, linkAs: L = "a", tag, className }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string; className?: string }) {
+/** MediaCard: a wide picture (placeholder until uploaded), a title and one detail. Used for competitions and anything with a cover. */
+export function MediaCard({ name, detail, cover, href, linkAs: L = "a", tag, className }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string; className?: string }) {
   return (
     <L href={href} className={cx("rx-ccard", className)}>
       <div className="rx-ccard__cover"><Photo src={cover} name={name} kind="cover" alt="" className="rx-ccard__img" />{tag ? <span className="rx-ccard__tag">{tag}</span> : null}</div>
-      <p className="rx-rcard__title">{name}</p>
-      <p className="rx-rcard__sub">{detail}</p>
+      <div className="rx-cardtext"><p className="rx-rcard__title">{name}</p><p className="rx-rcard__sub">{detail}</p></div>
     </L>
   );
 }
@@ -156,4 +154,62 @@ export function MemberCard({ rank, name, rating, photo, href, linkAs: L = "a" }:
       <span className="rx-mcard__meta"><span className="rx-mcard__name">{name}</span><span className="rx-mcard__rating">{rating}</span></span>
     </L>
   );
+}
+
+/* ---------- Page anatomy and the six card kinds ---------- */
+/**
+ * Every content screen: a blue band (club header, title, optional stories) over a light canvas.
+ * The first card on the canvas overlaps the band. Use `flat` when the page starts with plain content instead of a card.
+ */
+export function PageShell({ header, title, back, action, band, flat, children }: { header?: ReactNode; title?: ReactNode; back?: ReactNode; action?: ReactNode; band?: ReactNode; flat?: boolean; children: ReactNode }) {
+  return (
+    <>
+      <div className="rx-band">
+        {header}
+        {back || title || action ? <div className="rx-band__row">{back}{title ? <h1 className="rx-band__title">{title}</h1> : <span />}{action}</div> : null}
+        {band}
+      </div>
+      <div className={cx("rx-canvas", flat && "rx-canvas--flat")}>{children}</div>
+    </>
+  );
+}
+
+/** Panel: the plain white surface for forms, text and groups. Not for things that have a picture or a number to show off. */
+export function Panel({ children, className, title }: { children: ReactNode; className?: string; title?: string }) {
+  return <section className={cx("rx-panel", className)} aria-label={title}>{title ? <h2 className="rx-panel__title">{title}</h2> : null}{children}</section>;
+}
+
+/** ListRow: avatar or icon, a title, one detail line, and a value or chevron on the right. Rows stack inside a `ListGroup`. */
+export function ListRow({ media, title, subtitle, trailing, href, linkAs: L = "a", tone, current }: { media?: ReactNode; title: string; subtitle?: string; trailing?: ReactNode; href?: string; linkAs?: ElementType; tone?: "good" | "bad" | "warn"; current?: boolean }) {
+  const body = (
+    <>
+      {media ? <span className="rx-lrow__media" aria-hidden="true">{media}</span> : null}
+      <span className="rx-lrow__text"><span className="rx-lrow__title">{title}</span>{subtitle ? <span className="rx-lrow__sub">{subtitle}</span> : null}</span>
+      {trailing ? <span className={cx("rx-lrow__end", tone && `is-${tone}`)}>{trailing}</span> : href ? <Icon name="back" size={18} style={{ transform: "rotate(180deg)", opacity: .5 }} aria-hidden="true" /> : null}
+    </>
+  );
+  const cls = cx("rx-lrow", current && "is-current");
+  return href ? <L href={href} className={cls} aria-current={current ? "true" : undefined}>{body}</L> : <div className={cls}>{body}</div>;
+}
+/** `bare` drops the card background so rows can sit inside a Panel. */
+export const ListGroup = ({ children, label, bare }: { children: ReactNode; label?: string; bare?: boolean }) => <div className={cx("rx-lgroup", bare && "rx-lgroup--bare")} role="list" aria-label={label}>{children}</div>;
+
+/** Icon in a round badge, for ListRow media when there is no picture (settings, payments, actions). */
+export function IconBadge({ icon }: { icon: IconName }) { return <span className="rx-iconbadge"><Icon name={icon} size={22} /></span>; }
+
+/** MetricCard: one big number with a label. Use in a `MetricGrid` (2 columns). */
+export function MetricCard({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "good" | "bad" }) {
+  return (
+    <div className="rx-metric">
+      <span className="rx-metric__label">{label}</span>
+      <span className={cx("rx-metric__value", tone && `is-${tone}`)}>{value}</span>
+      {hint ? <span className="rx-metric__hint">{hint}</span> : null}
+    </div>
+  );
+}
+export const MetricGrid = ({ children }: { children: ReactNode }) => <div className="rx-metricgrid">{children}</div>;
+
+/** One small status pill, four tones. The only badge style in the app. */
+export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "live" }) {
+  return <span className={cx("rx-pill", `rx-pill--${tone}`)}>{children}</span>;
 }

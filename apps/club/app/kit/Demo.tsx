@@ -1,49 +1,46 @@
 "use client";
+import { ActionButton, AttentionTile, Carousel, ClubBanner, HeroMatch, IconBadge, ListGroup, ListRow, MediaCard, MemberCard, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, ResultCard, SectionTitle, SelectSheet, Skeleton, Stories, TileLink, type StoryItem } from "@rallix/ui";
 import { useState } from "react";
-import { AppHeader, BottomNav, Button, Card, ChoiceToggle, Chip, Count, IconButton, PlayerRow, RankCard, RankGrid,
-  Screen, Segmented, SectionHeader, StatGrid, Switch, TextField, Title, clubAdminNav } from "@rallix/ui";
 
+const a = { name: "Ada Obi" }, b = { name: "Tunde Bello" };
+const stories: StoryItem[] = [
+  { id: "1", live: true, caption: "Ada v Tunde", title: "League night", subtitle: "Group A", a, b, score: "1–0" },
+  { id: "2", caption: "Ada 3–1 Tunde", title: "League night", subtitle: "Group A · 28 Oct", a, b, score: "3–1" },
+];
+
+/** Living style guide: every token and card kind with placeholders only (no data, no uploads). */
 export function Demo() {
-  const [own, setOwn] = useState<"no" | "yes" | undefined>("yes");
-  const [period, setPeriod] = useState("monthly");
-  const [on, setOn] = useState(true);
-  const [picked, setPicked] = useState(true);
+  const [v, setV] = useState("");
   return (
-    <Screen>
-      <AppHeader clubName="Paris Arena" userName="Innocent Amos" />
-      <Title>Members <Count>100</Count></Title>
-      <div style={{ height: 16 }} />
-      <TextField label="Do you have a name for your club?" placeholder="E.g. Paris Arena" />
-      <TextField label="Where are you located" icon="pin" placeholder="E.g. Central Market, Kubwa, FCT, Abuja" error="Enter your location" />
-      <ChoiceToggle label="Do you own the club?" value={own} onChange={setOwn}
-        options={[{ value: "no", label: "No", icon: "close" }, { value: "yes", label: "Yes", icon: "thumb" }]} />
-      <SectionHeader title="Subscription" linkLabel="View all" href="#" />
-      <Segmented label="Billing period" value={period} onChange={setPeriod}
-        options={[{ value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }]} />
-      <div style={{ height: 12 }} />
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>Monthly</span><Switch label="Monthly plan enabled" checked={on} onChange={setOn} />
-        </div>
-        <p className="rx-title" style={{ fontSize: 32 }}>₦6,000</p>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Chip tone="active">Active</Chip><Chip tone="dark">Senior</Chip><Chip tone="warn">Intermediate</Chip>
-        </div>
-      </Card>
-      <div style={{ height: 12 }} />
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Button ball>Resume</Button><Button variant="ghost">Edit Price</Button><IconButton icon="plus" label="New member" />
-      </div>
-      <SectionHeader title="Players" />
-      <PlayerRow rank={1} name="Jide Taiwo" checked={picked} onChange={setPicked} />
-      <SectionHeader title="Leaderboard" />
-      <RankGrid>
-        <RankCard rank={1} name="Jide Taiwo" points={100} />
-        <RankCard rank={2} name="Pastor" points={80} />
-      </RankGrid>
-      <SectionHeader title="Overview" />
-      <StatGrid stats={[{ label: "Current Rank", value: "10" }, { label: "Titles Won", value: "2" }, { label: "Won / Lost", value: "40 / 12" }, { label: "Total Earned", value: "₦200,000" }]} />
-      <BottomNav items={clubAdminNav("/kit#")} current="members" />
-    </Screen>
+    <PageShell title="UI kit" band={<Stories items={stories} />}>
+      <HeroMatch competition="League night" whenLabel="Sat, 7 Nov, 15:00" startsAt={new Date(Date.now() + 3 * 86400000)} a={a} b={b} href="#" cta="Match details" />
+      <SectionTitle title="Cards" href="#" />
+      <h3 className="rx-panel__title">MetricCard</h3>
+      <MetricGrid><MetricCard label="Club rank" value="#7" hint="Rating 1150" /><MetricCard label="Win rate" value="50%" tone="good" hint="Streak: 2 wins" /></MetricGrid>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ListRow</h3>
+      <ListGroup>
+        <ListRow media={<Photo name="Ada Obi" alt="" />} title="Ada Obi" subtitle="Rating 1300" trailing="#1" />
+        <ListRow media={<IconBadge icon="wallet" />} title="Payments" subtitle="Dues, receipts and history" href="#" />
+        <ListRow media={<Photo name="Tunde Bello" alt="" />} title="Tunde Bello" subtitle="Group A · 28 Oct" trailing="Won 3–1" tone="good" />
+        <ListRow title="Upcoming match" subtitle="Sat, 7 Nov" trailing={<Pill tone="live">Live</Pill>} />
+      </ListGroup>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>MediaCard and ResultCard (carousel)</h3>
+      <Carousel label="Examples">
+        <MediaCard name="Paris Arena Group Stage" detail="28 Aug – 16 Oct" tag="Active" href="#" />
+        <ResultCard a={a} b={b} scoreA={3} scoreB={1} winner="a" competition="League night" when="28 Oct" href="#" />
+      </Carousel>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>TileLink, ActionButton, AttentionTile</h3>
+      <div className="rx-tilegrid"><TileLink icon="wallet" label="Payments" href="#" /><TileLink icon="tag" label="Plans" href="#" /></div>
+      <div className="rx-actions"><ActionButton icon="trophy" label="New event" href="#" /><ActionButton icon="members" label="Invite" href="#" /></div>
+      <div className="rx-attn-row"><AttentionTile count={4} label="unpaid dues" href="#" /><AttentionTile label="Start a competition" tone="go" href="#" /></div>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>MemberCard</h3>
+      <div className="rx-mgrid"><MemberCard rank={1} name="Ada Obi" rating={1300} href="#" /><MemberCard rank={2} name="Tunde Bello" rating={1275} href="#" /></div>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ClubBanner</h3>
+      <ClubBanner name="Lagos Spin Club" figure="₦18,000" figureLabel="Revenue, last 30 days" members={7} />
+      <Panel title="Panel and controls"><SelectSheet label="Bank" value={v} onChange={setV} options={[{ value: "1", label: "Access Bank" }, { value: "2", label: "GTBank" }]} searchable placeholder="Choose your bank" />
+        <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Pill>Neutral</Pill><Pill tone="success">Success</Pill><Pill tone="warning">Warning</Pill><Pill tone="live">Live</Pill></p></Panel>
+      <SectionTitle title="Loading" />
+      <div style={{ display: "flex", gap: 12 }}><Skeleton h={80} /><Skeleton h={80} /></div>
+    </PageShell>
   );
 }

@@ -4,8 +4,8 @@ import { Icon, type IconName } from "./icons";
 const cx = (...a: Array<string | false | undefined | null>) => a.filter(Boolean).join(" ");
 
 /* ---------- Layout ---------- */
-export function Screen({ children, tone = "blue", className }: { children: ReactNode; tone?: "blue" | "cream"; className?: string }) {
-  return <div className={cx("rx-screen", tone === "cream" && "rx-screen--cream", className)}>{children}</div>;
+export function Screen({ children, tone = "blue", className }: { children: ReactNode; tone?: "blue" | "cream" | "canvas"; className?: string }) {
+  return <div className={cx("rx-screen", tone === "cream" && "rx-screen--cream", tone === "canvas" && "rx-screen--canvas", className)}>{children}</div>;
 }
 
 export function Title({ children, as: Tag = "h1" }: { children: ReactNode; as?: "h1" | "h2" | "h3" }) {

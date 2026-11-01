@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ActionButton, AttentionTile, Carousel, ClubBanner, CoverCard, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { ActionButton, AttentionTile, Carousel, ClubBanner, MediaCard, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { ClubHeader } from "../../components/ClubHeader";
 import { inClub, requireRole } from "../../lib/context";
 import { buildStories, byRecent, dayLabel, isDone, winnerSide } from "../../lib/highlights";
@@ -21,8 +21,7 @@ export default async function Home() {
   const stories = buildStories(matches, (m) => `/competition/${m.competitionId}/groups`, "Open match");
   const needs = unpaid > 0 || toScore > 0 || active.length === 0;
   return (
-    <>
-      <ClubHeader />
+    <PageShell header={<ClubHeader />} band={<Stories items={stories} label="Match highlights" />}>
       <ClubBanner name={ctx.club.name} logo={ctx.club.logoUrl} figure={naira(month.total)} figureLabel="Revenue, last 30 days" members={members.length} />
 
       {needs ? (
@@ -39,13 +38,11 @@ export default async function Home() {
         <ActionButton icon="money" label="Payments" href="/membership/payments" linkAs={Link} />
       </div>
 
-      <Stories items={stories} label="Match highlights" />
-
       {active.length ? (
         <>
           <SectionTitle title="Competitions" href="/competition" linkAs={Link} label="See all competitions" />
           <Carousel label="Active competitions">
-            {active.map((c) => <CoverCard key={c.id} name={c.name} detail={c.level ?? "In progress"} tag="Active" href={`/competition/${c.id}/groups`} linkAs={Link} />)}
+            {active.map((c) => <MediaCard key={c.id} name={c.name} detail={c.level ?? "In progress"} tag="Active" href={`/competition/${c.id}/groups`} linkAs={Link} />)}
           </Carousel>
         </>
       ) : null}
@@ -58,6 +55,6 @@ export default async function Home() {
           </Carousel>
         </>
       ) : null}
-    </>
+    </PageShell>
   );
 }

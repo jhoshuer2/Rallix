@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TileLink } from "@rallix/ui";
+import { PageShell, TileLink } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requireRole } from "../../../lib/context";
 import { payoutDetails } from "../../../lib/payment-queries";
@@ -15,9 +15,7 @@ export default async function Membership() {
   }))));
   const payout = await payoutDetails(ctx);
   return (
-    <>
-      <ClubHeader />
-      <h1 className="rx-title" style={{ margin: "8px 0 16px" }}>Membership</h1>
+    <PageShell header={<ClubHeader />} title="Membership">
       <Revenue data={data as Record<string, { amount: string; bars: number[] }>} />
       {payout ? (
         <div className="rx-payrow rx-payrow--on">
@@ -36,6 +34,6 @@ export default async function Membership() {
         <TileLink icon="calendar" label="Reminders" href="/membership/reminders" linkAs={Link} />
         <TileLink icon="money" label="Rallix invoices" href="/membership/rallix" linkAs={Link} />
       </div>
-    </>
+    </PageShell>
   );
 }

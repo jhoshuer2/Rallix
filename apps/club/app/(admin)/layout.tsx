@@ -6,7 +6,7 @@ import { requireRole } from "../../lib/context";
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await requireRole("admin"); // non-admins are redirected to the player home
   return (
-    <Screen>
+    <Screen tone="canvas">
       {children}
       <AdminNav />
     </Screen>
