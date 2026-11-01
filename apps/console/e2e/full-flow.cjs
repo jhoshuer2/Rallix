@@ -12,14 +12,20 @@ if (!LOGS[CLUB] || !LOGS[CON]) { console.error('Set CLUB_LOG and CONSOLE_LOG'); 
 const sql = q => execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g, '\\"')}"`).toString().trim();
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ok  ', m); } else { fail++; console.log('  FAIL', m); } };
-async function signIn(page, base, phone) {
-  await page.goto(base + '/sign-in');
-  await page.getByLabel('Phone number').fill(phone); await page.getByRole('button', { name: 'Send code' }).click();
-  await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(400);
-  const log = fs.readFileSync(LOGS[base]).toString().replace(/\0/g, '');
-  const m = [...log.matchAll(/\[sms:dev\] to (\+\d+): Your Rallix code is (\d{6})/g)].filter(x => x[1] === phone).pop();
-  await page.getByLabel(/6-digit code/).fill(m[2]); await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(800);
+const EMAILS = { '+2348030000100': 'admin@example.com', '+2348030000200': 'owner@rallix.app', '+2348030000300': 'lt@x.example', '+2348039999999': 'newowner@example.com', '+2348038888888': 'joiner@example.com', '+2348037777777': 'badcode@example.com', '+2348030000000': 'jide@example.com', '+2348030000001': 'pastor@example.com', '+2348030000002': 'sule@example.com', '+2348030000003': 'nurudeen@example.com', '+2348030000004': 'dorathy@example.com', '+2348030000005': 'nathaniel@example.com', '+2348030000006': 'ade@example.com' };
+const emailFor = p => EMAILS[p] || p;
+const CODE_RE = (email) => new RegExp('\\[mail:dev\\] to ' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})', 'g');
+async function readCode(logPath, email) {
+  const log = require('fs').readFileSync(logPath).toString().replace(/\0/g, '');
+  const all = [...log.matchAll(CODE_RE(email))]; return all.length ? all[all.length - 1][1] : null;
+}
+async function signIn(page, base, who) {
+  const email = emailFor(who);
+  await page.goto(base + '/sign-in'); await page.getByLabel(/Email address|Work email/).fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
+  const code = await readCode(LOGS[base], email);
+  await page.getByLabel(/6-digit code/).fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForLoadState('networkidle'); await page.waitForTimeout(700);
 }
 (async () => {
   const b = await chromium.launch();
@@ -92,7 +98,7 @@ async function signIn(page, base, phone) {
   await O.getByText('Invoice branding saved.').waitFor({ timeout: 10000 });
   const invId = sql(`select id from platform_invoices where number='${invNo}'`); await O.goto(CON + '/invoices/' + invId); t = await text(O);
   ok(/Includes VAT \(10%\)/.test(t) && /Test Bank/.test(t), 'new branding (VAT and bank details) shows on the invoice');
-  await O.goto(CON + '/templates'); const ta = O.getByLabel('Message').nth(2); await ta.fill('Hi {{player_name}}, dues of {{amount}} due {{due_date}} at {{club_name}}. Thanks!'); await O.getByRole('button', { name: 'Save template' }).nth(2).click();
+  await O.goto(CON + '/templates'); const dues = O.locator('form', { hasText: 'Dues reminder' }).first(); await dues.getByLabel('Message').fill('Hi {{player_name}}, dues of {{amount}} due {{due_date}} at {{club_name}}. Thanks!'); await dues.getByRole('button', { name: 'Save template' }).click();
   await O.getByText('Template saved.').waitFor({ timeout: 10000 }); await O.goto(CON + '/templates'); t = await text(O);
   ok(/Hi Ade, dues of ₦6,000 due 28 Nov 2026 at Paris Arena\. Thanks!/.test(t), 'edited template is saved and the preview fills in sample data');
   await O.screenshot({ path: process.env.E2E_OUT + '/c_templates.png' });
@@ -121,12 +127,12 @@ async function signIn(page, base, phone) {
   console.log('9. audit and team');
   await O.goto(CON + '/audit'); t = await text(O); ok(/club\.suspended/.test(t) && /invoice\.create/.test(t) && /issue\.create/.test(t) && /template\.update/.test(t), 'audit log records every kind of change made above');
   await O.goto(CON + '/audit?action=invoice'); t = await text(O); ok(/invoice\.create/.test(t) && !/club\.suspended/.test(t), 'audit filter works');
-  await O.goto(CON + '/team'); await O.getByLabel('Phone number').fill('0803 000 0006'); await O.getByRole('button', { name: 'Add to team' }).click(); await O.getByText('Added to the platform team.').waitFor({ timeout: 10000 });
+  await O.goto(CON + '/team'); await O.getByLabel('Email address').fill('ade@example.com'); await O.getByRole('button', { name: 'Add to team' }).click(); await O.getByText('Added to the platform team.').waitFor({ timeout: 10000 });
   await N.goto(CON + '/clubs'); await N.waitForLoadState('networkidle'); ok(/Paris Arena/.test(await text(N)), 'a newly added team member gets in immediately');
   await O.goto(CON + '/team'); O.once('dialog', d => d.accept()); await O.getByRole('row', { name: /Ade/ }).getByRole('button', { name: 'Remove' }).click(); await O.getByRole('row', { name: /Ade/ }).waitFor({ state: 'detached', timeout: 10000 });
   await N.goto(CON + '/clubs'); await N.waitForURL(/denied=1/, { timeout: 15000 }); ok(true, 'a removed member loses access on their next request');
   await O.goto(CON + '/team'); ok(!(await O.getByRole('row', { name: /Platform Owner/ }).getByRole('button', { name: 'Remove' }).count()), 'you cannot remove yourself');
-  await O.getByLabel('Phone number').fill('0803 000 9999'); await O.getByRole('button', { name: 'Add to team' }).click(); await O.getByText(/No account has that number/).waitFor({ timeout: 10000 }); ok(true, 'adding an unknown number explains what to do');
+  await O.getByLabel('Email address').fill('nobody@example.com'); await O.getByRole('button', { name: 'Add to team' }).click(); await O.getByText(/No account has that email/).waitFor({ timeout: 10000 }); ok(true, 'adding an unknown number explains what to do');
 
   console.log('10. quality');
   const small = [];

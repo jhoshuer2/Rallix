@@ -15,11 +15,11 @@ import { recentAttempts } from "./payments-core";
 type Res<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Paystack needs an email on every payment. Real address if we have one, else a placeholder derived from the phone number (no receipt can be delivered to it). */
+/** Paystack needs an email on every payment. Every account has a real one now, so receipts reach the payer. */
 async function payerEmail(userId: string): Promise<string> {
-  const [u] = await serviceDb().select({ email: users.email, phone: users.phoneNumber }).from(users).where(eq(users.id, userId));
-  if (u?.email) return u.email;
-  return `${u?.phone ? u.phone.replace(/\D/g, "") : `user-${userId.replace(/[^a-z0-9]/gi, "").slice(0, 24)}`}@phone.rallix.app`;
+  const [u] = await serviceDb().select({ email: users.email }).from(users).where(eq(users.id, userId));
+  if (!u) throw new Error("Unknown user");
+  return u.email;
 }
 const friendly = (e: unknown) => (isPaymentError(e) && e.code !== "config" ? e.message : "Payments are unavailable right now. Please try again shortly.");
 

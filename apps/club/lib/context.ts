@@ -9,7 +9,7 @@ import { appDb } from "./db";
 export type Role = "admin" | "scorer" | "coach" | "player";
 export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; roles: Role[] };
 export type BlockedClub = { name: string; status: "suspended" | "closed" };
-export type Ctx = { user: { id: string; name: string; image: string | null }; clubs: MyClub[]; club: MyClub | null; blocked: BlockedClub[] };
+export type Ctx = { user: { id: string; name: string; email: string; image: string | null }; needsName: boolean; clubs: MyClub[]; club: MyClub | null; blocked: BlockedClub[] };
 
 export const CLUB_COOKIE = "rallix_club";
 
@@ -32,7 +32,9 @@ export const getCtx = cache(async (): Promise<Ctx | null> => {
   }));
   const wanted = (await cookies()).get(CLUB_COOKIE)?.value;
   const club = rows.find((c) => c.clubId === wanted) ?? rows[0] ?? null;
-  return { user: { id: user.id, name: user.name, image: user.image ?? null }, clubs: rows as MyClub[], club: club as MyClub | null, blocked };
+  const named = user.name.trim().length > 0 && user.name !== "New player";
+  // A brand-new email account has no name yet. Show the part of the email before @ until they give one.
+  return { user: { id: user.id, name: named ? user.name : user.email.split("@")[0]!, email: user.email, image: user.image ?? null }, needsName: !named, clubs: rows as MyClub[], club: club as MyClub | null, blocked };
 });
 
 /** Page guard: signed in and belongs to a club. New users are sent to create or join one. */

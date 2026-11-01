@@ -5,7 +5,7 @@ Mobile-first PWA for table tennis clubs in Nigeria. Slack-style multi-tenancy: o
 ## Layout (pnpm + Turborepo monorepo)
 - `apps/club`: club PWA (admin and player, role-based routes), on `{club}.rallix.app`
 - `apps/console`: Rallix platform console (desktop-first, platform owner only): usage, payments, invoices and templates, notifications, issues
-- `packages/ui`: design tokens, fonts, shared components. `packages/db`, `stats`, `payments`, `config`
+- `packages/ui`: design tokens, fonts, shared components. `packages/db`, `stats`, `payments`, `mailer`, `config`
 - `design/admin-screens/`: source design frames (440x956 SVG, club admin side). Text is outlined, so render to PNG to read them.
 
 Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), General Sans Variable (body). Files go in `packages/ui/fonts/`.
@@ -26,7 +26,7 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Run `pnpm --filter @rallix/db test` after any schema or policy change (needs local Postgres; see `packages/db/README.md`).
 
 ## App (`apps/club`)
-- Auth: Better Auth with phone OTP (`lib/auth.ts`), runs on the service DB role. Numbers are normalised to +234 E.164 (`lib/phone.ts`). In development the code is printed to the server log; production needs a real SMS provider in `lib/sms.ts` (it throws until then).
+- Auth: Better Auth with an emailed 6-digit code (`emailOTP` plugin, `lib/auth.ts`), runs on the service DB role. A first successful code creates the account. Codes are 5 minutes, 3 attempts, stored hashed. Sending is `sendSignInCode` in `lib/mail.ts`: it never throws, and caps one address at 5 codes per 10 minutes (counted in `email_log`). In development the email is printed to the server log (`[mail:dev] to ...`); production needs SMTP (see `packages/mailer/README.md`). Phone is an OPTIONAL contact field (normalised to +234 by `@rallix/config/phone`, saved via `updateContact`, unique, never verified, not readable by the app role).
 - Request context: `lib/context.ts`. `requireClub()` / `requireRole()` guard pages, `inClub(ctx, fn)` runs queries as the signed-in user in the active club (cookie `rallix_club`, always re-validated against memberships).
 - Reads live in `lib/queries.ts`, writes are server actions in `lib/actions.ts`. Only export intended actions from that file: every export in a `"use server"` file is a public endpoint.
 - Never use `serviceDb()` for anything scoped by user input unless the app-role checks have already passed (see `saveResult` then `updateRatings`).
@@ -34,12 +34,19 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Club switching is a plain `<a href="/switch/:id">` on purpose: `next/link` would prefetch it and change the active club.
 - `pnpm --filter @rallix/stats test`, `pnpm --filter @rallix/db test`, and `apps/club/e2e/full-flow.cjs` (see its header) should all pass before merging.
 
+## Email (`packages/mailer`)
+- `createMailer(env)`: `SmtpMailer` (nodemailer, one `SMTP_URL`) or `ConsoleMailer` (dev; `MAIL_FAIL_ADDRESSES=a@x.com,b@x.com` makes chosen addresses fail on purpose). Production refuses the console mailer. Setup, SPF/DKIM/DMARC and the go-live check: `packages/mailer/README.md`; try it with `pnpm --filter @rallix/mailer send-test you@example.com`.
+- `email_log` records every attempt (never the code or body); `notification_deliveries` is the per-person broadcast queue. Both are service-only.
+- SQL trap: `error <> 'x'` is NOT true when `error` is NULL. Use `(error is null or error <> 'x')` (a regression test covers it).
+- Tests: `pnpm --filter @rallix/mailer test` (includes a real SMTP round trip against a local server), `apps/club/e2e/email.cjs` (needs both apps; console must run with `MAIL_FAIL_ADDRESSES=fail@example.com`).
+
 ## Console (`apps/console`, port 3001)
-- Desktop-first back office for the platform team. Own sign-in (phone OTP, cookie prefix `rallix-console`, 12 h sessions) on the same user tables. Signing in is not enough: `requireAdmin()` (`lib/guard.ts`) checks the `platform_admins` list on every page and action, so removing someone takes effect on their next request.
+- Desktop-first back office for the platform team. Own sign-in (emailed code, cookie prefix `rallix-console`, 12 h sessions) on the same user tables. `disableSignUp` is on: the console never creates accounts and an unknown email gets no code but the same screen, so it does not reveal who exists. Signing in is not enough: `requireAdmin()` (`lib/guard.ts`) checks the `platform_admins` list on every page and action, so removing someone takes effect on their next request.
 - Uses only the service DB role (BYPASSRLS). Every server action in `lib/actions.ts` must call `requireAdmin()` first, validate its input, and write an `audit_log` row. Console-only tables (`issues`, `templates`, `platform_settings`, `notifications`, `audit_log`, `platform_admins`) have no app-role grants.
-- Grant access with `pnpm --filter @rallix/db make-platform-admin 08031234567 "Name"`. Dev seed admin: +2348030000200.
+- Grant access with `pnpm --filter @rallix/db make-platform-admin you@example.com "Name"` (creates the account if needed). Dev seed admin: owner@rallix.app. Team members are added by email and must already have an account.
 - Suspending or closing a club (`clubs.status`) is enforced in Postgres (`app.is_member` / `has_role` / `is_self` require an active club), not just in the UI. Members land on `/suspended` in the club app.
-- Notification delivery is not connected (stored as `queued`). Invoices can be paid online (the club app webhook credits them) or recorded by hand with a reference.
+- Email is real: invoices (and past-due reminders) are emailed to a club's admins from the invoice page (`lib/email-core.ts`), and notifications on the Email channel are sent in batches of 100 with per-person rows in `notification_deliveries` (claimed with `FOR UPDATE SKIP LOCKED`, so two staff clicking at once never double-send). Push, SMS and WhatsApp are not connected and stay `queued`. Template placeholders are whitelisted per template in `lib/placeholders.ts`; a missing value fails before anything is sent. Invoices can also be paid online or recorded by hand.
+- Templates, `{{pay_link}}`, `{{invoice_number}}` etc. are filled by `@rallix/mailer` `compose()`: values are escaped for HTML, and CR/LF in subjects or addresses is rejected (header injection).
 - Invoice numbers come from `app.next_invoice_number()` (service role only); one invoice per club per `period_label`.
 - Touch targets: 44px minimum in the club PWA; the desktop console uses at least 36px for buttons and inputs.
 - Console e2e: `apps/console/e2e/full-flow.cjs` (needs both apps running; see its header).
@@ -55,6 +62,7 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Reactivation lives inside `finalizeInvoice` (same transaction as the credit): only a club suspended with `suspension_reason = non_payment` and no other overdue invoice comes back; the rule is the pure `shouldReactivate()`. Setting a reason without a suspension is blocked by a CHECK; clear it in the same UPDATE as the status.
 - Never grant `SELECT` on a whole table when it holds secrets: use column grants (`platform_invoices`, `clubs`). When adding a column, decide whether the app role may read it.
 - Tests: `pnpm --filter @rallix/payments test`, `apps/club/e2e/payments.cjs` and `apps/club/e2e/pay-link.cjs` (both need both apps and a fresh seeded DB).
+- Every account now has a real email, so Paystack receipts reach the payer (no more placeholder addresses).
 
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.

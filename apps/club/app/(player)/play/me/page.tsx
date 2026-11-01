@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Avatar, Card, Chip, ClubRow, SectionHeader } from "@rallix/ui";
 import { inClub, requireClub } from "../../../../lib/context";
 import { ageOf, listMembers } from "../../../../lib/queries";
+import { ContactForm } from "../../../../components/ContactForm";
+import { ownPhone } from "../../../../lib/contact";
 
 export default async function Me() {
   const ctx = await requireClub();
@@ -16,6 +18,8 @@ export default async function Me() {
           <div><strong>{ctx.user.name}</strong><br /><span>{mine?.country ?? "NGR"}{age ? ` · ${age} yrs` : ""}{mine?.heightCm ? ` · ${mine.heightCm} cm` : ""}</span><br />{mine ? <Chip tone="warn">{mine.level}</Chip> : null}</div>
         </div>
       </Card>
+      <SectionHeader title="Contact details" />
+      <ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} />
       <SectionHeader title="Payments" />
       <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/play/me/payments">Dues, receipts and history</Link>
       <SectionHeader title="My clubs" />

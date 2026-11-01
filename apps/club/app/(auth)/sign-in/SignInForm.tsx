@@ -1,46 +1,55 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, TextField } from "@rallix/ui";
+import { isEmail } from "@rallix/mailer/validate";
 import { authClient } from "../../../lib/auth-client";
-import { normalizePhone } from "@rallix/config/phone";
+
+const COOLDOWN = 60;
 
 export function SignInForm({ next }: { next: string }) {
-  const [step, setStep] = useState<"phone" | "code">("phone");
-  const [phone, setPhone] = useState("");
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const e164 = normalizePhone(phone);
+  const [wait, setWait] = useState(0);
+  useEffect(() => { if (wait <= 0) return; const t = setTimeout(() => setWait(wait - 1), 1000); return () => clearTimeout(t); }, [wait]);
+  const address = email.trim().toLowerCase();
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!e164) return setError("Enter a valid Nigerian phone number, like 0803 000 0000");
+  async function send(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!isEmail(address)) return setError("Enter a valid email address, like ade@example.com");
     setError(undefined); setBusy(true);
-    const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber: e164 });
+    const { error } = await authClient.emailOtp.sendVerificationOtp({ email: address, type: "sign-in" });
     setBusy(false);
-    if (error) return setError(error.message ?? "Could not send the code. Try again.");
-    setStep("code");
+    if (error) return setError(error.status === 429 ? "Too many tries. Please wait a minute and try again." : "We couldn’t send a code. Please try again.");
+    setCode(""); setStep("code"); setWait(COOLDOWN);
   }
   async function verify(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{6}$/.test(code)) return setError("Enter the 6-digit code");
+    if (!/^\d{6}$/.test(code)) return setError("Enter the 6-digit code from your email");
     setError(undefined); setBusy(true);
-    const { error } = await authClient.phoneNumber.verify({ phoneNumber: e164!, code });
-    if (error) { setBusy(false); return setError(error.message ?? "That code didn’t work. Try again."); }
+    const { error } = await authClient.signIn.emailOtp({ email: address, otp: code });
+    if (error) { setBusy(false); return setError(error.status === 429 ? "Too many tries. Please wait a minute and try again." : "That code didn’t work. Check it, or ask for a new one."); }
     window.location.assign(next);
   }
 
   return (
-    <form noValidate onSubmit={step === "phone" ? send : verify} style={{ paddingTop: 48 }}>
+    <form noValidate onSubmit={step === "email" ? send : verify} style={{ paddingTop: 48 }}>
       <h1 className="rx-title" style={{ marginBottom: 8 }}>Sign in to Rallix</h1>
-      <p className="rx-muted" style={{ marginBottom: 24 }}>{step === "phone" ? "We’ll text you a 6-digit code." : `Enter the code we sent to ${e164}.`}</p>
-      {step === "phone" ? (
-        <TextField label="Phone number" type="tel" inputMode="tel" autoComplete="tel" placeholder="0803 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} error={error} />
+      <p className="rx-muted" style={{ marginBottom: 24 }}>{step === "email" ? "We’ll email you a 6-digit code. No password needed." : `If ${address} can sign in, a code is on its way. It can take a minute, and check your spam folder.`}</p>
+      {step === "email" ? (
+        <TextField label="Email address" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={error} />
       ) : (
         <TextField label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} error={error} />
       )}
-      <Button type="submit" variant="surface" block disabled={busy}>{busy ? "Please wait…" : step === "phone" ? "Send code" : "Sign in"}</Button>
-      {step === "code" ? <p style={{ marginTop: 16 }}><button type="button" className="rx-btn rx-btn--ghost" onClick={() => { setStep("phone"); setCode(""); setError(undefined); }}>Use a different number</button></p> : null}
+      <Button type="submit" variant="surface" block disabled={busy}>{busy ? "Please wait…" : step === "email" ? "Email me a code" : "Sign in"}</Button>
+      {step === "code" ? (
+        <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
+          <Button type="button" variant="ghost" block disabled={busy || wait > 0} onClick={() => send()}>{wait > 0 ? `Send a new code in ${wait}s` : "Send a new code"}</Button>
+          <Button type="button" variant="ghost" block onClick={() => { setStep("email"); setCode(""); setError(undefined); }}>Use a different email</Button>
+        </div>
+      ) : null}
     </form>
   );
 }

@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, PageHead } from "../../../../components/ui";
-import { MarkPaidForm, PayLinkCard, PrintButton, RunButton } from "../../../../components/Forms";
+import { InvoiceEmailCard, MarkPaidForm, PayLinkCard, PrintButton, RunButton } from "../../../../components/Forms";
 import { setInvoiceStatus } from "../../../../lib/actions";
-import { date, naira, uuid } from "../../../../lib/format";
-import { getInvoice } from "../../../../lib/queries";
+import { date, dateTime, naira, uuid } from "../../../../lib/format";
+import { getInvoice, invoiceEmails } from "../../../../lib/queries";
 import { payLinkUrl } from "../../../../lib/pay-link";
 import { db } from "../../../../lib/db";
 import { sql } from "drizzle-orm";
 
-export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ emailed?: string; failed?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   if (!uuid.test(id)) notFound();
   const d = await getInvoice(id);
   if (!d) notFound();
@@ -30,6 +31,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             {!final ? <RunButton tone="danger" confirmText={`Void invoice ${inv.number}? This cannot be undone.`} action={setInvoiceStatus.bind(null, inv.id, "void")} success="Invoice voided.">Void</RunButton> : null}
           </>} />
         {inv.status === "issued" ? <PayLinkCard invoiceId={inv.id} url={tokenRow?.pay_token ? payLinkUrl(tokenRow.pay_token) : null} club={inv.club_name} number={inv.number} amount={naira(total)} /> : null}
+        {inv.status === "issued" ? <InvoiceEmailCard invoiceId={inv.id} flash={sp.emailed ? (sp.emailed === "err" ? "The invoice was created but the email could not be sent. Use the button below to try again." : `Invoice created and emailed to ${sp.emailed} admin${sp.emailed === "1" ? "" : "s"}${Number(sp.failed) ? `, ${sp.failed} failed` : ""}.`) : undefined} history={(await invoiceEmails(inv.id)).map((h) => ({ to: h.to_email, kind: h.kind, status: h.status, error: h.error, at: dateTime(h.created_at) }))} /> : null}
         {inv.status === "issued" ? <section className="cs-card" style={{ marginBottom: 20 }}><h2 className="cs-h2" style={{ marginTop: 0 }}>Record payment</h2><MarkPaidForm invoiceId={inv.id} /></section> : null}
         <p><Link href="/invoices">← All invoices</Link></p>
       </div>

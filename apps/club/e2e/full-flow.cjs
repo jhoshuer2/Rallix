@@ -12,14 +12,21 @@ const SC=process.env.E2E_OUT||'/tmp';const DEV_LOG=process.env.DEV_LOG;if(!DEV_L
 const B='http://localhost:3000';
 const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
 let pass=0,fail=0;const ok=(c,m)=>{if(c){pass++;console.log('  ok  ',m)}else{fail++;console.log('  FAIL',m)}};
-async function signIn(page,phone,next='/'){
-  await page.goto(B+'/sign-in?next='+encodeURIComponent(next));
-  await page.getByLabel('Phone number').fill(phone);await page.getByRole('button',{name:'Send code'}).click();
-  await page.getByLabel('6-digit code').waitFor({timeout:25000});await page.waitForTimeout(400);
-  const log=fs.readFileSync(DEV_LOG).toString().replace(/\0/g,'');const digits=phone.replace(/^0/,'+234');
-  const m=[...log.matchAll(/\[sms:dev\] to (\+\d+): Your Rallix code is (\d{6})/g)].filter(x=>x[1]===digits).pop();
-  await page.getByLabel('6-digit code').fill(m[2]);await page.getByRole('button',{name:'Sign in'}).click();
-  await page.waitForURL(u=>!/sign-in/.test(u.toString()),{timeout:25000});
+const EMAILS = { '+2348030000100': 'admin@example.com', '+2348030000200': 'owner@rallix.app', '+2348030000300': 'lt@x.example', '+2348039999999': 'newowner@example.com', '+2348038888888': 'joiner@example.com', '+2348037777777': 'badcode@example.com', '+2348030000000': 'jide@example.com', '+2348030000001': 'pastor@example.com', '+2348030000002': 'sule@example.com', '+2348030000003': 'nurudeen@example.com', '+2348030000004': 'dorathy@example.com', '+2348030000005': 'nathaniel@example.com', '+2348030000006': 'ade@example.com' };
+const emailFor = p => EMAILS[p] || p;
+const CODE_RE = (email) => new RegExp('\\[mail:dev\\] to ' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})', 'g');
+async function readCode(logPath, email) {
+  const log = require('fs').readFileSync(logPath).toString().replace(/\0/g, '');
+  const all = [...log.matchAll(CODE_RE(email))]; return all.length ? all[all.length - 1][1] : null;
+}
+async function signIn(page, who, next = '/') {
+  const email = emailFor(who);
+  await page.goto(B + '/sign-in?next=' + encodeURIComponent(next));
+  await page.getByLabel('Email address').fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByLabel('6-digit code').waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
+  const code = await readCode(DEV_LOG, email);
+  await page.getByLabel('6-digit code').fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(u => !/sign-in/.test(u.toString()), { timeout: 25000 });
 }
 (async()=>{const b=await chromium.launch();
 const mk=async()=>{const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.newPage();p._errs=[];p.on('pageerror',e=>p._errs.push(e.message.slice(0,120)));return p};
@@ -104,7 +111,7 @@ const code=((await text(N)).match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!code,'ne
 const J=await mk();await signIn(J,'+2348038888888','/join/'+code);await J.waitForLoadState('networkidle');
 await J.getByLabel('Full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();
 await J.waitForURL(/\/play/,{timeout:20000});ok(/Hi, Chika/i.test(await text(J)),'invited user joined and sees the player home');
-ok(sql(`select level from player_profiles p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.phone_number='+2348038888888'`)==='senior','joined profile has the chosen level');
+ok(sql(`select level from player_profiles p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.email='joiner@example.com'`)==='senior','joined profile has the chosen level');
 const J2=await mk();await signIn(J2,'+2348037777777','/join/NOPE1234');await J2.getByLabel('Full name').fill('Bad Code');await J2.getByRole('radio',{name:'Junior'}).click();await J2.getByRole('button',{name:'Join club'}).click();await J2.waitForTimeout(1500);
 ok(/invalid, expired or full/i.test(await text(J2)),'a bad invite code shows a clear error');
 await J.goto(B+'/members');await J.waitForURL(/\/play/);ok(true,'the new player cannot open admin pages in that club');

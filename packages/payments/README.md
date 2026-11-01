@@ -21,7 +21,7 @@ Payment provider layer. The app talks to `PaymentProvider`; `PaystackProvider` i
 3. In the Paystack dashboard set the webhook URL to `https://<your domain>/api/webhooks/paystack` (test and live are configured separately).
 4. Test end to end in test mode with Paystack's test cards: pay a due, then replay the webhook from the dashboard and confirm nothing is double-credited.
 5. Complete Paystack business verification before switching to live keys. Settlement to subaccounts uses the bank details clubs enter, so double-check the account-name confirmation screen with a real account.
-6. Replace the placeholder-email behaviour if you want receipts: players without an email use `<phone>@phone.rallix.app`, which cannot receive mail.
+6. Receipts: every account signs in with a real email now, and that address is sent to Paystack, so receipts reach the payer.
 
 ## Pay by link (Rallix invoices)
 Staff can copy or WhatsApp-share a public link for any issued invoice (`/pay/invoice/<token>`). Anyone holding it can pay that one invoice, even a club that is suspended and cannot sign in. The page shows only the club name, invoice number, period and amount. A club suspended for **non-payment** is reactivated automatically once nothing else is overdue; any other suspension stays until staff lift it. Replace or turn off a link from the invoice page in the console. Tokens are 24 characters (about 138 bits), never readable by the app database role, and unknown, malformed, draft or replaced tokens all show the same generic page.

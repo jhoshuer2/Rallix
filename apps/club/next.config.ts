@@ -7,5 +7,5 @@ const payLinkHeaders = [
   { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
 ];
 
-const config: NextConfig = { async headers() { return [{ source: "/pay/invoice/:path*", headers: payLinkHeaders }]; }, transpilePackages: ["@rallix/ui", "@rallix/db", "@rallix/stats", "@rallix/payments", "@rallix/config"] };
+const config: NextConfig = { async headers() { return [{ source: "/pay/invoice/:path*", headers: payLinkHeaders }]; }, transpilePackages: ["@rallix/ui", "@rallix/db", "@rallix/stats", "@rallix/payments", "@rallix/config", "@rallix/mailer"] };
 export default config;

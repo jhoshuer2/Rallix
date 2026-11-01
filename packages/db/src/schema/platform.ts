@@ -56,6 +56,8 @@ export const notifications = pgTable("notifications", {
   body: text("body").notNull(),
   status: notificationStatus("status").notNull().default("draft"),
   recipientCount: integer("recipient_count").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
   failureReason: text("failure_reason"),
   createdBy: text("created_by").references(() => users.id),
   sentAt: timestamp("sent_at", { withTimezone: true }),
@@ -162,3 +164,35 @@ export const paymentEvents = pgTable("payment_events", {
   raw: jsonb("raw"),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("payment_events_ref_idx").on(t.reference), index("payment_events_received_idx").on(t.receivedAt)]);
+
+/** Every email we try to send, for troubleshooting. Never stores codes or message bodies. Service role only. */
+export const emailLog = pgTable("email_log", {
+  id: id(),
+  toEmail: text("to_email").notNull(),
+  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast
+  templateKey: text("template_key"),
+  status: text("status").notNull(), // sent | failed
+  error: text("error"),
+  relatedId: text("related_id"), // invoice id, notification id...
+  createdAt: createdAt(),
+}, (t) => [
+  index("email_log_related_idx").on(t.relatedId, t.createdAt),
+  index("email_log_created_idx").on(t.createdAt),
+  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast')`),
+  check("email_log_status", sql`${t.status} IN ('sent','failed')`),
+]);
+
+/** One row per recipient of a notification. Lets a large send be resumed and failures retried. Service role only. */
+export const notificationDeliveries = pgTable("notification_deliveries", {
+  id: id(),
+  notificationId: uuid("notification_id").notNull().references(() => notifications.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  status: text("status").notNull().default("pending"), // pending | sent | failed
+  error: text("error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+}, (t) => [
+  unique("notification_deliveries_uq").on(t.notificationId, t.userId),
+  index("notification_deliveries_pending_idx").on(t.notificationId, t.status),
+  check("notification_deliveries_status", sql`${t.status} IN ('pending','sent','failed')`),
+]);

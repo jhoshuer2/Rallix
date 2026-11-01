@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { competitionEntries, competitions, dues, games, globalRatings, invites, matches, memberships, plans, ratingEvents, ratings, users, withTenant } from "@rallix/db";
 import { applyElo, resolveMatch, roundRobin, snakeGroups, START_RATING, type GameScore } from "@rallix/stats";
+import { normalizePhone } from "@rallix/config/phone";
 import { CLUB_COOKIE, canScore, getCtx, inClub, isAdmin, requireClub } from "./context";
 import { appDb, serviceDb } from "./db";
 import { listMembers } from "./queries";
@@ -19,17 +20,40 @@ async function setClubCookie(clubId: string) {
 }
 const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/g, "") || "club";
 
-async function setName(userId: string, name: string) {
-  await withTenant(appDb(), { userId }, (tx) => tx.update(users).set({ name }).where(eq(users.id, userId)));
+/**
+ * Save the optional phone number for the signed-in user. The app role cannot read or write phone numbers (so club-mates
+ * can't see each other's), so this uses the service role, scoped strictly to the user id from the session.
+ * Returns an error message, or null when saved or when no number was given.
+ */
+async function savePhone(userId: string, raw: string | undefined): Promise<string | null> {
+  const input = (raw ?? "").trim();
+  if (!input) return null;
+  const phone = normalizePhone(input);
+  if (!phone) return "Enter a valid Nigerian phone number, like 0803 000 0000, or leave it blank.";
+  try { await serviceDb().update(users).set({ phoneNumber: phone, phoneNumberVerified: false }).where(eq(users.id, userId)); return null; }
+  catch (e) { return pgCode(e) === "23505" ? "That phone number is already used by another account." : "Could not save the phone number."; }
+}
+
+/** Change the signed-in user's optional contact phone. Empty clears it. */
+export async function updateContact(input: { phone: string }): Promise<Result> {
+  const ctx = await getCtx();
+  if (!ctx) return fail("Please sign in again.");
+  if (!input.phone.trim()) { await serviceDb().update(users).set({ phoneNumber: null, phoneNumberVerified: false }).where(eq(users.id, ctx.user.id)); revalidatePath("/", "layout"); return { ok: true }; }
+  const err = await savePhone(ctx.user.id, input.phone);
+  if (err) return fail(err);
+  revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 /* ---------- Onboarding ---------- */
-export async function createClub(input: { clubName: string; yourName: string; location: string }): Promise<Result<{ clubId: string }>> {
+export async function createClub(input: { clubName: string; yourName: string; location: string; phone?: string }): Promise<Result<{ clubId: string }>> {
   const ctx = await getCtx();
   if (!ctx) return fail("Please sign in again.");
   const clubName = input.clubName.trim(), yourName = input.yourName.trim(), location = input.location.trim();
   if (clubName.length < 2 || clubName.length > 60) return fail("Club name must be 2 to 60 characters.");
   if (yourName.length < 2) return fail("Enter your name.");
+  const phoneProblem = await savePhone(ctx.user.id, input.phone);
+  if (phoneProblem) return fail(phoneProblem);
   const base = slugify(clubName);
   for (let i = 0; i < 5; i++) {
     const slug = i === 0 ? base : `${base}-${randomBytes(2).toString("hex")}`;
@@ -49,11 +73,13 @@ export async function createClub(input: { clubName: string; yourName: string; lo
   return fail("Could not find a free club address. Try a different name.");
 }
 
-export async function joinClub(input: { code: string; yourName: string; level: "junior" | "intermediate" | "senior" }): Promise<Result<{ clubId: string }>> {
+export async function joinClub(input: { code: string; yourName: string; level: "junior" | "intermediate" | "senior"; phone?: string }): Promise<Result<{ clubId: string }>> {
   const ctx = await getCtx();
   if (!ctx) return fail("Please sign in again.");
   const name = input.yourName.trim();
   if (name.length < 2) return fail("Enter your name.");
+  const phoneProblem = await savePhone(ctx.user.id, input.phone);
+  if (phoneProblem) return fail(phoneProblem);
   try {
     const clubId = await withTenant(appDb(), { userId: ctx.user.id }, async (tx) => {
       await tx.update(users).set({ name }).where(eq(users.id, ctx.user.id));

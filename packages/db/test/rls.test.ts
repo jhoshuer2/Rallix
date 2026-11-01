@@ -198,7 +198,7 @@ describe("club creation and invites", () => {
   });
 
   it("join_club adds a player once, counts uses, and rejects expired, exhausted, revoked and suspended", async () => {
-    await svc.insert(s.users).values([{ id: "j1", name: "J1" }, { id: "j2", name: "J2" }, { id: "j3", name: "J3" }]);
+    await svc.insert(s.users).values([{ id: "j1", name: "J1", email: "j1@x.com" }, { id: "j2", name: "J2", email: "j2@x.com" }, { id: "j3", name: "J3", email: "j3@x.com" }]);
     await withTenant(app, { userId: "j1" }, (tx) => tx.execute(sql`select app.join_club('GOOD', 'senior')`));
     const again = await withTenant(app, { userId: "j1" }, (tx) => tx.execute(sql`select app.join_club('GOOD')`));
     expect(again.rows).toHaveLength(1); // idempotent for an active member
@@ -358,5 +358,56 @@ describe("pay links and suspension reasons", () => {
 
   it("the app role can't touch invoice payments made through links", async () => {
     expect(await denied(app.execute(sql`select via_link, payer_email from invoice_payments`))).toBe("42501");
+  });
+});
+
+describe("email tables and email-based accounts", () => {
+  it("the app role cannot see or write the email log or notification deliveries", async () => {
+    for (const t of ["email_log", "notification_deliveries"]) {
+      expect(await denied(app.execute(sql.raw(`select * from ${t}`)))).toBe("42501");
+      expect(await denied(app.execute(sql.raw(`insert into ${t} default values`)))).toBe("42501");
+    }
+  });
+
+  it("every account must have an email, and emails are unique regardless of letter case", async () => {
+    expect(await denied(svc.execute(sql`insert into users (id, name) values ('noemail', 'No Email')`))).toBe("23502");
+    await svc.execute(sql`insert into users (id, name, email) values ('case1', 'Case One', 'MixedCase@Example.com')`);
+    expect(await denied(svc.execute(sql`insert into users (id, name, email) values ('case2', 'Case Two', 'mixedcase@example.com')`))).toBe("23505");
+  });
+
+  it("phone is optional, but two accounts cannot share one", async () => {
+    await svc.execute(sql`insert into users (id, name, email, phone_number) values ('ph1', 'Ph One', 'ph1@x.com', '+2348031110000')`);
+    await svc.execute(sql`insert into users (id, name, email) values ('ph2', 'Ph Two', 'ph2@x.com')`);
+    expect(await denied(svc.execute(sql`insert into users (id, name, email, phone_number) values ('ph3', 'Ph Three', 'ph3@x.com', '+2348031110000')`))).toBe("23505");
+  });
+
+  it("email log only accepts known kinds and statuses", async () => {
+    expect(await denied(svc.execute(sql`insert into email_log (to_email, kind, status) values ('a@x.com', 'spam', 'sent')`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into email_log (to_email, kind, status) values ('a@x.com', 'otp', 'maybe')`))).toBe("23514");
+    await svc.execute(sql`insert into email_log (to_email, kind, status) values ('a@x.com', 'otp', 'sent')`);
+  });
+
+  it("a notification can be delivered to each person only once", async () => {
+    const n = (await svc.execute(sql`insert into notifications (audience, channel, title, body) values ('{}'::jsonb, 'email', 'T', 'B') returning id`)).rows[0] as { id: string };
+    const ins = sql`insert into notification_deliveries (notification_id, user_id, email) values (${n.id}, 'ph1', 'ph1@x.com')`;
+    await svc.execute(ins);
+    expect(await denied(svc.execute(ins))).toBe("23505");
+    expect(await denied(svc.execute(sql`insert into notification_deliveries (notification_id, user_id, email, status) values (${n.id}, 'ph2', 'ph2@x.com', 'lost')`))).toBe("23514");
+  });
+
+  it("the dues reminder template is an email template now", async () => {
+    const r = (await svc.execute(sql`select kind::text as kind, subject from templates where key = 'dues_reminder'`)).rows[0] as { kind: string; subject: string };
+    expect(r.kind).toBe("email"); expect(r.subject).toMatch(/dues/i);
+  });
+});
+
+describe("null-safe filters (regression: NULL <> 'x' is not true)", () => {
+  it("rate-limit counting must include rows whose error is NULL", async () => {
+    await svc.execute(sql`insert into email_log (to_email, kind, status) values ('rl@x.com', 'otp', 'sent'), ('rl@x.com', 'otp', 'sent')`);
+    await svc.execute(sql`insert into email_log (to_email, kind, status, error) values ('rl@x.com', 'otp', 'failed', 'rate_limited')`);
+    const bad = (await svc.execute(sql`select count(*)::int as n from email_log where to_email = 'rl@x.com' and error <> 'rate_limited'`)).rows[0] as { n: number };
+    const good = (await svc.execute(sql`select count(*)::int as n from email_log where to_email = 'rl@x.com' and (error is null or error <> 'rate_limited')`)).rows[0] as { n: number };
+    expect(bad.n).toBe(0); // documents the trap
+    expect(good.n).toBe(2);
   });
 });

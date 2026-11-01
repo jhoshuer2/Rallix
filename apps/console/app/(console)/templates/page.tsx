@@ -1,13 +1,8 @@
 import { PageHead } from "../../../components/ui";
 import { SettingsForm, TemplateForm } from "../../../components/Forms";
 import { getSettings, listTemplates } from "../../../lib/queries";
+import { PLACEHOLDERS as placeholders } from "../../../lib/placeholders";
 
-const placeholders: Record<string, string[]> = {
-  invoice_issued: ["admin_name", "club_name", "invoice_number", "period", "amount", "due_date", "pay_link", "payment_instructions", "company_name"],
-  subscription_past_due: ["admin_name", "club_name", "period", "amount", "pay_link", "company_name"],
-  dues_reminder: ["player_name", "club_name", "amount", "due_date"],
-  welcome_admin: ["admin_name", "club_name"],
-};
 const sample: Record<string, string> = { admin_name: "Innocent", player_name: "Ade", club_name: "Paris Arena", invoice_number: "RLX-2026-0001", period: "2026-11", amount: "₦6,000", due_date: "28 Nov 2026", payment_instructions: "Pay to the account on the invoice.", company_name: "Rallix", pay_link: "https://app.rallix.app/pay/invoice/AbCd…" };
 const render = (t: string) => t.replace(/\{\{(\w+)\}\}/g, (_, k: string) => sample[k] ?? `{{${k}}}`);
 

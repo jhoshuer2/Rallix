@@ -1,5 +1,5 @@
 import { Badge, Empty, PageHead } from "../../../components/ui";
-import { NotificationForm } from "../../../components/Forms";
+import { NotificationForm, NotificationProgress } from "../../../components/Forms";
 import { dateTime } from "../../../lib/format";
 import { clubOptions, listNotifications } from "../../../lib/queries";
 
@@ -18,7 +18,7 @@ export default async function Notifications() {
             <div className="cs-tablewrap"><table className="cs-table"><tbody>
               {history.map((n) => (
                 <tr key={n.id}>
-                  <td><strong>{n.title}</strong><br /><span className="cs-hint">{audience(n.audience)} · {n.channel} · {n.recipient_count} recipient{n.recipient_count === 1 ? "" : "s"}</span></td>
+                  <td><strong>{n.title}</strong><br /><span className="cs-hint">{audience(n.audience)} · {n.channel} · {n.recipient_count} recipient{n.recipient_count === 1 ? "" : "s"}</span><br /><NotificationProgress id={n.id} channel={n.channel} status={n.status} recipients={n.recipient_count} sent={n.sent_count} failed={n.failed_count} pending={n.pending} failures={n.failures} /></td>
                   <td><Badge tone={n.status === "sent" ? "ok" : n.status === "failed" ? "bad" : "warn"}>{n.status}</Badge></td>
                   <td className="num">{dateTime(n.created_at)}</td>
                 </tr>

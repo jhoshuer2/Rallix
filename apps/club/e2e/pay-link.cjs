@@ -12,12 +12,19 @@ const sign = body => crypto.createHmac('sha512', 'fake_webhook_secret').update(b
 const hook = async body => { const r = await fetch(CLUB + '/api/webhooks/paystack', { method: 'POST', headers: { 'content-type': 'application/json', 'x-paystack-signature': sign(body) }, body }); return r.json(); };
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ok  ', m); } else { fail++; console.log('  FAIL', m); } };
-async function signIn(page, base, phone) {
-  await page.goto(base + '/sign-in'); await page.getByLabel('Phone number').fill(phone); await page.getByRole('button', { name: 'Send code' }).click();
-  await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(400);
-  const log = fs.readFileSync(LOGS[base]).toString().replace(/\0/g, '');
-  const m = [...log.matchAll(/\[sms:dev\] to (\+\d+): Your Rallix code is (\d{6})/g)].filter(x => x[1] === phone).pop();
-  await page.getByLabel(/6-digit code/).fill(m[2]); await page.getByRole('button', { name: 'Sign in' }).click();
+const EMAILS = { '+2348030000100': 'admin@example.com', '+2348030000200': 'owner@rallix.app', '+2348030000300': 'lt@x.example', '+2348039999999': 'newowner@example.com', '+2348038888888': 'joiner@example.com', '+2348037777777': 'badcode@example.com', '+2348030000000': 'jide@example.com', '+2348030000001': 'pastor@example.com', '+2348030000002': 'sule@example.com', '+2348030000003': 'nurudeen@example.com', '+2348030000004': 'dorathy@example.com', '+2348030000005': 'nathaniel@example.com', '+2348030000006': 'ade@example.com' };
+const emailFor = p => EMAILS[p] || p;
+const CODE_RE = (email) => new RegExp('\\[mail:dev\\] to ' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})', 'g');
+async function readCode(logPath, email) {
+  const log = require('fs').readFileSync(logPath).toString().replace(/\0/g, '');
+  const all = [...log.matchAll(CODE_RE(email))]; return all.length ? all[all.length - 1][1] : null;
+}
+async function signIn(page, base, who) {
+  const email = emailFor(who);
+  await page.goto(base + '/sign-in'); await page.getByLabel(/Email address|Work email/).fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
+  await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
+  const code = await readCode(LOGS[base], email);
+  await page.getByLabel(/6-digit code/).fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForLoadState('networkidle'); await page.waitForTimeout(700);
 }
 const clubId = slug => sql(`select id from clubs where slug='${slug}'`);

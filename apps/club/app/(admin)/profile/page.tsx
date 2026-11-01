@@ -3,6 +3,8 @@ import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { invites } from "@rallix/db";
 import { inClub, requireRole } from "../../../lib/context";
 import { InviteLink } from "./InviteLink";
+import { ContactForm } from "../../../components/ContactForm";
+import { ownPhone } from "../../../lib/contact";
 
 export default async function Profile() {
   const ctx = await requireRole("admin");
@@ -17,6 +19,8 @@ export default async function Profile() {
           <div><strong>{ctx.user.name}</strong><br /><span>Club admin · {ctx.club.name}</span></div>
         </div>
       </Card>
+      <SectionHeader title="Contact details" />
+      <ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} />
       <SectionHeader title="Invite players" />
       <InviteLink clubName={ctx.club.name} initialCode={inv?.code ?? null} />
       <SectionHeader title="Account" />

@@ -84,15 +84,17 @@ export function NewInvoiceForm({ clubs, defaultClubId }: { clubs: Array<{ id: st
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
   const [issueNow, setIssueNow] = useState(true);
+  const [emailNow, setEmailNow] = useState(true);
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.createInvoice({ clubId, periodLabel: label, naira: Number(amount), description: desc, issueNow }), "Invoice created.", (r) => router.push(`/invoices/${r.id as string}`)); }}>
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.createInvoice({ clubId, periodLabel: label, naira: Number(amount), description: desc, issueNow, emailNow: issueNow && emailNow }), "Invoice created.", (r) => { const m = r.emailed as { sent?: number; failed?: number; error?: string } | undefined; router.push(`/invoices/${r.id as string}${m ? `?emailed=${m.error ? "err" : m.sent}&failed=${m.failed ?? 0}` : ""}`); }); }}>
       <div className="cs-grid cs-grid--2">
         <Field label="Club"><select value={clubId} onChange={(e) => setClubId(e.target.value)}>{clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
         <Field label="Period" hint="For example 2026-11. One invoice per club per period."><input value={label} onChange={(e) => setLabel(e.target.value)} required /></Field>
         <Field label="Total (₦)" hint="VAT, if set in Templates, is shown as included."><input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} required /></Field>
         <Field label="Description"><input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Rallix monthly subscription" /></Field>
       </div>
-      <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, minHeight: 44 }}><input type="checkbox" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} style={{ width: 20, height: 20 }} /> Issue now (otherwise save as a draft)</label>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", minHeight: 44 }}><input type="checkbox" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} style={{ width: 20, height: 20 }} /> Issue now (otherwise save as a draft)</label>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14, minHeight: 44, opacity: issueNow ? 1 : 0.5 }}><input type="checkbox" checked={issueNow && emailNow} disabled={!issueNow} onChange={(e) => setEmailNow(e.target.checked)} style={{ width: 20, height: 20 }} /> Email the club’s admins the invoice and pay link now</label>
       <button className="cs-btn" disabled={pending || !amount || !clubId}>Create invoice</button>{note}
     </form>
   );
@@ -153,7 +155,7 @@ export function NotificationForm({ clubs }: { clubs: Array<{ id: string; name: s
   const [audience, setAudience] = useState<"all_admins" | "all_players" | "clubs">("all_admins");
   const [picked, setPicked] = useState<string[]>([]);
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.sendNotification({ title, body, channel, audience, clubIds: picked }), (r) => `Queued for ${r.recipients as number} recipient${r.recipients === 1 ? "" : "s"}.`, () => { setTitle(""); setBody(""); }); }} className="cs-card">
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.sendNotification({ title, body, channel, audience, clubIds: picked }), (r) => channel === "email" ? `Email sent to ${r.sent as number} of ${r.recipients as number}${(r.failed as number) ? `. ${r.failed} failed` : ""}${(r.remaining as number) ? `. ${r.remaining} still waiting: use Continue sending below.` : "."}` : `Queued for ${r.recipients as number} recipient${r.recipients === 1 ? "" : "s"}.`, () => { setTitle(""); setBody(""); }); }} className="cs-card">
       <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} required minLength={3} /></Field>
       <Field label="Message"><textarea value={body} onChange={(e) => setBody(e.target.value)} required minLength={5} /></Field>
       <div className="cs-grid cs-grid--2">
@@ -171,7 +173,7 @@ export function NotificationForm({ clubs }: { clubs: Array<{ id: string; name: s
         </fieldset>
       ) : null}
       <button className="cs-btn" disabled={pending}>Queue notification</button>{note}
-      <p className="cs-hint" style={{ marginTop: 12 }}>Delivery providers are not connected yet. Notifications are recorded as queued, with the number of people they would reach.</p>
+      <p className="cs-hint" style={{ marginTop: 12 }}>Email is sent for real, up to 100 at a time. Push, SMS and WhatsApp are not connected yet, so those stay queued.</p>
     </form>
   );
 }
@@ -223,10 +225,10 @@ export function IssueNoteForm({ id }: { id: string }) {
 
 export function TeamForm() {
   const { run, pending, note } = useRun();
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.addTeamMember(phone), "Added to the platform team.", () => setPhone("")); }} className="cs-filters">
-      <Field label="Phone number" hint="They must have signed in to a Rallix app once."><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0803 000 0000" required /></Field>
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.addTeamMember(email), "Added to the platform team.", () => setEmail("")); }} className="cs-filters">
+      <Field label="Email address" hint="They must have signed in to the Rallix club app once."><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" required /></Field>
       <button className="cs-btn" disabled={pending}>Add to team</button>{note}
     </form>
   );
@@ -255,6 +257,52 @@ export function PayLinkCard({ invoiceId, url, club, number, amount }: { invoiceI
       </div>
       {note}
     </section>
+  );
+}
+
+type MailRes = { ok: boolean; error?: string; needsConfirm?: boolean; sent?: number; failed?: number; recipients?: number };
+export function InvoiceEmailCard({ invoiceId, history, flash }: { invoiceId: string; history: Array<{ to: string; kind: string; status: string; error: string | null; at: string }>; flash?: string }) {
+  const { run, pending, note } = useRun();
+  const send = (kind: "invoice" | "reminder") => {
+    const go = (force: boolean) => run(async () => {
+      const r = (await A.emailInvoice(invoiceId, kind, force)) as MailRes;
+      if (!r.ok && r.needsConfirm && window.confirm(r.error)) return (await A.emailInvoice(invoiceId, kind, true)) as MailRes;
+      return r;
+    }, (r) => { const m = r as MailRes; return `Emailed ${m.sent} of ${m.recipients} admin${m.recipients === 1 ? "" : "s"}${m.failed ? `. ${m.failed} failed, see the list below` : "."}`; });
+    go(false);
+  };
+  return (
+    <section className="cs-card cs-noprint" style={{ marginBottom: 20 }} aria-label="Email this invoice">
+      <h2 className="cs-h2" style={{ marginTop: 0 }}>Email</h2>
+      <p className="cs-muted">Sends the invoice and pay link to everyone who is an admin of this club, even if the club is suspended.</p>
+      {flash ? <p role="status" className="cs-ok">{flash}</p> : null}
+      <div className="cs-actions">
+        <button className="cs-btn" disabled={pending} onClick={() => send("invoice")}>Email invoice to club admins</button>
+        <button className="cs-btn cs-btn--ghost" disabled={pending} onClick={() => send("reminder")}>Send past-due reminder</button>
+      </div>
+      {note}
+      {history.length ? (
+        <details style={{ marginTop: 12 }}><summary style={{ cursor: "pointer", minHeight: 36 }}>Sent so far ({history.length})</summary>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14 }}>{history.map((h, i) => <li key={i}>{h.at} · {h.kind === "invoice" ? "Invoice" : "Reminder"} · {h.to} · {h.status === "sent" ? "sent" : `failed (${h.error})`}</li>)}</ul></details>
+      ) : null}
+    </section>
+  );
+}
+
+type NotifProps = { id: string; channel: string; status: string; recipients: number; sent: number; failed: number; pending: number; failures: string[] };
+export function NotificationProgress(n: NotifProps) {
+  const { run, pending, note } = useRun();
+  if (n.channel !== "email") return <span className="cs-hint">Queued. {n.channel} delivery is not connected yet.</span>;
+  return (
+    <div>
+      <span className="cs-hint">Sent {n.sent} of {n.recipients}{n.failed ? ` · ${n.failed} failed` : ""}{n.pending ? ` · ${n.pending} waiting` : ""}</span>
+      <div className="cs-actions" style={{ marginTop: 6 }}>
+        {n.pending > 0 ? <button className="cs-btn cs-btn--small" disabled={pending} onClick={() => run(() => A.continueNotification(n.id), (r) => `Sent ${r.sent as number} more. ${r.remaining as number} left.`)}>{pending ? "Sending…" : `Continue sending (${Math.min(100, n.pending)} next)`}</button> : null}
+        {n.failed > 0 ? <button className="cs-btn cs-btn--small cs-btn--ghost" disabled={pending} onClick={() => run(() => A.retryFailedDeliveries(n.id), (r) => `${r.requeued as number} put back in the queue. Press Continue sending.`)}>Retry failed</button> : null}
+      </div>
+      {n.failures.length ? <details style={{ marginTop: 6 }}><summary style={{ cursor: "pointer", minHeight: 32 }}>Why some failed</summary><ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>{n.failures.map((f, i) => <li key={i}>{f}</li>)}</ul></details> : null}
+      {note}
+    </div>
   );
 }
 

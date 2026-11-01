@@ -133,8 +133,12 @@ export async function getIssue(id: string) {
   return { issue, notes };
 }
 
-export const listNotifications = () => q<{ id: string; title: string; body: string; channel: string; status: string; recipient_count: number; audience: { type?: string; clubIds?: string[] }; created_at: Date; author: string | null }>(
-  sql`select n.id, n.title, n.body, n.channel, n.status, n.recipient_count, n.audience, n.created_at, u.name as author from notifications n left join users u on u.id = n.created_by order by n.created_at desc limit 50`);
+export const listNotifications = () => q<{ id: string; title: string; body: string; channel: string; status: string; recipient_count: number; sent_count: number; failed_count: number; pending: number; audience: { type?: string; clubIds?: string[] }; created_at: Date; author: string | null; failures: string[] }>(
+  sql`select n.id, n.title, n.body, n.channel, n.status, n.recipient_count, n.sent_count, n.failed_count, n.audience, n.created_at, u.name as author,
+        (select count(*)::int from notification_deliveries d where d.notification_id = n.id and d.status = 'pending') as pending,
+        coalesce((select array_agg(x.line) from (select d.email || ': ' || coalesce(d.error, 'failed') as line from notification_deliveries d where d.notification_id = n.id and d.status = 'failed' order by d.email limit 5) x), '{}') as failures
+      from notifications n left join users u on u.id = n.created_by order by n.created_at desc limit 50`);
+export const invoiceEmails = (invoiceId: string) => q<{ to_email: string; kind: string; status: string; error: string | null; created_at: Date }>(sql`select to_email, kind, status, error, created_at from email_log where related_id = ${invoiceId} and kind in ('invoice','reminder') order by created_at desc limit 20`);
 export const clubOptions = () => q<{ id: string; name: string }>(sql`select id, name from clubs order by name`);
 
 export async function listAudit(f: { action?: string }) {
@@ -142,7 +146,7 @@ export async function listAudit(f: { action?: string }) {
   return q<{ id: string; actor: string | null; action: string; entity: string | null; entity_id: string | null; meta: unknown; at: Date }>(
     sql`select l.id, u.name as actor, l.action, l.entity, l.entity_id, l.meta, l.at from audit_log l left join users u on u.id = l.actor_id where (${a}::text is null or l.action ilike ${a}) order by l.at desc limit 200`);
 }
-export const listTeam = () => q<{ user_id: string; name: string; phone: string | null; created_at: Date }>(sql`select a.user_id, u.name, u.phone_number as phone, a.created_at from platform_admins a join users u on u.id = a.user_id order by u.name`);
+export const listTeam = () => q<{ user_id: string; name: string; email: string; created_at: Date }>(sql`select a.user_id, u.name, u.email, a.created_at from platform_admins a join users u on u.id = a.user_id order by u.name`);
 
 /** Distinct people a broadcast would reach. Only active members of active clubs. */
 export async function audienceCount(a: { type: "all_admins" | "all_players" | "clubs"; clubIds?: string[] }) {
