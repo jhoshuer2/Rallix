@@ -1,7 +1,8 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button, TextField } from "@rallix/ui";
+import { Button, SelectSheet, TextField } from "@rallix/ui";
+import { BankBadge } from "../../../../lib/bank-badge";
 import { resolvePayoutAccount, savePayoutAccount } from "../../../../lib/payment-actions";
 
 export function PayoutForm({ banks, replacing }: { banks: Array<{ name: string; code: string }>; replacing: boolean }) {
@@ -26,13 +27,8 @@ export function PayoutForm({ banks, replacing }: { banks: Array<{ name: string; 
   }
   return (
     <form noValidate onSubmit={verify}>
-      <div className="rx-field">
-        <label className="rx-label" htmlFor="bank">Bank</label>
-        <div className="rx-input"><select id="bank" value={bank} onChange={(e) => { setBank(e.target.value); reset(); }} style={{ flex: 1, minHeight: 44, background: "transparent", color: "inherit", border: 0, font: "inherit" }}>
-          <option value="" style={{ color: "#141414" }}>Choose your bank</option>
-          {banks.map((b) => <option key={b.code} value={b.code} style={{ color: "#141414" }}>{b.name}</option>)}
-        </select></div>
-      </div>
+      <SelectSheet label="Bank" title="Choose your bank" value={bank} onChange={(v) => { setBank(v); reset(); }} placeholder="Choose your bank" searchable searchPlaceholder="Search banks"
+        options={banks.map((b) => ({ value: b.code, label: b.name, icon: <BankBadge name={b.name} /> }))} />
       <TextField label="Account number" inputMode="numeric" maxLength={10} autoComplete="off" placeholder="10 digits" value={acct} onChange={(e) => { setAcct(e.target.value.replace(/\D/g, "")); reset(); }} />
       {error ? <p role="alert" className="rx-error" style={{ marginBottom: 16 }}>{error}</p> : null}
       {name ? (

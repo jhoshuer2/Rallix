@@ -42,7 +42,7 @@ const refFor = who => sql(`select p.provider_ref from payments p join membership
   console.log('2. admin sets up the payout account');
   const A = await mk(); await signIn(A, CLUB, ADMIN); await A.goto(CLUB + '/membership');
   ok(/Not set up/.test(await text(A)), 'membership page says online payments are not set up');
-  await A.goto(CLUB + '/membership/payouts'); await A.getByLabel('Bank').selectOption('044'); await A.getByLabel('Account number').fill('0123450000'); await A.getByRole('button', { name: 'Verify account' }).click();
+  await A.goto(CLUB + '/membership/payouts'); await A.getByRole('button', { name: /^Bank/ }).click(); await A.screenshot({ path: process.env.SHOT || '/tmp/bank_sheet.png' }); await A.getByLabel('Search banks').fill('access'); await A.getByRole('radio', { name: /Access/ }).first().click(); await A.getByRole('button', { name: /^Bank Access Bank/ }).waitFor(); await A.getByLabel('Account number').fill('0123450000'); await A.getByRole('button', { name: 'Verify account' }).click();
   await A.getByText(/could not find that account/i).waitFor({ timeout: 10000 }); ok(true, 'an account the bank cannot find is refused with a clear message');
   await A.getByLabel('Account number').fill('0123456789'); await A.getByRole('button', { name: 'Verify account' }).click();
   await A.getByText('TEST ACCOUNT 6789').waitFor({ timeout: 10000 }); ok(true, 'the account holder name is shown for the admin to confirm');
