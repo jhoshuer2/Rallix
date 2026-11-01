@@ -7,6 +7,7 @@ export * from "./signature";
 export * from "./reference";
 export * from "./reconcile";
 export * from "./reactivation";
+export * from "./reminders";
 export { PaystackProvider } from "./paystack";
 export { FakeProvider, FAKE_SECRET } from "./fake";
 

@@ -107,6 +107,19 @@ describe("SmtpMailer against a real local SMTP server", () => {
     for (const bad of [msg({ to: "a@example.com, b@example.com" }), msg({ to: "a@example.com\r\nBcc: e@x.com" }), msg({ subject: "Hi\r\nBcc: e@x.com" })]) expect((await mailer().send(bad)).ok).toBe(false);
     expect(received.length).toBe(before);
   });
+  it("adds one-click List-Unsubscribe headers only when asked", async () => {
+    await mailer().send(msg({ unsubscribeUrl: "https://app.rallix.app/unsubscribe/abc.def" }));
+    const withIt = received.at(-1)!.raw;
+    expect(withIt).toMatch(/^List-Unsubscribe: <https:\/\/app\.rallix\.app\/unsubscribe\/abc\.def>/mi);
+    expect(withIt).toMatch(/^List-Unsubscribe-Post: List-Unsubscribe=One-Click/mi);
+    await mailer().send(msg());
+    expect(received.at(-1)!.raw).not.toMatch(/List-Unsubscribe/i);
+  });
+  it("refuses an unsafe unsubscribe URL instead of putting it in a header", async () => {
+    const before = received.length;
+    expect((await mailer().send(msg({ unsubscribeUrl: "https://x.com/a>\r\nBcc: e@x.com" }))).ok).toBe(false);
+    expect(received.length).toBe(before);
+  });
   it("reports a login failure without leaking details", async () => {
     const r = await mailer("rallix", "wrong").send(msg()); expect(r).toEqual({ ok: false, error: "The mail server rejected our login" });
   });
@@ -136,4 +149,44 @@ describe("sendBatch", () => {
     expect(peak).toBeLessThanOrEqual(4); expect(peak).toBeGreaterThan(1);
   });
   it("handles an empty list", async () => { expect(await sendBatch(flaky, [])).toEqual([]); });
+});
+
+import { assertUrl, signUnsubscribeToken, verifyUnsubscribeToken } from "./index";
+
+describe("unsubscribe tokens", () => {
+  const secret = "a-long-enough-secret-for-tests";
+  it("round-trips a user id, including ids with unusual characters", () => {
+    for (const id of ["u_123", "7f3a9c2e-1b4d-4c8e-9a6f-0d5e2b1c3a4f", "user with spaces & symbols ñ", "x".repeat(200)]) expect(verifyUnsubscribeToken(secret, signUnsubscribeToken(secret, id))).toBe(id);
+  });
+  it("rejects a token signed with another secret, or for a different user, or tampered", () => {
+    const t = signUnsubscribeToken(secret, "u_1");
+    expect(verifyUnsubscribeToken("another-secret-of-length-ok!", t)).toBeNull();
+    const [id, sig] = t.split(".");
+    expect(verifyUnsubscribeToken(secret, `${Buffer.from("u_2").toString("base64url")}.${sig}`)).toBeNull();
+    expect(verifyUnsubscribeToken(secret, `${id}.${sig!.slice(0, -2)}AA`)).toBeNull();
+    expect(verifyUnsubscribeToken(secret, `${id}.${sig}.extra`)).toBeNull();
+  });
+  it("never throws on garbage and treats it as not valid", () => {
+    for (const bad of ["", "nodot", ".", "a.b", "a.", ".b", "!!!.???", "x".repeat(700), null, undefined, 42, {}, ["a.b"]]) expect(verifyUnsubscribeToken(secret, bad)).toBeNull();
+    expect(verifyUnsubscribeToken("", signUnsubscribeToken(secret, "u_1"))).toBeNull();
+  });
+  it("refuses to sign with a weak secret or a silly id", () => {
+    expect(() => signUnsubscribeToken("short", "u_1")).toThrow(/at least 16/);
+    expect(() => signUnsubscribeToken(secret, "")).toThrow();
+  });
+  it("tokens are URL-safe", () => { expect(signUnsubscribeToken(secret, "ñ/?#&=+ ")).toMatch(/^[A-Za-z0-9_.-]+$/); });
+});
+
+describe("List-Unsubscribe over real SMTP", () => {
+  it("rejects unsafe unsubscribe URLs", () => {
+    for (const bad of ["javascript:alert(1)", "https://x.com/a b", "https://x.com/<script>", "https://x.com/\r\nBcc: e@x.com", "ftp://x.com", ""]) expect(() => assertUrl(bad), bad).toThrow();
+    expect(assertUrl("https://app.rallix.app/unsubscribe/abc.def")).toBe("https://app.rallix.app/unsubscribe/abc.def");
+  });
+});
+
+describe("footer links", () => {
+  it("turns a URL in the footer into a safe link and escapes everything else", () => {
+    const html = layout({ title: "t", bodyHtml: "<p>x</p>", footer: "Unsubscribe: https://app.rallix.app/unsubscribe/abc.def\n<b>not bold</b>" });
+    expect(html).toContain('<a href="https://app.rallix.app/unsubscribe/abc.def"'); expect(html).toContain("&lt;b&gt;not bold"); expect(html).not.toContain("<b>not bold");
+  });
 });

@@ -64,6 +64,14 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Tests: `pnpm --filter @rallix/payments test`, `apps/club/e2e/payments.cjs` and `apps/club/e2e/pay-link.cjs` (both need both apps and a fresh seeded DB).
 - Every account now has a real email, so Paystack receipts reach the payer (no more placeholder addresses).
 
+## Dues reminders
+- Per-club, OFF by default (`reminder_settings`: `enabled`, `offsets` = days relative to due date, e.g. -3, 0, 3, 7). Club admins edit them at `/membership/reminders` and can press "Send now".
+- Rules are the pure `nextReminder` in `packages/payments/src/reminders.ts` (browser-safe, import from `@rallix/payments/reminders`): only the latest eligible offset, a 2-day grace window, never repeat. Sending is `runDueReminders` in `apps/club/lib/reminders-core.ts`.
+- Idempotence: each send first claims a row in `reminder_log` (UNIQUE `due_id, offset_days`) with `INSERT ... ON CONFLICT DO UPDATE ... WHERE`; failed rows retry up to 3 attempts, stale `sending` rows after 10 minutes. Never send without a claim.
+- Scheduler: call `POST /api/jobs/dues-reminders` once a day with `Authorization: Bearer $CRON_SECRET` (optional `?club=<uuid>`). 503 if `CRON_SECRET` is missing or under 16 chars. "Today" is computed in each club's timezone. The `today` override is ignored in production.
+- Opt-out: `users.email_opt_out`. Every reminder carries a signed one-click unsubscribe link (`@rallix/mailer` `signUnsubscribeToken`, `List-Unsubscribe` headers). GET only shows a confirm page; POST acts. Players also have a switch on their Me page. The console's optional broadcasts honour it too.
+- `UNSUBSCRIBE_SECRET` must be identical in both apps; `CRON_SECRET` is only needed by the club app. Test: `apps/club/e2e/reminders.cjs` (needs both apps).
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.

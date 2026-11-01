@@ -19,6 +19,21 @@ Production refuses `MAIL_PROVIDER=console`, because it would silently drop sign-
 5. Check your provider's free-tier limits (daily and monthly sends) against: one code per sign-in, one email per invoice per club admin, and broadcasts to the audience size you expect. Gmail SMTP with an app password is fine for a quick test but is not for production.
 6. Provider free plans and limits change often. Verify them on the provider's site; they were not checked when this was written.
 
+## Dues reminders: scheduler and secrets
+Reminders are sent by a job endpoint; nothing runs by itself. Call it once a day from any scheduler (host cron, a cron service, GitHub Actions):
+```
+curl -X POST https://<club-app-host>/api/jobs/dues-reminders \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+Environment (production):
+```
+CRON_SECRET=<16+ random characters>          # club app only
+UNSUBSCRIBE_SECRET=<16+ random characters>   # SAME value in club app and console
+APP_URL=https://<club-app-host>              # club app, used in links
+CLUB_APP_URL=https://<club-app-host>         # console, used in broadcast links
+```
+Clubs must switch reminders on themselves (Membership, Dues reminders). Running the job twice in a day sends nothing extra. Every reminder has a one-click unsubscribe link; players can also turn emails off on their Me page.
+
 ## Safety built in
 - Recipients are validated as a single plain address; line breaks and commas are rejected everywhere (header injection).
 - Template placeholders with no value are an error (an invoice with a blank amount never goes out).

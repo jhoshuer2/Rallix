@@ -1,7 +1,10 @@
 import { Badge, Empty, Kpi, PageHead } from "../../../components/ui";
 import { dateTime, naira } from "../../../lib/format";
 import Link from "next/link";
-import { ATTENTION, paidButSuspended, paymentEvents, paymentsSummary } from "../../../lib/queries";
+import { ATTENTION, paidButSuspended, paymentEvents, paymentsSummary, reminderStats } from "../../../lib/queries";
+import { RunButton } from "../../../components/Forms";
+import { runRemindersJob } from "../../../lib/actions";
+import { ago } from "../../../lib/format";
 
 const tone = (o: string) => (o === "credited" ? "ok" : ATTENTION.includes(o) ? "bad" : undefined) as "ok" | "bad" | undefined;
 const hint: Record<string, string> = {
@@ -13,7 +16,7 @@ const hint: Record<string, string> = {
 };
 
 export default async function Payments() {
-  const [events, s, stuck] = await Promise.all([paymentEvents(), paymentsSummary(), paidButSuspended()]);
+  const [events, s, stuck, rem] = await Promise.all([paymentEvents(), paymentsSummary(), paidButSuspended(), reminderStats()]);
   const attention = events.filter((e) => ATTENTION.includes(e.outcome) && e.event !== "return.verify");
   return (
     <>
@@ -24,6 +27,14 @@ export default async function Payments() {
         <Kpi label="Clubs accepting online dues" value={`${s!.clubs_with_payouts} of ${s!.clubs_total}`} note="Active clubs with a payout account" />
         <Kpi label="Stuck payments" value={s!.pending_old} note="Started over a day ago, never completed" />
       </div>
+      <h2 className="cs-h2">Dues reminders</h2>
+      <div className="cs-kpis">
+        <Kpi label="Reminders sent (7 days)" value={rem!.sent_7d} note={rem!.failed_7d ? `${rem!.failed_7d} failed` : "None failed"} />
+        <Kpi label="Clubs with reminders on" value={`${rem!.clubs_on} of ${rem!.clubs_total}`} note="Clubs choose this themselves" />
+        <Kpi label="People who opted out" value={rem!.opted_out} />
+        <Kpi label="Last job run that sent mail" value={rem!.last_run ? ago(rem!.last_run) : "never"} note="Set up the daily call; see packages/payments/README" />
+      </div>
+      <p style={{ margin: "12px 0 0" }}><RunButton action={runRemindersJob as () => Promise<{ ok: boolean }>} success="Reminder job ran. See the numbers above after a refresh.">Run the reminder job now</RunButton></p>
       {stuck.length ? (
         <>
           <h2 className="cs-h2">Paid but still locked out</h2>

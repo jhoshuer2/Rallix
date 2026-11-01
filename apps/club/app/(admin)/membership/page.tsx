@@ -26,7 +26,10 @@ export default async function Membership() {
       </div>
       <PromoCard title="Manage your subscription" cta="Visit" href="/membership/subscriptions" linkAs={Link} />
       <PromoCard title="Manage membership" cta="View" href="/membership/payments" tone="green" linkAs={Link} />
-      <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/membership/rallix">Your Rallix subscription and invoices</Link>
+      <div style={{ display: "grid", gap: 12 }}>
+        <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/membership/reminders">Dues reminders</Link>
+        <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/membership/rallix">Your Rallix subscription and invoices</Link>
+      </div>
     </>
   );
 }

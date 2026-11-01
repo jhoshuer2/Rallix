@@ -1,5 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
-import { assertEmail, assertHeaderSafe } from "./safe";
+import { assertEmail, assertHeaderSafe, assertUrl } from "./safe";
 import { MailError, type Mailer, type Message, type SendResult } from "./types";
 
 export type SmtpOptions = { url: string; from: string; replyTo?: string; transport?: Transporter };
@@ -24,7 +24,11 @@ export class SmtpMailer implements Mailer {
       const info = await this.t.sendMail({
         from: this.from, replyTo: this.replyTo, to: assertEmail(m.to), subject: assertHeaderSafe(m.subject, "Subject"),
         text: m.text, ...(m.html ? { html: m.html } : {}),
-        headers: { "X-Auto-Response-Suppress": "OOF, AutoReply" },
+        headers: {
+          "X-Auto-Response-Suppress": "OOF, AutoReply",
+          // RFC 8058 one-click unsubscribe: the mailbox provider POSTs to this URL, no page visit needed.
+          ...(m.unsubscribeUrl ? { "List-Unsubscribe": `<${assertUrl(m.unsubscribeUrl)}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } : {}),
+        },
       });
       return { ok: true, messageId: info.messageId ?? null };
     } catch (e) {

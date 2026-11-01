@@ -3,6 +3,7 @@ import { BackButton, DueCard, PageHead, PaymentRow, SectionHeader } from "@ralli
 import { PayButton } from "../../../../../components/PayButton";
 import { inClub, requireClub } from "../../../../../lib/context";
 import { payoutsEnabled } from "../../../../../lib/payment-queries";
+import { ownEmailOptOut } from "../../../../../lib/contact";
 import { listDues, listPayments, naira, fmtDate} from "../../../../../lib/queries";
 
 export default async function PlayerPayments() {
@@ -10,11 +11,13 @@ export default async function PlayerPayments() {
   const me = ctx.club.membershipId;
   const d = await inClub(ctx, async (tx) => ({ dues: await listDues(tx, ctx.club.clubId, me), pays: await listPayments(tx, ctx.club.clubId, me) }));
   const payOn = await payoutsEnabled(ctx);
+  const optedOut = await ownEmailOptOut(ctx.user.id);
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
   return (
     <>
       <PageHead back={<BackButton href="/play/me" linkAs={Link} />} title="Payments" />
       {due ? <DueCard plan={due.plan} amount={naira(due.amountKobo)} due={fmtDate(due.dueDate)} status={due.status === "overdue" ? "overdue" : "due"} action={<PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />} /> : <p className="rx-muted">You’re all paid up.</p>}
+      {optedOut ? <p className="rx-muted" style={{ fontSize: 14 }}>You’ve turned off reminder emails, so check here for what’s due. <Link href="/play/me" style={{ textDecoration: "underline" }}>Change this</Link></p> : null}
       <SectionHeader title="History" />
       {d.pays.length === 0 ? <p className="rx-muted">No payments yet.</p> : (
         <ul className="rx-pays">

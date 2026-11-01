@@ -1,9 +1,17 @@
 import { sql } from "drizzle-orm";
-import { assertHeaderSafe, compose, layout, renderHtml, sendBatch } from "@rallix/mailer";
+import { assertHeaderSafe, compose, layout, renderHtml, sendBatch, signUnsubscribeToken } from "@rallix/mailer";
 import { date, naira } from "./format";
 import { db } from "./db";
 import { logEmail, mailer } from "./mail";
-import { newPayToken, payLinkUrl } from "./pay-link";
+import { clubAppUrl, newPayToken, payLinkUrl } from "./pay-link";
+
+/** Same secret as the club app, which serves the unsubscribe page and verifies these links. */
+function unsubscribeSecret(): string {
+  const s = process.env.UNSUBSCRIBE_SECRET;
+  if (s && s.length >= 16) return s;
+  if (process.env.NODE_ENV === "production") throw new Error("UNSUBSCRIBE_SECRET is not set");
+  return "dev-only-unsubscribe-secret-not-for-production";
+}
 
 type Row = Record<string, unknown>;
 const rows = async <T = Row>(q: ReturnType<typeof sql>) => (await db().execute(q)).rows as T[];
@@ -58,7 +66,7 @@ export async function createDeliveries(notificationId: string, a: { type: "all_a
   const clubFilter = a.type === "clubs" ? sql`and m.club_id::text in (${sql.join(a.clubIds.map((c) => sql`${c}`), sql`, `)})` : sql``;
   const r = await db().execute(sql`insert into notification_deliveries (notification_id, user_id, email)
     select distinct on (u.id) ${notificationId}::uuid, u.id, u.email from memberships m join clubs c on c.id = m.club_id join users u on u.id = m.user_id
-    where m.status = 'active' and c.status = 'active' and ${roleFilter} ${clubFilter} order by u.id on conflict do nothing returning id`);
+    where m.status = 'active' and c.status = 'active' and ${roleFilter} ${a.type === 'all_admins' ? sql`` : sql`and not u.email_opt_out`} ${clubFilter} order by u.id on conflict do nothing returning id`);
   return r.rows.length;
 }
 
@@ -68,7 +76,7 @@ export async function createDeliveries(notificationId: string, a: { type: "all_a
  * Broadcast bodies are plain text typed by staff: they are escaped, never treated as templates.
  */
 export async function deliverNotification(id: string, limit = 100): Promise<{ sent: number; failed: number; remaining: number } | { error: string }> {
-  const [n] = await rows<{ title: string; body: string; channel: string }>(sql`select title, body, channel::text as channel from notifications where id = ${id}`);
+  const [n] = await rows<{ title: string; body: string; channel: string; audience: { type?: string } }>(sql`select title, body, channel::text as channel, audience from notifications where id = ${id}`);
   if (!n) return { error: "Notification not found." };
   if (n.channel !== "email") return { error: "Only the email channel can be sent for now." };
   let subject: string;
@@ -79,10 +87,18 @@ export async function deliverNotification(id: string, limit = 100): Promise<{ se
   const claimed = await rows<{ id: string; email: string; user_id: string }>(sql`update notification_deliveries set sent_at = now()
     where id in (select id from notification_deliveries where notification_id = ${id} and status = 'pending' and (sent_at is null or sent_at < now() - interval '5 minutes') order by id limit ${limit} for update skip locked)
     returning id, email, user_id`);
-  const footer = `Sent by ${company}. You received this because you are a member of a club on Rallix.`;
-  const html = layout({ title: subject, bodyHtml: renderHtml(n.body), footer, company });
-  const text = `${n.body}\n\n--\n${footer}`;
-  const out = await sendBatch(mailer(), claimed.map((c) => ({ key: c.id, message: { to: c.email, subject, text, html } })), { concurrency: 4 });
+  // Messages to admins about the platform are operational. Anything that can reach players is optional mail and gets an unsubscribe link.
+  const optional = n.audience?.type !== "all_admins";
+  const baseFooter = `Sent by ${company}. You received this because you are a member of a club on Rallix.`;
+  const out = await sendBatch(mailer(), claimed.map((c) => {
+    let footer = baseFooter, unsubscribeUrl: string | undefined;
+    if (optional) {
+      const token = signUnsubscribeToken(unsubscribeSecret(), c.user_id);
+      footer = `${baseFooter}\nDon't want these emails? Unsubscribe: ${clubAppUrl()}/unsubscribe/${token}`;
+      unsubscribeUrl = `${clubAppUrl()}/api/unsubscribe/${token}`;
+    }
+    return { key: c.id, message: { to: c.email, subject, text: `${n.body}\n\n--\n${footer}`, html: layout({ title: subject, bodyHtml: renderHtml(n.body), footer, company }), unsubscribeUrl } };
+  }), { concurrency: 4 });
   let sent = 0, failed = 0;
   for (const o of out) {
     const c = claimed.find((x) => x.id === o.key)!;

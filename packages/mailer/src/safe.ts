@@ -20,3 +20,10 @@ export function assertEmail(value: string): string {
 export const isEmail = (v: unknown): v is string => { try { return typeof v === "string" && !!assertEmail(v); } catch { return false; } };
 
 export const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+/** A plain http(s) URL with no line breaks, spaces, or angle brackets (it goes inside a header). */
+export function assertUrl(value: string): string {
+  const v = assertHeaderSafe(value.trim(), "URL");
+  if (!/^https?:\/\/[^\s<>"']+$/.test(v) || v.length > 2000) throw new MailError("That URL is not valid");
+  return v;
+}

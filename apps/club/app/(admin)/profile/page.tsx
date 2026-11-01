@@ -4,7 +4,8 @@ import { invites } from "@rallix/db";
 import { inClub, requireRole } from "../../../lib/context";
 import { InviteLink } from "./InviteLink";
 import { ContactForm } from "../../../components/ContactForm";
-import { ownPhone } from "../../../lib/contact";
+import { ownEmailOptOut, ownPhone } from "../../../lib/contact";
+import { EmailPrefs } from "../../../components/EmailPrefs";
 
 export default async function Profile() {
   const ctx = await requireRole("admin");
@@ -21,6 +22,8 @@ export default async function Profile() {
       </Card>
       <SectionHeader title="Contact details" />
       <ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} />
+      <SectionHeader title="Email" />
+      <EmailPrefs optedOut={await ownEmailOptOut(ctx.user.id)} />
       <SectionHeader title="Invite players" />
       <InviteLink clubName={ctx.club.name} initialCode={inv?.code ?? null} />
       <SectionHeader title="Account" />

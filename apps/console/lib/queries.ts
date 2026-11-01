@@ -152,7 +152,9 @@ export const listTeam = () => q<{ user_id: string; name: string; email: string; 
 export async function audienceCount(a: { type: "all_admins" | "all_players" | "clubs"; clubIds?: string[] }) {
   const roleFilter = a.type === "all_admins" ? sql`'admin' = any(m.roles)` : sql`true`;
   const clubFilter = a.type === "clubs" ? sql`and m.club_id::text in (${list(a.clubIds ?? [])})` : sql``;
-  const r = await one<{ n: number }>(sql`select count(distinct m.user_id)::int as n from memberships m join clubs c on c.id = m.club_id where m.status = 'active' and c.status = 'active' and ${roleFilter} ${clubFilter}`);
+  // Same rule as createDeliveries: optional mail (anything that can reach players) skips people who opted out.
+  const optOut = a.type === "all_admins" ? sql`` : sql`and not u.email_opt_out`;
+  const r = await one<{ n: number }>(sql`select count(distinct m.user_id)::int as n from memberships m join clubs c on c.id = m.club_id join users u on u.id = m.user_id where m.status = 'active' and c.status = 'active' and ${roleFilter} ${optOut} ${clubFilter}`);
   return r?.n ?? 0;
 }
 
@@ -174,3 +176,11 @@ export const paidButSuspended = () => q<{ club_id: string; club_name: string; st
   sql`select c.id as club_id, c.name as club_name, c.status::text as status, c.suspension_reason::text as reason, p.paid_at, i.number
       from invoice_payments p join clubs c on c.id = p.club_id join platform_invoices i on i.id = p.invoice_id
       where p.status = 'paid' and p.paid_at > now() - interval '14 days' and c.status <> 'active' order by p.paid_at desc`);
+
+export const reminderStats = () => one<{ sent_7d: number; failed_7d: number; clubs_on: number; clubs_total: number; opted_out: number; last_run: Date | null }>(sql`select
+  (select count(*)::int from reminder_log where status = 'sent' and created_at > now() - interval '7 days') sent_7d,
+  (select count(*)::int from reminder_log where status = 'failed' and created_at > now() - interval '7 days') failed_7d,
+  (select count(*)::int from reminder_settings s join clubs c on c.id = s.club_id where s.enabled and c.status = 'active') clubs_on,
+  (select count(*)::int from clubs where status = 'active') clubs_total,
+  (select count(*)::int from users where email_opt_out) opted_out,
+  (select max(at) from audit_log where action = 'reminders.run') last_run`);

@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   image: text("image"),
   phoneNumber: text("phone_number").unique(),
   phoneNumberVerified: boolean("phone_number_verified").notNull().default(false),
+  /** Player turned off optional email (dues reminders, announcements). Sign-in codes and admin invoices are never affected. Service-only. */
+  emailOptOut: boolean("email_opt_out").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -4,6 +4,8 @@ export type Message = {
   /** Plain-text body (always sent, so every client and spam filter has a text part). */
   text: string;
   html?: string;
+  /** For optional mail (reminders, announcements). Adds List-Unsubscribe headers so Gmail and Outlook show their own Unsubscribe button. */
+  unsubscribeUrl?: string;
 };
 export type SendResult = { ok: true; messageId: string | null } | { ok: false; error: string };
 

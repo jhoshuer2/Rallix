@@ -411,3 +411,56 @@ describe("null-safe filters (regression: NULL <> 'x' is not true)", () => {
     expect(good.n).toBe(2);
   });
 });
+
+describe("dues reminders", () => {
+  const adminCtx = () => ({ userId: "adminA", clubId: ids.A });
+  let dueP1: string;
+  beforeAll(async () => { dueP1 = ((await svc.execute(sql`select id from dues where membership_id = ${ids.mP1}`)).rows[0] as { id: string }).id; });
+
+  it("reminders are off by default and only the club's own admins can see or change the settings", async () => {
+    await withTenant(app, adminCtx(), (tx) => tx.execute(sql`insert into reminder_settings (club_id) values (${ids.A})`));
+    const mine = await rows(app, adminCtx(), sql`select enabled, offsets from reminder_settings`);
+    expect(mine).toEqual([{ enabled: false, offsets: [-3, 0, 3, 7] }]);
+    await withTenant(app, adminCtx(), (tx) => tx.execute(sql`update reminder_settings set enabled = true where club_id = ${ids.A}`));
+    expect(await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select * from reminder_settings`)).toHaveLength(0); // a player sees nothing
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select * from reminder_settings`)).toHaveLength(0); // another club's admin sees nothing
+    expect(await rows(app, { userId: "adminB", clubId: ids.A }, sql`select * from reminder_settings`)).toHaveLength(0); // even claiming club A
+  });
+
+  it("nobody else can change a club's settings or create them for another club", async () => {
+    expect((await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update reminder_settings set enabled = false where club_id = ${ids.A}`))).rowCount).toBe(0);
+    expect(await denied(withTenant(app, { userId: "adminB", clubId: ids.B }, (tx) => tx.execute(sql`insert into reminder_settings (club_id) values (${ids.A})`)))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into reminder_settings (club_id) values (${ids.B})`)))).toBe("42501");
+  });
+
+  it("reminder days must be 1 to 6 distinct whole numbers between -14 and 30", async () => {
+    const set = (v: string) => withTenant(app, adminCtx(), (tx) => tx.execute(sql.raw(`update reminder_settings set offsets = ${v} where club_id = '${ids.A}'`)));
+    for (const bad of ["ARRAY[]::int[]", "ARRAY[1,2,3,4,5,6,7]", "ARRAY[-15]", "ARRAY[31]", "ARRAY[3,3]", "ARRAY[NULL]::int[]"]) expect(await denied(set(bad)), bad).toBe("23514");
+    await set("ARRAY[-14,30]"); await set("ARRAY[-3,0,3,7]");
+  });
+
+  it("the app role cannot read or write the reminder log, or any player's opt-out flag", async () => {
+    expect(await denied(app.execute(sql`select * from reminder_log`))).toBe("42501");
+    expect(await denied(app.execute(sql`insert into reminder_log (club_id, due_id, offset_days) values (${ids.A}, ${dueP1}, 0)`))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select email_opt_out from users`)))).toBe("42501");
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update users set email_opt_out = true where id = 'playerA1'`)))).toBe("42501");
+  });
+
+  it("a due can only be reminded once per reminder day, which is what makes the job safe to repeat", async () => {
+    await svc.execute(sql`insert into reminder_log (club_id, due_id, offset_days, status) values (${ids.A}, ${dueP1}, -3, 'sent')`);
+    expect(await denied(svc.execute(sql`insert into reminder_log (club_id, due_id, offset_days) values (${ids.A}, ${dueP1}, -3)`))).toBe("23505");
+    await svc.execute(sql`insert into reminder_log (club_id, due_id, offset_days, status) values (${ids.A}, ${dueP1}, 0, 'sent')`);
+    expect(await denied(svc.execute(sql`insert into reminder_log (club_id, due_id, offset_days, status) values (${ids.A}, ${dueP1}, 3, 'bounced')`))).toBe("23514");
+  });
+
+  it("the unsent-reminder claim pattern lets exactly one of several concurrent runners win", async () => {
+    const claim = () => svc.execute(sql`insert into reminder_log (club_id, due_id, offset_days) values (${ids.A}, ${dueP1}, 7) on conflict (due_id, offset_days) do nothing returning id`);
+    const results = await Promise.all(Array.from({ length: 8 }, claim));
+    expect(results.filter((r) => r.rows.length === 1)).toHaveLength(1);
+  });
+
+  it("the reminder wording was upgraded, and mentions the timing and pay link", async () => {
+    const t = (await svc.execute(sql`select subject, body from templates where key = 'dues_reminder'`)).rows[0] as { subject: string; body: string };
+    expect(t.subject).toContain("{{timing}}"); expect(t.body).toContain("{{pay_link}}");
+  });
+});

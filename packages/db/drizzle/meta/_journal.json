@@ -85,6 +85,20 @@
       "when": 1793511552621,
       "tag": "0011_email_rls_and_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793513604487,
+      "tag": "0012_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793513605276,
+      "tag": "0013_reminders_rls_and_template",
+      "breakpoints": true
     }
   ]
 }

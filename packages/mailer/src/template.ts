@@ -21,6 +21,8 @@ export const fillSubject = (subject: string, vars: Record<string, string | numbe
 
 const URL_RE = /(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)])/g;
 
+const linkify = (escaped: string) => escaped.replace(URL_RE, (u) => `<a href="${u}" style="color:#b54829">${u}</a>`);
+
 /** Plain text to HTML: escape everything first, then turn paragraphs and bare links into markup. Never trusts the input. */
 export function renderHtml(text: string): string {
   return text.split(/\n{2,}/).map((para) => {
@@ -38,7 +40,7 @@ export function layout(opts: { title: string; bodyHtml: string; footer?: string;
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden">
 <tr><td style="background:#3b6ca7;color:#ffffff;padding:18px 24px;font-size:20px;font-weight:bold;font-style:italic;text-transform:uppercase">${company}</td></tr>
 <tr><td style="padding:24px;font-size:16px">${opts.bodyHtml}</td></tr>
-<tr><td style="padding:16px 24px;background:#f4f1e8;font-size:12px;color:#555555">${escapeHtml(opts.footer ?? `Sent by ${opts.company ?? "Rallix"}.`)}</td></tr>
+<tr><td style="padding:16px 24px;background:#f4f1e8;font-size:12px;color:#555555;line-height:1.5">${linkify(escapeHtml(opts.footer ?? `Sent by ${opts.company ?? "Rallix"}.`)).replace(/\n/g, "<br>")}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

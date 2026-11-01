@@ -288,3 +288,19 @@ export async function retryFailedDeliveries(id: string): Promise<Res<{ requeued:
   revalidatePath("/notifications");
   return { ok: true, requeued: r.rows.length };
 }
+
+/* ---------- Dues reminders ---------- */
+/** Run the club app's daily reminder job now. It is the same code the scheduler calls, and safe to repeat. */
+export async function runRemindersJob(): Promise<Res<{ sent: number; failed: number }>> {
+  const staff = await requireAdmin();
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 16) return fail("CRON_SECRET is not set for the console, so it can't call the job.");
+  try {
+    const res = await fetch(`${process.env.CLUB_APP_URL ?? "http://localhost:3000"}/api/jobs/dues-reminders`, { method: "POST", headers: { Authorization: `Bearer ${secret}` }, cache: "no-store", signal: AbortSignal.timeout(110_000) });
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; sent?: number; failed?: number; error?: string } | null;
+    if (!res.ok || !body?.ok) return fail(body?.error ?? `The job returned ${res.status}.`);
+    await audit(staff.id, "reminders.run_manual", "reminders", null, { sent: body.sent, failed: body.failed });
+    revalidatePath("/payments");
+    return { ok: true, sent: body.sent ?? 0, failed: body.failed ?? 0 };
+  } catch { return fail("Couldn't reach the club app. Check CLUB_APP_URL and that it is running."); }
+}

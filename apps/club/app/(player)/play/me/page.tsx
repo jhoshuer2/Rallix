@@ -3,7 +3,8 @@ import { Avatar, Card, Chip, ClubRow, SectionHeader } from "@rallix/ui";
 import { inClub, requireClub } from "../../../../lib/context";
 import { ageOf, listMembers } from "../../../../lib/queries";
 import { ContactForm } from "../../../../components/ContactForm";
-import { ownPhone } from "../../../../lib/contact";
+import { ownEmailOptOut, ownPhone } from "../../../../lib/contact";
+import { EmailPrefs } from "../../../../components/EmailPrefs";
 
 export default async function Me() {
   const ctx = await requireClub();
@@ -20,6 +21,8 @@ export default async function Me() {
       </Card>
       <SectionHeader title="Contact details" />
       <ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} />
+      <SectionHeader title="Email" />
+      <EmailPrefs optedOut={await ownEmailOptOut(ctx.user.id)} />
       <SectionHeader title="Payments" />
       <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/play/me/payments">Dues, receipts and history</Link>
       <SectionHeader title="My clubs" />

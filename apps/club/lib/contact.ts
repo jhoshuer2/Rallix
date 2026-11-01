@@ -7,3 +7,9 @@ export async function ownPhone(userId: string): Promise<string> {
   const [u] = await serviceDb().select({ phone: users.phoneNumber }).from(users).where(eq(users.id, userId));
   return u?.phone ?? "";
 }
+
+/** Whether this person turned off optional emails. Only ever called with the id from their own session. */
+export async function ownEmailOptOut(userId: string): Promise<boolean> {
+  const [u] = await serviceDb().select({ out: users.emailOptOut }).from(users).where(eq(users.id, userId));
+  return !!u?.out;
+}

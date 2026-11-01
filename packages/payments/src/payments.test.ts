@@ -219,3 +219,61 @@ describe("shouldReactivate", () => {
     expect(shouldReactivate({ ...base, otherUnpaidInvoices: [{ dueAt: now }] })).toBe(false);
   });
 });
+
+import { DEFAULT_OFFSETS, GRACE_DAYS, checkOffsets, daysBetween, describeOffset, nextReminder, timingPhrase } from "./index";
+
+describe("daysBetween", () => {
+  it("counts whole days across month ends, leap years and daylight saving", () => {
+    expect(daysBetween("2026-11-28", "2026-11-28")).toBe(0);
+    expect(daysBetween("2026-11-28", "2026-12-01")).toBe(3);
+    expect(daysBetween("2026-12-01", "2026-11-28")).toBe(-3);
+    expect(daysBetween("2028-02-28", "2028-03-01")).toBe(2); // leap year
+    expect(daysBetween("2026-03-28", "2026-03-30")).toBe(2);
+    expect(daysBetween("2025-12-31", "2026-01-01")).toBe(1);
+  });
+});
+
+describe("checkOffsets", () => {
+  it("normalises: unique and sorted", () => { expect(checkOffsets([7, -3, 0, -3])).toEqual({ ok: true, offsets: [-3, 0, 7] }); });
+  it("rejects empty, too many, out of range, fractional and non-numbers", () => {
+    for (const bad of [[], [1, 2, 3, 4, 5, 6, 7], [-15], [31], [1.5], ["3"], [NaN], [null], "3", null, undefined, {}]) expect(checkOffsets(bad as unknown).ok, JSON.stringify(bad)).toBe(false);
+    expect(checkOffsets([-14, 30]).ok).toBe(true);
+  });
+});
+
+describe("nextReminder", () => {
+  const base = { dueDate: "2026-11-28", offsets: DEFAULT_OFFSETS, alreadySent: new Set<number>() };
+  const on = (today: string, sent: number[] = [], grace?: number) => nextReminder({ ...base, today, alreadySent: new Set(sent), grace });
+  it("sends exactly on each configured day", () => {
+    expect(on("2026-11-25")).toBe(-3); expect(on("2026-11-28")).toBe(0); expect(on("2026-12-01")).toBe(3); expect(on("2026-12-05")).toBe(7);
+  });
+  it("sends nothing on quiet days (before the first reminder, between windows, long after)", () => { for (const d of ["2026-11-20", "2026-11-24", "2026-12-04", "2026-12-15"]) expect(on(d), d).toBeNull(); });
+  it("never repeats a reminder that was already sent", () => { expect(on("2026-11-25", [-3])).toBeNull(); expect(on("2026-11-28", [0])).toBeNull(); expect(on("2026-11-28", [-3])).toBe(0); });
+  it("catches up within the grace window after an outage, but only the latest one", () => {
+    expect(on("2026-11-26")).toBe(-3);               // missed day -3 by one day: still sent
+    expect(on("2026-11-27")).toBe(-3);               // by two days: still sent (grace = 2)
+    expect(on("2026-11-27", [], 0)).toBeNull();      // with no grace it is skipped
+    expect(on("2026-12-01", [])).toBe(3);            // day 3 AND earlier ones eligible? only the latest in window
+    expect(on("2026-12-02")).toBe(3);
+    expect(on("2026-12-04")).toBeNull();             // 3 days after offset 3: past grace; offset 7 not yet
+  });
+  it("after a long outage never sends a burst of old reminders", () => {
+    const sent: number[] = []; const got = on("2026-12-05"); expect(got).toBe(7); sent.push(got!);
+    expect(on("2026-12-05", sent)).toBeNull();
+  });
+  it("is stable for every day across a month: at most one reminder per day, never a duplicate", () => {
+    const sent = new Set<number>(); let count = 0;
+    for (let i = -20; i <= 20; i++) { const today = new Date(Date.UTC(2026, 10, 28 + i)).toISOString().slice(0, 10); const r = nextReminder({ ...base, today, alreadySent: sent }); if (r !== null) { expect(sent.has(r)).toBe(false); sent.add(r); count++; } }
+    expect(count).toBe(DEFAULT_OFFSETS.length); expect([...sent].sort((a, b) => a - b)).toEqual([...DEFAULT_OFFSETS]);
+  });
+  it("works for a due date at a month or year boundary", () => { expect(nextReminder({ dueDate: "2026-12-31", today: "2026-12-28", offsets: [-3], alreadySent: new Set() })).toBe(-3); expect(nextReminder({ dueDate: "2026-12-31", today: "2027-01-03", offsets: [3], alreadySent: new Set() })).toBe(3); });
+  it("uses the documented grace default", () => { expect(GRACE_DAYS).toBe(2); });
+});
+
+describe("wording", () => {
+  it("reads naturally for every case", () => {
+    expect(timingPhrase(-7)).toBe("are due in 7 days"); expect(timingPhrase(-1)).toBe("are due tomorrow"); expect(timingPhrase(0)).toBe("are due today");
+    expect(timingPhrase(1)).toBe("were due yesterday"); expect(timingPhrase(3)).toBe("were due 3 days ago");
+    expect(describeOffset(-3)).toBe("3 days before"); expect(describeOffset(-1)).toBe("The day before"); expect(describeOffset(0)).toBe("On the due date"); expect(describeOffset(1)).toBe("1 day after"); expect(describeOffset(7)).toBe("7 days after");
+  });
+});

@@ -6,6 +6,8 @@ export * from "./types";
 export * from "./safe";
 export * from "./template";
 export * from "./batch";
+export * from "./unsubscribe";
+export * from "./placeholders";
 export { SmtpMailer } from "./smtp";
 export { ConsoleMailer } from "./console";
 

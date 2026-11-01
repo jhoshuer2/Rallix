@@ -226,3 +226,33 @@ export const statSnapshots = pgTable("stat_snapshots", {
   unique("stat_snapshots_uq").on(t.membershipId, t.period),
   foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "stat_snapshots_membership_fk" }).onDelete("cascade"),
 ]);
+
+/** Each club decides whether and when its members get dues reminder emails. Off by default. Offsets are days relative to the due date (negative = before). */
+export const reminderSettings = pgTable("reminder_settings", {
+  clubId: uuid("club_id").primaryKey().references(() => clubs.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(false),
+  offsets: integer("offsets").array().notNull().default(sql`ARRAY[-3,0,3,7]`),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * One row per reminder we have sent (or tried to send) for a due. UNIQUE (due, offset) is what makes the job safe to run
+ * any number of times and from several places at once: only whoever inserts the row sends the email. Service role only.
+ */
+export const reminderLog = pgTable("reminder_log", {
+  id: id(),
+  clubId: clubId(),
+  dueId: uuid("due_id").notNull().references(() => dues.id, { onDelete: "cascade" }),
+  offsetDays: smallint("offset_days").notNull(),
+  userId: text("user_id"),
+  email: text("email"),
+  status: text("status").notNull().default("sending"), // sending | sent | failed
+  attempts: smallint("attempts").notNull().default(1),
+  error: text("error"),
+  createdAt: createdAt(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+}, (t) => [
+  unique("reminder_log_due_offset_uq").on(t.dueId, t.offsetDays),
+  index("reminder_log_club_idx").on(t.clubId, t.createdAt),
+  check("reminder_log_status", sql`${t.status} IN ('sending','sent','failed')`),
+]);
