@@ -125,9 +125,12 @@ describe("SmtpMailer against a real local SMTP server", () => {
   });
   it("reports a rejected recipient as a failure, not a crash", async () => {
     const r = await mailer().send(msg({ to: "reject@example.com" })); expect(r.ok).toBe(false);
+    // the log must say WHICH kind of failure it was, without the server's reply text or any credential
+    if (!r.ok) { expect(r.error).toMatch(/^The mail server could not deliver the message \((EENVELOPE|EMESSAGE)?\s?\d{3}\)$/); expect(r.error).not.toContain("secret"); }
   });
   it("reports an unreachable server as a failure", async () => {
-    const r = await new SmtpMailer({ url: "smtp://u:p@127.0.0.1:1", from: "a@x.com" }).send(msg()); expect(r.ok).toBe(false);
+    const r = await new SmtpMailer({ url: "smtp://u:hunter2@127.0.0.1:1", from: "a@x.com" }).send(msg()); expect(r.ok).toBe(false);
+    if (!r.ok) { expect(r.error).toMatch(/\((ECONNECTION|ESOCKET|ETIMEDOUT|ECONNREFUSED)\)/); expect(r.error).not.toContain("hunter2"); }
   });
 });
 

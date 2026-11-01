@@ -33,7 +33,11 @@ export class SmtpMailer implements Mailer {
       return { ok: true, messageId: info.messageId ?? null };
     } catch (e) {
       // Never leak server details or credentials into logs shown to users.
-      const msg = e instanceof MailError ? e.message : (e as { responseCode?: number; code?: string }).code === "EAUTH" ? "The mail server rejected our login" : "The mail server could not deliver the message";
+      const x = e as { responseCode?: number; code?: string };
+      // Only the nodemailer error code (e.g. ECONNECTION, EENVELOPE) and numeric SMTP status are added: enough to tell a
+      // refused sender/recipient from a bad port, without the server's reply text or the URL.
+      const hint = [/^[A-Z_]{3,20}$/.test(x.code ?? "") ? x.code : "", typeof x.responseCode === "number" ? String(x.responseCode) : ""].filter(Boolean).join(" ");
+      const msg = e instanceof MailError ? e.message : x.code === "EAUTH" ? "The mail server rejected our login" : `The mail server could not deliver the message${hint ? ` (${hint})` : ""}`;
       return { ok: false, error: msg };
     }
   }
