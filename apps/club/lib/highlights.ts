@@ -18,3 +18,6 @@ export function buildStories(all: MatchView[], hrefFor: (m: MatchView) => string
     a: m.p1!, b: m.p2!, score: `${m.gamesP1}–${m.gamesP2}`, href: hrefFor(m), cta,
   }));
 }
+
+/** Today as YYYY-MM-DD in the club's usual timezone (Nigeria), so a birthday flips at local midnight and not at UTC midnight. */
+export const todayInClub = (now: Date = new Date(), tz = "Africa/Lagos") => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);

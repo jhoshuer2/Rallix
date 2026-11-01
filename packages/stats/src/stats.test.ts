@@ -83,3 +83,36 @@ describe("fixtures", () => {
     expect([...out].sort()).toEqual([1, 2, 3, 4, 5]);
   });
 });
+
+import { celebrations } from "./celebrations";
+describe("celebrations", () => {
+  const m = (id: string, dob: string | null, joined: string) => ({ id, name: id, dob, joinedAt: joined });
+  it("labels a birthday today, tomorrow, yesterday and further out, soonest first", () => {
+    const out = celebrations([m("a", "1990-11-01", "2026-01-01"), m("b", "1990-11-02", "2026-01-01"), m("c", "1990-10-31", "2026-01-01"), m("d", "1990-11-05", "2026-01-01"), m("e", "1990-10-25", "2026-01-01")], "2026-11-01");
+    expect(out.filter((c) => c.kind === "birthday").map((c) => [c.name, c.label])).toEqual([["a", "Birthday today"], ["b", "Birthday tomorrow"], ["d", "Birthday in 4 days"], ["c", "Birthday yesterday"], ["e", "Birthday 7 days ago"]]);
+  });
+  it("ignores birthdays outside the window and members with no birthday", () => {
+    expect(celebrations([m("a", "1990-11-20", "2026-01-01"), m("b", null, "2026-01-01")], "2026-11-01")).toEqual([]);
+  });
+  it("works across New Year", () => {
+    const out = celebrations([m("a", "1990-01-02", "2020-06-15"), m("b", "1990-12-30", "2020-06-15")], "2026-12-31");
+    expect(out.map((c) => c.label)).toEqual(["Birthday in 2 days", "Birthday yesterday"]);
+  });
+  it("treats 29 February as 28 February in a non-leap year", () => {
+    expect(celebrations([m("a", "1992-02-29", "2020-06-15")], "2027-02-28").map((c) => c.label)).toEqual(["Birthday today"]);
+  });
+  it("shows club anniversaries from one year up, and new members in their first week", () => {
+    const out = celebrations([m("a", null, "2024-11-02"), m("b", null, "2026-10-30"), m("c", null, "2026-11-01"), m("d", null, "2025-06-01")], "2026-11-01");
+    expect(out.map((c) => [c.name, c.kind, c.label])).toEqual([["c", "new", "Joined today"], ["a", "anniversary", "2-year anniversary tomorrow"], ["b", "new", "New in the club"]]);
+  });
+  it("never exposes age and never throws on bad dates", () => {
+    const out = celebrations([m("a", "not-a-date", "2020-01-01"), m("b", "1990-11-01", "2020-01-01")], "2026-11-01");
+    expect(JSON.stringify(out)).not.toMatch(/1990|age/);
+  });
+});
+describe("celebrations ordering", () => {
+  it("puts a birthday before an anniversary before a new member on the same day", () => {
+    const out = celebrations([{ id: "n", name: "A new", joinedAt: "2026-11-01" }, { id: "b", name: "Z bday", dob: "1990-11-01", joinedAt: "2026-01-01" }, { id: "a", name: "M anniv", joinedAt: "2025-11-01" }], "2026-11-01");
+    expect(out.map((c) => c.kind)).toEqual(["birthday", "anniversary", "new"]);
+  });
+});

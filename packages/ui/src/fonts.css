@@ -1,25 +1,9 @@
-/* Spotlight: add the file to packages/ui/fonts/, then uncomment its block.
-   General Sans Variable: installed (Fontshare, free).
-   Spotlight: license held by the owner (web/app use), save as Spotlight.woff2.
-   Until then the fallbacks in tokens.css are used. */
-@font-face {
-  font-family: "General Sans";
-  src: url("../fonts/GeneralSans-Variable.woff2") format("woff2");
-  font-weight: 200 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "General Sans";
-  src: url("../fonts/GeneralSans-VariableItalic.woff2") format("woff2");
-  font-weight: 200 700;
-  font-style: italic;
-  font-display: swap;
-}
-/*
-@font-face {
-  font-family: "Spotlight";
-  src: url("../fonts/Spotlight.woff2") format("woff2");
-  font-display: swap;
-}
-*/
+/* Fonts (all committed in packages/ui/fonts):
+   - General Sans Variable (Fontshare, free): body and UI text.
+   - Newsreader Variable (SIL OFL 1.1): serif for titles, section headings and big names.
+   - Spotlight: big score numerals only (licence held by the owner for web/app use). */
+@font-face { font-family: "General Sans"; src: url("../fonts/GeneralSans-Variable.woff2") format("woff2"); font-weight: 200 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "General Sans"; src: url("../fonts/GeneralSans-VariableItalic.woff2") format("woff2"); font-weight: 200 700; font-style: italic; font-display: swap; }
+@font-face { font-family: "Newsreader"; src: url("../fonts/Newsreader-Variable.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "Newsreader"; src: url("../fonts/Newsreader-VariableItalic.woff2") format("woff2"); font-weight: 200 800; font-style: italic; font-display: swap; }
+@font-face { font-family: "Spotlight"; src: url("../fonts/Spotlight.ttf") format("truetype"); font-display: swap; }

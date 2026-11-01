@@ -4,7 +4,7 @@ import { computeRecord, headToHead, type PlayedMatch } from "@rallix/stats";
 
 export type MemberView = {
   id: string; userId: string; name: string; photo: string | null; level: "junior" | "intermediate" | "senior";
-  country: string; heightCm: number | null; dob: string | null; rating: number; rank: number; roles: string[];
+  country: string; heightCm: number | null; dob: string | null; rating: number; rank: number; roles: string[]; joinedAt: Date;
 };
 
 const ratingExpr = sql<number>`coalesce(${ratings.rating}, 1200)`;
@@ -13,7 +13,7 @@ const ratingExpr = sql<number>`coalesce(${ratings.rating}, 1200)`;
 export async function listMembers(tx: Tx, clubId: string): Promise<MemberView[]> {
   const rows = await tx.select({
     id: memberships.id, userId: memberships.userId, name: users.name, photo: playerProfiles.photoUrl, level: playerProfiles.level,
-    country: playerProfiles.country, heightCm: playerProfiles.heightCm, dob: playerProfiles.dateOfBirth, rating: ratingExpr, roles: memberships.roles,
+    country: playerProfiles.country, heightCm: playerProfiles.heightCm, dob: playerProfiles.dateOfBirth, rating: ratingExpr, roles: memberships.roles, joinedAt: memberships.joinedAt,
   }).from(memberships)
     .innerJoin(users, eq(users.id, memberships.userId))
     .leftJoin(playerProfiles, eq(playerProfiles.membershipId, memberships.id))

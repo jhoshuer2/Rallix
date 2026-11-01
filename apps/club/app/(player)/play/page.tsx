@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Carousel, HeroMatch, MediaCard, MetricCard, MetricGrid, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, HeroMatch, MediaCard, MetricCard, MetricGrid, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
-import { buildStories, byRecent, dayLabel, isDone, winnerSide } from "../../../lib/highlights";
+import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
+import { celebrations } from "@rallix/stats";
 import { listCompetitions, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
@@ -23,6 +24,7 @@ export default async function PlayerHome() {
   }));
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
+  const celebs = celebrations(d.members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
   const done = d.clubMatches.filter(isDone).sort(byRecent).slice(0, 8);
   const stories = buildStories(d.clubMatches, (m) => `/play/compete/${m.competitionId}`, "See the draw");
   const hero = mineAll.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2)
@@ -36,18 +38,24 @@ export default async function PlayerHome() {
   const dueDay = due ? dayLabel(new Date(`${due.dueDate}T12:00:00`)) : "";
 
   return (
-    <PageShell header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={<Stories items={stories} label="Match highlights" />}>
-      {hero ? (
+    <PageShell home header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={<Stories items={stories} label="Match highlights" />}
+      lead={hero ? (
         <HeroMatch competition={hero.competitionName} whenLabel={when(hero.scheduledAt)} startsAt={hero.status === "live" ? null : hero.scheduledAt} live={hero.status === "live"}
           a={hero.p1!} b={hero.p2!} scoreA={hero.status === "live" ? hero.gamesP1 : null} scoreB={hero.status === "live" ? hero.gamesP2 : null}
           href={`/play/compete/${hero.competitionId}`} linkAs={Link} cta={hero.status === "live" ? "Follow live" : "Match details"} />
-      ) : null}
-
+      ) : null}>
       {due ? (
         <div className="rx-duebar" role="status">
           <p>{naira(due.amountKobo)} {due.status === "overdue" ? "overdue" : `due ${dueDay}`}</p>
           <PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />
         </div>
+      ) : null}
+
+      {celebs.length ? (
+        <>
+          <SectionTitle title="Celebrations" />
+          <Celebrations items={celebs} />
+        </>
       ) : null}
 
       <SectionTitle title="My standing" href="/play/stats" linkAs={Link} label="See my stats" />

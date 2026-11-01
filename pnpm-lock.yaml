@@ -212,6 +212,16 @@ importers:
         version: 3.2.7(@types/node@22.20.5)(tsx@4.23.15)
 
   packages/ui:
+    dependencies:
+      '@fontsource-variable/newsreader':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@hugeicons/core-free-icons':
+        specifier: ^4.4.0
+        version: 4.4.0
+      '@hugeicons/react':
+        specifier: ^1.1.10
+        version: 1.1.10(react@19.3.1)
     devDependencies:
       '@types/react':
         specifier: ^19.0.0
@@ -761,6 +771,17 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/newsreader@5.3.0':
+    resolution: {integrity: sha512-rrzYi43qMpbzwuFtf9OkWH8sxAPVPcQQQEwXpPtwaKYeJ8yVg5aLs5kawmo1f2Q1t1M38TLmEKCkGVDsYwgdFw==}
+
+  '@hugeicons/core-free-icons@4.4.0':
+    resolution: {integrity: sha512-7Mz8bmGoY6tZ6l3C2TXwNMLVSr0I8HPwjjFIERAuJFj3rWwLxdF2ZLkDqdrVuEE1dx5b/VXyIsP4WoSU6Q40KQ==}
+
+  '@hugeicons/react@1.1.10':
+    resolution: {integrity: sha512-9tAsd92yMVVGP+E+d8cM+wc0VnXuYZHNbWQi7TOe8k2neawmhiaFmVFbzyruejhOMa197/LbgvSED32ayUo3ZA==}
+    peerDependencies:
+      react: '>=16.0.0'
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -2092,6 +2113,14 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fontsource-variable/newsreader@5.3.0': {}
+
+  '@hugeicons/core-free-icons@4.4.0': {}
+
+  '@hugeicons/react@1.1.10(react@19.3.1)':
+    dependencies:
+      react: 19.3.1
 
   '@img/colour@1.1.0':
     optional: true

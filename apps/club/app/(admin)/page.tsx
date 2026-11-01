@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ActionButton, AttentionTile, Carousel, ClubBanner, MediaCard, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { ActionButton, AttentionTile, Carousel, Celebrations, ClubBanner, MediaCard, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { ClubHeader } from "../../components/ClubHeader";
 import { inClub, requireRole } from "../../lib/context";
-import { buildStories, byRecent, dayLabel, isDone, winnerSide } from "../../lib/highlights";
+import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../lib/highlights";
+import { celebrations } from "@rallix/stats";
 import { listCompetitions, listDues, listMatches, listMembers, naira, revenue } from "../../lib/queries";
 
 export default async function Home() {
@@ -14,6 +15,7 @@ export default async function Home() {
     month: await revenue(tx, ctx.club.clubId, "Month"),
     matches: await listMatches(tx, ctx.club.clubId),
   }));
+  const celebs = celebrations(members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
   const unpaid = dues.filter((d) => d.status === "due" || d.status === "overdue").length;
   const toScore = matches.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2).length;
   const active = comps.filter((c) => c.status === "active");
@@ -21,8 +23,15 @@ export default async function Home() {
   const stories = buildStories(matches, (m) => `/competition/${m.competitionId}/groups`, "Open match");
   const needs = unpaid > 0 || toScore > 0 || active.length === 0;
   return (
-    <PageShell header={<ClubHeader />} band={<Stories items={stories} label="Match highlights" />}>
-      <ClubBanner name={ctx.club.name} logo={ctx.club.logoUrl} figure={naira(month.total)} figureLabel="Revenue, last 30 days" members={members.length} />
+    <PageShell home header={<ClubHeader />} band={<Stories items={stories} label="Match highlights" />}
+      lead={<ClubBanner name={ctx.club.name} logo={ctx.club.logoUrl} figure={naira(month.total)} figureLabel="Revenue, last 30 days" members={members.length} />}>
+
+      {celebs.length ? (
+        <>
+          <SectionTitle title="Celebrations" />
+          <Celebrations items={celebs} />
+        </>
+      ) : null}
 
       {needs ? (
         <div className="rx-attn-row" aria-label="Needs your attention">

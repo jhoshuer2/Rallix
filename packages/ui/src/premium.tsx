@@ -28,7 +28,7 @@ export function SectionTitle({ title, href, linkAs: L = "a", label }: { title: s
   return (
     <div className="rx-sectiontitle">
       <h2 className="rx-sectiontitle__h">{title}</h2>
-      {href ? <L href={href} className="rx-sectiontitle__go" aria-label={label ?? `See all ${title}`}><Icon name="back" size={20} style={{ transform: "rotate(180deg)" }} /></L> : null}
+      {href ? <L href={href} className="rx-sectiontitle__go" aria-label={label ?? `See all ${title}`}><Icon name="forward" size={22} /></L> : null}
     </div>
   );
 }
@@ -40,23 +40,33 @@ export function Carousel({ label, children }: { label: string; children: ReactNo
 
 /* ---------- Hero match ---------- */
 type Side = { name: string; photo?: string | null };
-/** The one big moment at the top of Home: live or next match. */
+/**
+ * The one big moment at the top of Home: live, next or just finished. A scoreboard on the blue hero block:
+ * meta line, player A row, a status pill between two rules, player B row, one button.
+ */
 export function HeroMatch({ competition, whenLabel, startsAt, live, a, b, scoreA, scoreB, href, linkAs: L = "a", cta }: {
   competition: string; whenLabel: string; startsAt?: Date | null; live?: boolean; a: Side; b: Side; scoreA?: number | null; scoreB?: number | null; href?: string; linkAs?: ElementType; cta?: string;
 }) {
   const showScore = live || (scoreA != null && scoreB != null);
+  const status = live ? "Live now" : showScore ? "Full time" : startsAt ? `Starts in ${countdown(startsAt)}` : "Upcoming";
+  const row = (p: Side, score?: number | null) => (
+    <div className="rx-mhero__row">
+      <Photo src={p.photo} name={p.name} alt="" className="rx-mhero__face" />
+      <span className="rx-mhero__name">{p.name}</span>
+      {showScore ? <span className="rx-mhero__score" aria-hidden="true">{score ?? 0}</span> : null}
+    </div>
+  );
   return (
-    <section className={cx("rx-mhero", live && "is-live")} aria-label={live ? "Live match" : "Next match"}>
-      <div className="rx-mhero__top">
-        <span className="rx-mhero__comp">{competition}</span>
-        {live ? <span className="rx-livetag"><span className="rx-livetag__dot" aria-hidden="true" />Live</span> : startsAt ? <span className="rx-mhero__count" aria-label={`Starts in ${countdown(startsAt)}`}>{countdown(startsAt)}</span> : null}
+    <section className={cx("rx-mhero", live && "is-live")} aria-label={live ? "Live match" : showScore ? "Match result" : "Next match"}>
+      <p className="rx-mhero__meta"><span>{whenLabel}</span><span aria-hidden="true" className="rx-mhero__sep" /><span>{competition}</span></p>
+      {row(a, scoreA)}
+      <div className="rx-mhero__mid" role="status">
+        <span aria-hidden="true" className="rx-mhero__rule" />
+        <span className={cx("rx-mhero__status", live && "is-live")}>{live ? <span className="rx-livetag__dot" aria-hidden="true" /> : null}{status}</span>
+        <span aria-hidden="true" className="rx-mhero__rule" />
       </div>
-      <div className="rx-mhero__stage">
-        <div className="rx-mhero__side"><Photo src={a.photo} name={a.name} alt="" className="rx-mhero__face" /><span className="rx-mhero__name">{a.name}</span></div>
-        <div className="rx-mhero__mid">{showScore ? <span className="rx-mhero__score" aria-label={`Score ${scoreLine(scoreA, scoreB)}`}>{scoreLine(scoreA, scoreB)}</span> : <span className="rx-mhero__vs">VS</span>}</div>
-        <div className="rx-mhero__side"><Photo src={b.photo} name={b.name} alt="" className="rx-mhero__face" /><span className="rx-mhero__name">{b.name}</span></div>
-      </div>
-      <p className="rx-mhero__when">{whenLabel}</p>
+      {row(b, scoreB)}
+      {showScore ? <p className="rx-vh">Score {scoreLine(scoreA, scoreB)}</p> : null}
       {href && cta ? <L href={href} className="rx-btn rx-btn--block">{cta}</L> : null}
     </section>
   );
@@ -96,19 +106,14 @@ export function Skeleton({ w = "100%", h = 16, round, className }: { w?: number 
   return <span className={cx("rx-skel", className)} aria-hidden="true" style={{ width: w, height: h, borderRadius: round ? "50%" : undefined }} />;
 }
 
-/* ---------- Admin: club banner, attention tiles, actions, tiles ---------- */
-/** Admin hero: the club itself, with this month's revenue as the one big number. */
+/* ---------- Admin: club hero, attention tiles, actions, tiles ---------- */
+/** Admin hero on the blue block: the club's logo and name, this month's revenue as the one big number, members count. */
 export function ClubBanner({ name, logo, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; figure: string; figureLabel: string; members: number; membersLabel?: string }) {
   return (
     <section className="rx-cb" aria-label={`${name} overview`}>
-      <Photo src={null} name={name} kind="cover" alt="" className="rx-cb__cover" />
-      <div className="rx-cb__body">
-        <Photo src={logo} name={name} kind="club" alt={`${name} logo`} className="rx-cb__logo" />
-        <div className="rx-cb__main">
-          <p className="rx-cb__name">{name}</p>
-          <p className="rx-cb__figure">{figure}</p>
-          <p className="rx-cb__label">{figureLabel}</p>
-        </div>
+      <div className="rx-cb__head"><Photo src={logo} name={name} kind="club" alt={`${name} logo`} className="rx-cb__logo" /><p className="rx-cb__name">{name}</p></div>
+      <div className="rx-cb__stats">
+        <div><p className="rx-cb__figure">{figure}</p><p className="rx-cb__label">{figureLabel}</p></div>
         <div className="rx-cb__side"><b>{members}</b><span>{membersLabel}</span></div>
       </div>
     </section>
@@ -158,18 +163,37 @@ export function MemberCard({ rank, name, rating, photo, href, linkAs: L = "a" }:
 
 /* ---------- Page anatomy and the six card kinds ---------- */
 /**
- * Every content screen: a blue band (club header, title, optional stories) over a light canvas.
- * The first card on the canvas overlaps the band. Use `flat` when the page starts with plain content instead of a card.
+ * Every content screen. Three layouts, picked by what you pass:
+ * - Home (`lead`): a flat blue block holding the club header, a greeting and the hero; highlights sit on white right under it.
+ * - Tab (`title`): a white app bar with the club header, then a large serif title on the light canvas.
+ * - Detail (`back`): a white app bar with a back button and a centred title.
+ * The `band` prop is the stories row (Home). `flat` is accepted for older callers and ignored.
  */
-export function PageShell({ header, title, back, action, band, flat, children }: { header?: ReactNode; title?: ReactNode; back?: ReactNode; action?: ReactNode; band?: ReactNode; flat?: boolean; children: ReactNode }) {
+export function PageShell({ header, title, back, action, band, lead, home, children }: { header?: ReactNode; title?: ReactNode; back?: ReactNode; action?: ReactNode; band?: ReactNode; lead?: ReactNode; home?: boolean; flat?: boolean; children: ReactNode }) {
+  if (lead || home) {
+    return (
+      <>
+        <div className="rx-top rx-top--blue">{header}{title ? <h1 className="rx-top__greeting">{title}</h1> : null}{lead}</div>
+        {band ? <div className="rx-storiesbar">{band}</div> : null}
+        <div className="rx-canvas">{children}</div>
+      </>
+    );
+  }
+  if (back) {
+    return (
+      <>
+        <div className="rx-top rx-top--light"><div className="rx-detailbar">{back}<h1 className="rx-detailbar__title">{title}</h1><span className="rx-detailbar__end">{action}</span></div></div>
+        <div className="rx-canvas">{children}</div>
+      </>
+    );
+  }
   return (
     <>
-      <div className="rx-band">
-        {header}
-        {back || title || action ? <div className="rx-band__row">{back}{title ? <h1 className="rx-band__title">{title}</h1> : <span />}{action}</div> : null}
-        {band}
+      <div className="rx-top rx-top--light">{header}</div>
+      <div className="rx-canvas">
+        {title || action ? <div className="rx-pagetitle"><h1 className="rx-pagetitle__h">{title}</h1>{action}</div> : null}
+        {children}
       </div>
-      <div className={cx("rx-canvas", flat && "rx-canvas--flat")}>{children}</div>
     </>
   );
 }
@@ -180,15 +204,15 @@ export function Panel({ children, className, title }: { children: ReactNode; cla
 }
 
 /** ListRow: avatar or icon, a title, one detail line, and a value or chevron on the right. Rows stack inside a `ListGroup`. */
-export function ListRow({ media, title, subtitle, trailing, href, linkAs: L = "a", tone, current }: { media?: ReactNode; title: string; subtitle?: string; trailing?: ReactNode; href?: string; linkAs?: ElementType; tone?: "good" | "bad" | "warn"; current?: boolean }) {
+export function ListRow({ media, title, subtitle, eyebrow, size, trailing, href, linkAs: L = "a", tone, current }: { media?: ReactNode; title: string; subtitle?: string; /** Small blue category label above the title, like "PODCAST". */ eyebrow?: string; /** `lg`: a bigger rectangular picture on the left, like a news row. */ size?: "lg"; trailing?: ReactNode; href?: string; linkAs?: ElementType; tone?: "good" | "bad" | "warn"; current?: boolean }) {
   const body = (
     <>
       {media ? <span className="rx-lrow__media" aria-hidden="true">{media}</span> : null}
-      <span className="rx-lrow__text"><span className="rx-lrow__title">{title}</span>{subtitle ? <span className="rx-lrow__sub">{subtitle}</span> : null}</span>
-      {trailing ? <span className={cx("rx-lrow__end", tone && `is-${tone}`)}>{trailing}</span> : href ? <Icon name="back" size={18} style={{ transform: "rotate(180deg)", opacity: .5 }} aria-hidden="true" /> : null}
+      <span className="rx-lrow__text">{eyebrow ? <span className="rx-lrow__eyebrow">{eyebrow}</span> : null}<span className="rx-lrow__title">{title}</span>{subtitle ? <span className="rx-lrow__sub">{subtitle}</span> : null}</span>
+      {trailing ? <span className={cx("rx-lrow__end", tone && `is-${tone}`)}>{trailing}</span> : href ? <Icon name="forward" size={20} className="rx-lrow__chev" aria-hidden="true" /> : null}
     </>
   );
-  const cls = cx("rx-lrow", current && "is-current");
+  const cls = cx("rx-lrow", size === "lg" && "rx-lrow--lg", current && "is-current");
   return href ? <L href={href} className={cls} aria-current={current ? "true" : undefined}>{body}</L> : <div className={cls}>{body}</div>;
 }
 /** `bare` drops the card background so rows can sit inside a Panel. */
@@ -212,4 +236,23 @@ export const MetricGrid = ({ children }: { children: ReactNode }) => <div classN
 /** One small status pill, four tones. The only badge style in the app. */
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "live" }) {
   return <span className={cx("rx-pill", `rx-pill--${tone}`)}>{children}</span>;
+}
+
+/* ---------- Celebrations: birthdays and anniversaries, LinkedIn-style ---------- */
+export type CelebrationItem = { id: string; name: string; photo?: string | null; label: string; kind: "birthday" | "anniversary" | "new" };
+const celebIcon: Record<CelebrationItem["kind"], IconName> = { birthday: "cake", anniversary: "medal", new: "user-add" };
+/** A row of people with a speech-bubble label above each photo ("Birthday yesterday"). Names only, never ages. */
+export function Celebrations({ items, label = "Celebrations" }: { items: CelebrationItem[]; label?: string }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="rx-celebs" role="list" aria-label={label} tabIndex={0}>
+      {items.map((c) => (
+        <div className="rx-celeb" role="listitem" key={c.id}>
+          <span className="rx-celeb__bubble"><span className={cx("rx-celeb__icon", `is-${c.kind}`)} aria-hidden="true"><Icon name={celebIcon[c.kind]} size={16} /></span>{c.label}</span>
+          <Photo src={c.photo} name={c.name} alt="" className="rx-celeb__photo" />
+          <span className="rx-celeb__name">{c.name}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
