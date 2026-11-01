@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { EntryShell, Pill } from "@rallix/ui";
 import { FakeProvider, FAKE_SECRET, signBody } from "@rallix/payments";
 import { appUrl, provider } from "../../../../lib/payments";
 import { naira } from "../../../../lib/queries";
@@ -25,14 +26,11 @@ export default async function FakeCheckout({ searchParams }: { searchParams: Pro
     redirect(safeCallback);
   }
   return (
-    <main style={{ paddingTop: 48 }}>
-      <p className="rx-chip rx-chip--light" style={{ marginBottom: 12 }}>Test checkout, no real money</p>
-      <h1 className="rx-title" style={{ marginBottom: 8 }}>Pay {naira(tx.amountKobo)}</h1>
-      <p className="rx-muted" style={{ marginBottom: 24 }}>Reference {reference}</p>
+    <EntryShell title={`Pay ${naira(tx.amountKobo)}`} subtitle={`Reference ${reference}`} hero={<p style={{ margin: "16px 0 0" }}><Pill>Test checkout, no real money</Pill></p>}>
       <form action={settle} style={{ display: "grid", gap: 12 }}>
-        <button className="rx-btn rx-btn--surface rx-btn--block" name="outcome" value="pay">Pay now</button>
+        <button className="rx-btn rx-btn--block" name="outcome" value="pay">Pay now</button>
         <button className="rx-btn rx-btn--ghost rx-btn--block" name="outcome" value="fail">Simulate a failed payment</button>
       </form>
-    </main>
+    </EntryShell>
   );
 }

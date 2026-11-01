@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { eq } from "drizzle-orm";
+import { EntryShell } from "@rallix/ui";
 import { users } from "@rallix/db";
 import { serviceDb } from "../../../../lib/db";
 import { userFromToken } from "../../../../lib/unsubscribe";
@@ -15,13 +16,11 @@ export default async function Unsubscribe({ params }: { params: Promise<{ token:
   const { token } = await params;
   const userId = userFromToken(token);
   const [u] = userId ? await serviceDb().select({ email: users.email, out: users.emailOptOut }).from(users).where(eq(users.id, userId)) : [];
-  if (!u) return <main style={{ paddingTop: 48 }}><h1 className="rx-title" style={{ marginBottom: 16 }}>Link not valid</h1><p>This link isn’t valid. If you want to stop optional emails, sign in and use the switch on your Me page.</p></main>;
+  if (!u) return <EntryShell title="Link not valid"><p style={{ marginTop: 0 }}>This link isn’t valid. If you want to stop optional emails, sign in and use the switch on your Me page.</p></EntryShell>;
   return (
-    <main style={{ paddingTop: 48 }}>
-      <h1 className="rx-title" style={{ marginBottom: 16 }}>Email preferences</h1>
-      <p style={{ marginBottom: 8 }}>For <strong>{mask(u.email)}</strong></p>
+    <EntryShell title="Email preferences" subtitle={<>For <strong>{mask(u.email)}</strong></>}>
       <UnsubscribeButtons token={token} initiallyOut={u.out} />
       <p className="rx-muted" style={{ fontSize: 13, marginTop: 24 }}>This stops dues reminders and club announcements from every club you belong to. You will still get sign-in codes, and club admins still get invoices from Rallix.</p>
-    </main>
+    </EntryShell>
   );
 }

@@ -9,56 +9,8 @@ export function BackButton({ href, label = "Back", linkAs: L = "a" }: { href: st
   return <L href={href} aria-label={label} className="rx-iconbtn rx-back"><Icon name="back" size={20} /></L>;
 }
 
-export function PageHead({ title, back, action }: { title: ReactNode; back?: ReactNode; action?: ReactNode }) {
-  return (
-    <div className="rx-pagehead">
-      {back ? <div className="rx-pagehead__back">{back}</div> : null}
-      <div className="rx-pagehead__row">
-        <h1 className="rx-title">{title}</h1>
-        {action}
-      </div>
-    </div>
-  );
-}
-
-/** Big outlined selection card with the label bottom-left (competition format and level). */
-export function FormatCard({ title, href, linkAs: L = "a", hint }: { title: string; href: string; linkAs?: LinkAs; hint?: string }) {
-  return (
-    <L href={href} className="rx-format">
-      {hint ? <span className="rx-format__hint">{hint}</span> : null}
-      <span className="rx-format__title">{title}</span>
-    </L>
-  );
-}
-
 /* ---------- Money / members ---------- */
 export type PayStatus = "paid" | "pending" | "failed" | "refunded";
-export function PaymentRow({ rank, name, photo, detail, amount, status }: { rank: number; name: string; photo?: string; detail: string; amount: string; status: PayStatus }) {
-  return (
-    <li className="rx-pay">
-      <span className="rx-pay__rank" aria-hidden="true">{rank}</span>
-      {photo ? <img className="rx-pay__photo" src={photo} alt="" /> : <span className="rx-pay__photo" />}
-      <span className="rx-pay__who">
-        <span className="rx-pay__name">{name}</span>
-        <span className="rx-pay__detail">{detail}</span>
-      </span>
-      <span className="rx-pay__amt">
-        <span className="rx-pay__money">{amount}</span>
-        <span className={cx("rx-pay__status", `rx-pay__status--${status}`)}>{status[0]!.toUpperCase() + status.slice(1)}</span>
-      </span>
-    </li>
-  );
-}
-
-export function PromoCard({ title, cta, href, tone = "orange", linkAs: L = "a" }: { title: string; cta: string; href: string; tone?: "orange" | "green"; linkAs?: LinkAs }) {
-  return (
-    <div className={cx("rx-promo", `rx-promo--${tone}`)}>
-      <h2 className="rx-promo__title">{title}</h2>
-      <L href={href} className="rx-btn rx-btn--small">{cta}<span className="rx-btn__ball" aria-hidden="true" /></L>
-    </div>
-  );
-}
-
 export function RevenueCard({ period, onPeriod, amount, delta, bars }: { period: string; onPeriod: (p: string) => void; amount: string; delta: string; bars: number[] }) {
   const periods = ["Today", "Week", "Month", "Year"];
   const max = Math.max(1, ...bars);
@@ -93,21 +45,6 @@ export function PlayerSlot({ slot, tbd }: { slot?: Slot; tbd?: boolean }) {
     </div>
   );
 }
-
-export function MatchPair({ a, b, label }: { a?: Slot; b?: Slot; label?: string }) {
-  return (
-    <div className="rx-pair" role="group" aria-label={label ?? `${a?.name ?? "TBD"} versus ${b?.name ?? "TBD"}`}>
-      <PlayerSlot slot={a} />
-      <span className="rx-pair__vs" aria-hidden="true">VS</span>
-      <PlayerSlot slot={b} />
-    </div>
-  );
-}
-
-export function BracketRound({ title, children }: { title?: string; children: ReactNode }) {
-  return <div className="rx-round">{title ? <h2 className="rx-round__title">{title}</h2> : null}{children}</div>;
-}
-export const Bracket = ({ children }: { children: ReactNode }) => <div className="rx-bracket">{children}</div>;
 
 /** Live scoring tile. Tap the number to award a point. Large target by design. */
 export function ScoreTile({ name, score, dim, onPoint }: { name: string; score: number; dim?: boolean; onPoint: () => void }) {
@@ -151,64 +88,12 @@ export function RankChart({ years, series, caption, invert }: { years: string[];
 }
 
 /* ---------- Profile ---------- */
-export function ProfileHero({ name, photo }: { name: string; photo?: string }) {
-  return (
-    <div className="rx-hero">
-      <span className="rx-hero__name" aria-hidden="true">{name.toUpperCase()}</span>
-      {photo ? <img className="rx-hero__photo" src={photo} alt={name} /> : null}
-    </div>
-  );
-}
-
 /* ---------- Player side ---------- */
-export function RankRow({ rank, name, photo, points, you }: { rank: number; name: string; photo?: string; points: number; you?: boolean }) {
-  return (
-    <li className={cx("rx-pay", "rx-rankrow", you && "rx-rankrow--you")} aria-current={you ? "true" : undefined}>
-      <span className="rx-pay__rank" aria-hidden="true">{rank}</span>
-      {photo ? <img className="rx-pay__photo" src={photo} alt="" /> : <span className="rx-pay__photo" />}
-      <span className="rx-pay__who">
-        <span className="rx-pay__name">{name}{you ? " (you)" : ""}</span>
-        <span className="rx-pay__detail">Rank {rank}</span>
-      </span>
-      <span className="rx-pay__amt"><span className="rx-pay__money">{points} pts</span></span>
-    </li>
-  );
-}
-
 export function FormChips({ results }: { results: Array<"W" | "L"> }) {
   return (
     <ul className="rx-form" aria-label={`Last ${results.length} matches: ${results.map((r) => (r === "W" ? "win" : "loss")).join(", ")}`}>
       {results.map((r, i) => <li key={i} className={cx("rx-form__chip", r === "W" ? "rx-form__chip--w" : "rx-form__chip--l")}><span aria-hidden="true">{r}</span></li>)}
     </ul>
-  );
-}
-
-export function MatchCard({ title, when, opponent, opponentPhoto, result, href, linkAs: L = "a" }: { title: string; when: string; opponent: string; opponentPhoto?: string; result?: { won: boolean; score: string }; href?: string; linkAs?: LinkAs }) {
-  const body = (
-    <>
-      <span className="rx-match__meta">{title} · {when}</span>
-      <span className="rx-match__row">
-        {opponentPhoto ? <img className="rx-match__photo" src={opponentPhoto} alt="" /> : <span className="rx-match__photo" />}
-        <span className="rx-match__vs">vs <strong>{opponent}</strong></span>
-        {result ? <span className={cx("rx-match__res", result.won ? "is-win" : "is-loss")}>{result.won ? "Won" : "Lost"} {result.score}</span> : <span className="rx-match__res">Upcoming</span>}
-      </span>
-    </>
-  );
-  return href ? <L href={href} className="rx-match">{body}</L> : <div className="rx-match">{body}</div>;
-}
-
-export function DueCard({ plan, amount, due, status, action }: { plan: string; amount: string; due: string; status: "due" | "paid" | "overdue"; action?: ReactNode }) {
-  const label = status === "paid" ? "Paid" : status === "overdue" ? "Overdue" : "Due soon";
-  return (
-    <section className="rx-due" aria-label="Membership dues">
-      <div className="rx-due__top">
-        <span>{plan}</span>
-        <span className={cx("rx-pay__status", status === "paid" ? "rx-pay__status--paid" : status === "overdue" ? "rx-pay__status--failed" : "rx-pay__status--pending")}>{label}</span>
-      </div>
-      <p className="rx-due__amt">{amount}</p>
-      <p className="rx-due__date">{status === "paid" ? `Next due ${due}` : `Due ${due}`}</p>
-      {status !== "paid" ? action : null}
-    </section>
   );
 }
 
@@ -225,12 +110,3 @@ export function StatBar({ label, left, right }: { label: string; left: number; r
   );
 }
 
-export function ClubRow({ name, logo, role, href, current, linkAs: L = "a" }: { name: string; logo?: string; role: string; href: string; current?: boolean; linkAs?: LinkAs }) {
-  return (
-    <L href={href} className="rx-clubrow" aria-current={current ? "true" : undefined}>
-      {logo ? <img className="rx-avatar" src={logo} alt="" /> : <span className="rx-avatar">{name[0]}</span>}
-      <span className="rx-clubrow__name">{name}</span>
-      <span className="rx-chip rx-chip--light">{role}</span>
-    </L>
-  );
-}

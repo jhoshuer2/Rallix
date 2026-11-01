@@ -10,15 +10,17 @@ Goal: every screen in the club app looks like it came from one premium product: 
 Living style guide: open `/kit` in the club app. Source: `packages/ui/src` (`tokens.css`, `components.css`, `premium.tsx`, `stories.tsx`).
 
 ## Page anatomy (every content screen)
-Use `PageShell`. Do not build your own page structure.
-```
-<PageShell header={<ClubHeader />} title="Members" action={...} band={<Stories/>} flat?>
-  ...cards...
-</PageShell>
-```
-- **Band** (blue, rounded bottom): club header, one display title (or back button + title on detail screens), optional story highlights.
-- **Canvas** (light grey `--rx-canvas`): the first card overlaps the band. If the page starts with plain content (search box, tabs), pass `flat`.
-- Layouts use `<Screen tone="canvas">`. Auth, splash and onboarding keep the full blue `Screen`.
+Use `PageShell`. Do not build your own page structure. Three layouts, chosen by what you pass:
+
+| Layout | You pass | You get |
+|---|---|---|
+| Home | `home` (or `lead`), `title` greeting, `band` = story highlights | Flat blue block with the club header, greeting and the hero (`lead`), then highlights on white |
+| Tab | `title`, `action?` | White app bar with the club header, big serif title, light canvas |
+| Detail | `back`, `title` | White app bar with a back button and centred title. With `lead` too: blue hero block with a back button (member profile) |
+
+- Layouts use `<Screen tone="canvas">` (tab screens get the bottom bar, detail screens do not: route groups `(admin)`, `(player)` have tabs; `(adminflow)`, `(playerflow)` do not).
+- Entry and public screens (sign-in, onboarding, join, suspended, unsubscribe, pay pages) use `EntryShell`: blue top with the Rallix mark and a serif title, white sheet with the form. Pass `hero` for a pill under the title.
+- The live scoring screen is the one exception: `Screen className="rx-darkscreen"` (night background), instant feedback, no motion.
 - Loading: a `loading.tsx` with `Skeleton` blocks in the same shape. Never a spinner.
 
 ## The six card kinds. Nothing else.
@@ -28,7 +30,7 @@ All share: white surface, 16px radius, one soft shadow, 16px padding, 44px touch
 |---|---|---|
 | A competition, anything with a cover picture | `MediaCard` | Wide picture, one title line, one detail line, optional tag. Carousel size by default; `className="rx-ccard--wide"` for stacks |
 | A finished match | `ResultCard` | Both faces, the score, "X won 3–1" |
-| A person, payment, fixture, setting, club | `ListRow` inside `ListGroup` | Photo or `IconBadge`, title, one subtitle, value or chevron on the right |
+| A person, payment, fixture, setting, club | `ListRow` inside `ListGroup` | Photo or `IconBadge`, title, one subtitle, value or chevron on the right. `eyebrow` adds a blue category label, `size="lg"` a big picture. Use `CheckRow` to pick people and `ListActions` for buttons that belong to the row above |
 | One number that matters | `MetricCard` inside `MetricGrid` | Max 4 per screen |
 | A shortcut to another screen | `TileLink` (2 columns) or `ActionButton` (round, 3 in a row) | Icon plus 1 or 2 words |
 | A form, free text, a chart, anything else | `Panel` | Optional `title`. Use `className="rx-panel--night"` for dark media bands |
@@ -37,24 +39,31 @@ Hero pieces (one per screen): `HeroMatch` (player), `ClubBanner` (admin), the re
 
 ### Forbidden in pages
 - Raw `rx-card`, `rx-promo`, `rx-format`, `rx-rank`, `rx-stats`, `rx-match`, `rx-pays` classes, or inline-styled boxes that look like cards.
-- The legacy components `Card`, `Chip`, `FormatCard`, `PromoCard`, `PaymentRow`, `PlayerRow`, `RankRow`, `RankCard`, `DueCard`, `MatchCard`, `StatGrid`, `ClubRow`, `PageHead` in converted screens (a test enforces this).
+- The deleted legacy components (`Card`, `Chip`, `FormatCard`, `PromoCard`, `PaymentRow`, `PlayerRow`, `RankRow`, `RankCard`, `DueCard`, `MatchCard`, `StatGrid`, `ClubRow`, `PageHead`, `SectionHeader`, `ProfileHero`, `Bracket`, `MatchPair`). A test fails on any use in `apps/club`.
 - More than two lines of text on a card, stacked chips, or a paragraph inside a list row.
 - A second hero, or two primary buttons.
 - Local helper components that style a card inside a page file. Add it to `packages/ui` and to `/kit` first.
 
 ## Type
-- **Spotlight display** (italic, uppercase): the band title, section titles, hero numbers. Short.
-- **General Sans**: everything else, sentence case. Body 16px minimum, captions 13px, never below 12.
+- **Newsreader** (serif): page titles, section titles, hero names and big numbers. Sentence case, regular weight, never bold or italic.
+- **Spotlight**: big score numerals only (`--rx-font-score`).
+- **General Sans**: everything else, sentence case. Card titles 17px 600. Body 16px minimum, captions 13px, never below 12. Small category labels (`eyebrow`) are 12px bold uppercase blue.
 - No all-caps paragraphs.
 
 ## Colour
-- Blue (band, hero, active states), rust (the single action colour), night `#0F2038` (dark bands, hero cards), canvas `#F3F4F7`, white surface, line `#E2E4EA`, ink `#141414`, secondary text `--rx-ink-3` (never lighter).
+- Blue `#1450C8` (table-tennis-table blue: hero block, buttons, active tab, section titles), night `#081235` (dark bands, scoring), canvas `#F1F3F8`, white surface, line `#DFE3EE`, ink navy `#0B1B4D` (never pure black), secondary text `--rx-ink-3`. Rust is only an accent on old blue-screen pieces. Primary buttons are blue (`--rx-action`).
 - Green, orange, red only to say good, warning, bad or live. Never colour alone: add text or an icon.
 
 ## Pictures and placeholders
 Every picture slot uses `Photo` (`kind` person, club, cover). With no upload it shows a designed placeholder: brand gradient from the name, initials or the ball motif. Never a grey box, a broken image or empty space. Pass `alt=""` when the name is written next to it.
 
-## Story highlights (in the band)
+## Icons
+Hugeicons free set (MIT), always through `<Icon name="..." />` in `packages/ui/src/icons.tsx`. Add a name there, never import the library in a page. Outline style, 1.8 stroke, active tab 2.2.
+
+## Celebrations
+Birthdays and club anniversaries use `Celebrations` (bubble above a round photo, like LinkedIn) fed by `celebrations()` in `@rallix/stats`. Month and day only, never age.
+
+## Story highlights (on the white strip under the blue hero)
 Live match first, then the latest results. Ring means unseen, muted ring means seen, red LIVE tag for live. Viewer is a native `<dialog>`: progress bars, 5 s auto-advance, hold to pause, tap left or right, Esc closes and focus returns to the ring. With reduced motion there is no auto-advance. Seen state lives in `localStorage` inside try/catch.
 
 ## Screen recipes

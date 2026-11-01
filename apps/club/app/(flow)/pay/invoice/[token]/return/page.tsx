@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EntryShell } from "@rallix/ui";
 import { referenceKind } from "@rallix/payments";
 import { finalizeByReference, logEvent } from "../../../../../../lib/payments-core";
 import { lookupPayLink, referenceBelongsToToken } from "../../../../../../lib/pay-link";
@@ -13,9 +14,7 @@ export default async function PayLinkReturn({ params, searchParams }: { params: 
   const { token } = await params;
   const sp = await searchParams;
   const reference = sp.reference ?? sp.trxref ?? "";
-  const generic = (
-    <main style={{ paddingTop: 48 }}><h1 className="rx-title" style={{ marginBottom: 16 }}>Link not valid</h1><p>We couldn’t find that payment. Please contact Rallix.</p></main>
-  );
+  const generic = <EntryShell title="Link not valid"><p style={{ marginTop: 0 }}>We couldn’t find that payment. Please contact Rallix.</p></EntryShell>;
   if (referenceKind(reference) !== "invoice" || !(await referenceBelongsToToken(reference, token))) return generic;
   const v = await lookupPayLink(token);
 
@@ -26,17 +25,16 @@ export default async function PayLinkReturn({ params, searchParams }: { params: 
   const paid = o === "credited" || o === "already_processed" || o === "duplicate_payment";
   const waiting = o === "still_pending" && n < MAX_CHECKS;
   return (
-    <main style={{ paddingTop: 48 }}>
+    <EntryShell title={paid ? "Payment received" : waiting ? "Confirming your payment…" : o === "still_pending" ? "Still waiting for confirmation" : "Payment not completed"}>
       {waiting ? <meta httpEquiv="refresh" content={`3;url=/pay/invoice/${token}/return?reference=${reference}&n=${n + 1}`} /> : null}
-      <h1 className="rx-title" style={{ marginBottom: 16 }}>{paid ? "Payment received" : waiting ? "Confirming your payment…" : o === "still_pending" ? "Still waiting for confirmation" : "Payment not completed"}</h1>
-      <p role="status" aria-live="polite" style={{ marginBottom: 24 }}>
+      <p role="status" aria-live="polite" style={{ marginTop: 0, marginBottom: 24 }}>
         {paid ? `Thank you. ${naira(v.amountKobo ?? 0)} for ${v.clubName ?? "your club"} (${v.number}) has been received. If your club was suspended for non-payment, access returns automatically.`
           : waiting ? "This usually takes a few seconds. Please don’t pay again."
           : o === "still_pending" ? "We haven’t heard back from the payment provider yet. If money left your account it will be recorded once confirmed. Please don’t pay again."
           : o === "failed" ? "The payment didn’t go through and you weren’t charged. Open your link again to retry."
           : "We couldn’t confirm this payment. If you were charged, please contact Rallix with your invoice number."}
       </p>
-      {!paid ? <a className="rx-btn rx-btn--surface" href={`/pay/invoice/${token}`}>Back to the invoice</a> : null}
-    </main>
+      {!paid ? <a className="rx-btn rx-btn--block" href={`/pay/invoice/${token}`}>Back to the invoice</a> : null}
+    </EntryShell>
   );
 }

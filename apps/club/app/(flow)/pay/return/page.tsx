@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { EntryShell } from "@rallix/ui";
 import { and, eq, inArray } from "drizzle-orm";
 import { invoicePayments, memberships, payments } from "@rallix/db";
 import { referenceKind } from "@rallix/payments";
@@ -43,10 +44,9 @@ export default async function PayReturn({ searchParams }: { searchParams: Promis
   const waiting = o === "still_pending" && n < MAX_CHECKS;
 
   return (
-    <main style={{ paddingTop: 48 }}>
+    <EntryShell title={paid ? "Payment received" : waiting ? "Confirming your payment…" : o === "still_pending" ? "Still waiting for confirmation" : "Payment not completed"}>
       {waiting ? <meta httpEquiv="refresh" content={`3;url=/pay/return?reference=${reference}&n=${n + 1}`} /> : null}
-      <h1 className="rx-title" style={{ marginBottom: 16 }}>{paid ? "Payment received" : waiting ? "Confirming your payment…" : o === "still_pending" ? "Still waiting for confirmation" : "Payment not completed"}</h1>
-      <p role="status" aria-live="polite" style={{ marginBottom: 24 }}>
+      <p role="status" aria-live="polite" style={{ marginTop: 0, marginBottom: 24 }}>
         {paid ? `Thank you. ${naira(amountKobo)} has been recorded.${o === "duplicate_payment" ? " This was already marked as paid, so your admin has been flagged to refund the extra payment." : ""}`
           : waiting ? "This usually takes a few seconds. Please don’t pay again."
           : o === "still_pending" ? "We haven’t heard back from the payment provider yet. If money left your account, it will show here once it is confirmed. Please don’t pay again."
@@ -54,7 +54,7 @@ export default async function PayReturn({ searchParams }: { searchParams: Promis
           : o === "rejected_mismatch" ? "We couldn’t confirm this payment. If you were charged, contact your club admin. We’ve logged it for review."
           : "We couldn’t find that payment."}
       </p>
-      <Link className="rx-btn rx-btn--surface" href={back}>{kind === "due" ? "Back to my payments" : "Back to my club"}</Link>
-    </main>
+      <Link className="rx-btn rx-btn--block" href={back}>{kind === "due" ? "Back to my payments" : "Back to my club"}</Link>
+    </EntryShell>
   );
 }

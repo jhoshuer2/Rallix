@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { AppHeader, ClubRow, Sheet } from "@rallix/ui";
+import { AppHeader, ListGroup, ListRow, Photo, Pill, Sheet } from "@rallix/ui";
 
 type C = { id: string; name: string; logo: string | null; role: string };
 
@@ -12,7 +12,9 @@ export function ClubSwitcher({ user, clubs, current, blocked }: { user: { name: 
       <AppHeader clubName={cur.name} clubLogo={cur.logo ?? undefined} userName={user.name} userPhoto={user.image ?? undefined} onClubClick={() => setOpen(true)} />
       <Sheet open={open} onClose={() => setOpen(false)} title="Your clubs">
         {/* Plain links on purpose: next/link would prefetch /switch and change the active club by itself. */}
-        {clubs.map((c) => <ClubRow key={c.id} name={c.name} logo={c.logo ?? undefined} role={c.role} href={`/switch/${c.id}`} current={c.id === cur.id} />)}
+        <ListGroup bare label="Your clubs">
+          {clubs.map((c) => <ListRow key={c.id} media={<Photo src={c.logo} name={c.name} kind="club" alt="" />} title={c.name} subtitle={c.role} href={`/switch/${c.id}`} current={c.id === cur.id} trailing={c.id === cur.id ? <Pill tone="success">Current</Pill> : undefined} />)}
+        </ListGroup>
         {blocked.length ? (
           <div role="note" style={{ marginTop: 12 }}>
             <p className="rx-label" style={{ marginBottom: 6 }}>Unavailable</p>

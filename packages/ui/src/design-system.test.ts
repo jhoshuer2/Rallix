@@ -19,21 +19,18 @@ describe("colour contrast (WCAG AA)", () => {
   for (const [name, fg, bg, min] of pairs) it(`${name} is at least ${min}:1`, () => { expect(ratio(token(fg), token(bg))).toBeGreaterThanOrEqual(min); });
 });
 
-/** Converted screens must use the card family, not legacy components or raw card classes. */
-const ROOT = join(__dirname, "../../../apps/club/app");
-const CONVERTED = ["(admin)", "(player)", "(playerflow)"];
-const LEGACY = ["Card", "Chip", "FormatCard", "PromoCard", "PaymentRow", "PlayerRow", "RankRow", "RankCard", "DueCard", "MatchCard", "StatGrid", "ClubRow", "PageHead", "SectionHeader"];
-const RAW = ["rx-card", "rx-promo", "rx-format", "rx-rank", "rx-stats", "rx-match", "rx-pays"];
-function files(dir: string): string[] { return readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? files(p) : p.endsWith(".tsx") ? [p] : []; }); }
-describe("converted screens follow the design system", () => {
-  for (const group of CONVERTED) {
-    for (const f of files(join(ROOT, group))) {
-      it(`${group}/${f.split(group)[1]} uses no legacy cards`, () => {
-        const src = readFileSync(f, "utf8");
-        const imports = [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*"@rallix\/ui"/g)].flatMap((m) => m[1]!.split(",").map((x) => x.trim().split(/\s+as\s+/)[0]!));
-        expect(imports.filter((n) => LEGACY.includes(n))).toEqual([]);
-        for (const c of RAW) expect(src.includes(`"${c}"`) || src.includes(`"${c} `) || src.includes(` ${c}"`) || src.includes(`className="${c}`)).toBe(false);
-      });
-    }
+/** Every screen and shared component of the club app must use the card family, not deleted legacy components or raw card classes. */
+const APP = join(__dirname, "../../../apps/club");
+const LEGACY = ["Card", "Chip", "Count", "FormatCard", "PromoCard", "PaymentRow", "PlayerRow", "RankRow", "RankCard", "RankGrid", "DueCard", "MatchCard", "StatGrid", "ClubRow", "PageHead", "SectionHeader", "ProfileHero", "MatchPair", "Bracket", "BracketRound"];
+const RAW = ["rx-card", "rx-promo", "rx-format", "rx-rank", "rx-stats", "rx-match", "rx-pays", "rx-pay", "rx-row", "rx-hero", "rx-sheet", "rx-section", "rx-standing"];
+function files(dir: string): string[] { return readdirSync(dir).flatMap((f) => { const p = join(dir, f); return f === "node_modules" || f === ".next" ? [] : statSync(p).isDirectory() ? files(p) : p.endsWith(".tsx") ? [p] : []; }); }
+describe("every club screen follows the design system", () => {
+  for (const f of [...files(join(APP, "app")), ...files(join(APP, "components"))].filter((p) => !p.includes("/kit/"))) {
+    it(`${f.split("apps/club/")[1]} uses no legacy cards`, () => {
+      const src = readFileSync(f, "utf8");
+      const imports = [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*"@rallix\/ui"/g)].flatMap((m) => m[1]!.split(",").map((x) => x.trim().split(/\s+as\s+/)[0]!));
+      expect(imports.filter((n) => LEGACY.includes(n))).toEqual([]);
+      for (const c of RAW) expect(new RegExp(`className=\\{?["'\`][^"'\`]*\\b${c}(?![\\w-])`).test(src), `${c} used as a class`).toBe(false);
+    });
   }
 });

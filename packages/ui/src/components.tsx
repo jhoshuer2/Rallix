@@ -12,15 +12,6 @@ export function Title({ children, as: Tag = "h1" }: { children: ReactNode; as?: 
   return <Tag className="rx-title">{children}</Tag>;
 }
 
-export function SectionHeader({ title, linkLabel, href, linkAs: L = "a" }: { title: string; linkLabel?: string; href?: string; linkAs?: ElementType }) {
-  return (
-    <div className="rx-section">
-      <h2 className="rx-section__title">{title}</h2>
-      {linkLabel && href ? <L className="rx-section__link" href={href}>{linkLabel}</L> : null}
-    </div>
-  );
-}
-
 /* ---------- Actions ---------- */
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "surface"; block?: boolean; ball?: boolean };
 export function Button({ variant = "primary", block, ball, className, children, type = "button", ...rest }: ButtonProps) {
@@ -97,15 +88,6 @@ export function Checkbox({ label, ...rest }: { label: string } & Omit<InputHTMLA
 }
 
 /* ---------- Display ---------- */
-export function Chip({ children, tone }: { children: ReactNode; tone?: "active" | "warn" | "dark" | "light" }) {
-  return <span className={cx("rx-chip", tone && `rx-chip--${tone}`)}>{children}</span>;
-}
-export const Count = ({ children }: { children: ReactNode }) => <span className="rx-count">{children}</span>;
-
-export function Card({ children, variant, className }: { children: ReactNode; variant?: "outline" | "promo"; className?: string }) {
-  return <div className={cx("rx-card", variant && `rx-card--${variant}`, className)}>{children}</div>;
-}
-
 export function Avatar({ src, name, large }: { src?: string; name: string; large?: boolean }) {
   const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   return src ? <img className={cx("rx-avatar", large && "rx-avatar--lg")} src={src} alt={name} /> : <span className={cx("rx-avatar", large && "rx-avatar--lg")} role="img" aria-label={name}>{initials}</span>;
@@ -113,47 +95,7 @@ export function Avatar({ src, name, large }: { src?: string; name: string; large
 
 export function Ball() { return <span className="rx-ball" aria-hidden="true" />; }
 
-export function StatGrid({ stats }: { stats: Array<{ label: string; value: string }> }) {
-  return (
-    <dl className="rx-stats" style={{ margin: 0 }}>
-      {stats.map((s) => (
-        <div className="rx-stat" key={s.label}>
-          <dt className="rx-stat__label">{s.label}</dt>
-          <dd className="rx-stat__value" style={{ margin: 0 }}>{s.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 /* ---------- Members ---------- */
-export function RankCard({ rank, name, points, photo, href, linkAs: L = "a" }: { rank: number; name: string; points: number; photo?: string; href?: string; linkAs?: ElementType }) {
-  const body = (
-    <>
-      {photo ? <img className="rx-rank__photo" src={photo} alt="" /> : null}
-      <div className="rx-rank__meta">
-        <span className="rx-rank__label">Rank</span>
-        <span className="rx-rank__num" aria-label={`Rank ${rank}`}>{rank}</span>
-        <span className="rx-rank__pts">{points} Points</span>
-      </div>
-      <span className="rx-rank__name">{name}</span>
-    </>
-  );
-  return href ? <L className="rx-rank" href={href}>{body}</L> : <div className="rx-rank">{body}</div>;
-}
-export const RankGrid = ({ children }: { children: ReactNode }) => <div className="rx-rank-grid">{children}</div>;
-
-export function PlayerRow({ rank, name, photo, checked, onChange }: { rank: number; name: string; photo?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="rx-row">
-      <span className="rx-row__rank" aria-hidden="true">{rank}</span>
-      {photo ? <img className="rx-row__photo" src={photo} alt="" /> : <span className="rx-row__photo" />}
-      <span className="rx-row__name">{name}</span>
-      <Checkbox label={`Include ${name}`} checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    </div>
-  );
-}
-
 /* ---------- Header + navigation ---------- */
 export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick, onSearch }: { clubName: string; clubLogo?: string; userName: string; userPhoto?: string; onClubClick?: () => void; onSearch?: () => void }) {
   return (

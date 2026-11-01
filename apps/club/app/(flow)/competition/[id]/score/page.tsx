@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Screen } from "@rallix/ui";
 import { canScore, inClub, requireClub } from "../../../../../lib/context";
 import { listMatches, listMembers } from "../../../../../lib/queries";
 import { ScoreSheet } from "./ScoreSheet";
@@ -16,6 +17,6 @@ export default async function Score({ params, searchParams }: { params: Promise<
   const m = ms[0];
   const rank = new Map(members.map((x) => [x.id, x.rank]));
   if (!m || !m.p1 || !m.p2) notFound();
-  if (m.status === "completed") return <p>This match has already been recorded. <Link className="rx-btn" href={`/competition/${id}/groups`}>Back</Link></p>;
-  return <ScoreSheet competitionId={id} matchId={m.id} bestOf={m.bestOf} p1={{ ...m.p1, rank: rank.get(m.p1.id) ?? 0 }} p2={{ ...m.p2, rank: rank.get(m.p2.id) ?? 0 }} />;
+  if (m.status === "completed") return <Screen className="rx-darkscreen"><p>This match has already been recorded. <Link className="rx-btn" href={`/competition/${id}/groups`}>Back</Link></p></Screen>;
+  return <Screen className="rx-darkscreen"><ScoreSheet competitionId={id} matchId={m.id} bestOf={m.bestOf} p1={{ ...m.p1, rank: rank.get(m.p1.id) ?? 0 }} p2={{ ...m.p2, rank: rank.get(m.p2.id) ?? 0 }} /></Screen>;
 }

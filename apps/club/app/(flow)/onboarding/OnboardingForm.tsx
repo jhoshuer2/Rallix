@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button, TextField } from "@rallix/ui";
+import { Button, EntryShell, TextField } from "@rallix/ui";
 import { createClub } from "../../../lib/actions";
 
 export function OnboardingForm({ defaultName }: { defaultName: string }) {
@@ -25,15 +25,16 @@ export function OnboardingForm({ defaultName }: { defaultName: string }) {
     router.refresh();
   }
   return (
-    <form noValidate onSubmit={submit}>
-      <h1 className="rx-title" style={{ marginBottom: 24 }}>Welcome to the app for managing your table tennis club</h1>
-      <TextField label="What is your club called?" placeholder="E.g. Paris Arena" value={club} onChange={(e) => setClub(e.target.value)} error={tried && club.trim().length < 2 ? "Enter your club name" : undefined} />
-      <TextField label="What’s your name" placeholder="Your full name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={tried && name.trim().length < 2 ? "Enter your name" : undefined} />
-      <TextField label="Where are you located" icon="pin" placeholder="E.g. Central Market, Kubwa, FCT, Abuja" value={place} onChange={(e) => setPlace(e.target.value)} error={tried && !place.trim() ? "Enter your location" : undefined} />
-      <TextField label="Phone or WhatsApp (optional)" type="tel" inputMode="tel" autoComplete="tel" placeholder="0803 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      {error ? <p className="rx-error" role="alert">{error}</p> : null}
-      <Button type="submit" variant="surface" block disabled={busy}>{busy ? "Creating…" : "Create my club"}</Button>
-      <p className="rx-muted" style={{ marginTop: 16, fontSize: 13 }}>Joining a club instead? Open the invite link your club admin sent you.</p>
-    </form>
+    <EntryShell title="Welcome to the app for managing your table tennis club" subtitle="Set up your club in a minute. You can invite players with one link afterwards.">
+      <form noValidate onSubmit={submit}>
+        <TextField label="What is your club called?" placeholder="E.g. Paris Arena" value={club} onChange={(e) => setClub(e.target.value)} error={tried && club.trim().length < 2 ? "Enter your club name" : undefined} />
+        <TextField label="What’s your name" placeholder="Your full name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={tried && name.trim().length < 2 ? "Enter your name" : undefined} />
+        <TextField label="Where are you located" icon="pin" placeholder="E.g. Central Market, Kubwa, FCT, Abuja" value={place} onChange={(e) => setPlace(e.target.value)} error={tried && !place.trim() ? "Enter your location" : undefined} />
+        <TextField label="Phone or WhatsApp (optional)" type="tel" inputMode="tel" autoComplete="tel" placeholder="0803 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        {error ? <p className="rx-error" role="alert">{error}</p> : null}
+        <Button type="submit" block disabled={busy}>{busy ? "Creating…" : "Create my club"}</Button>
+        <p className="rx-muted" style={{ marginTop: 16, fontSize: 13 }}>Joining a club instead? Open the invite link your club admin sent you.</p>
+      </form>
+    </EntryShell>
   );
 }

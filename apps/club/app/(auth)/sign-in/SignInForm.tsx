@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, TextField } from "@rallix/ui";
+import { Button, EntryShell, TextField } from "@rallix/ui";
 import { isEmail } from "@rallix/mailer/validate";
 import { authClient } from "../../../lib/auth-client";
 
@@ -35,21 +35,21 @@ export function SignInForm({ next }: { next: string }) {
   }
 
   return (
-    <form noValidate onSubmit={step === "email" ? send : verify} style={{ paddingTop: 48 }}>
-      <h1 className="rx-title" style={{ marginBottom: 8 }}>Sign in to Rallix</h1>
-      <p className="rx-muted" style={{ marginBottom: 24 }}>{step === "email" ? "We’ll email you a 6-digit code. No password needed." : `If ${address} can sign in, a code is on its way. It can take a minute, and check your spam folder.`}</p>
-      {step === "email" ? (
-        <TextField label="Email address" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={error} />
-      ) : (
-        <TextField label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} error={error} />
-      )}
-      <Button type="submit" variant="surface" block disabled={busy}>{busy ? "Please wait…" : step === "email" ? "Email me a code" : "Sign in"}</Button>
-      {step === "code" ? (
-        <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
-          <Button type="button" variant="ghost" block disabled={busy || wait > 0} onClick={() => send()}>{wait > 0 ? `Send a new code in ${wait}s` : "Send a new code"}</Button>
-          <Button type="button" variant="ghost" block onClick={() => { setStep("email"); setCode(""); setError(undefined); }}>Use a different email</Button>
-        </div>
-      ) : null}
-    </form>
+    <EntryShell title="Sign in to Rallix" subtitle={step === "email" ? "We’ll email you a 6-digit code. No password needed." : `If ${address} can sign in, a code is on its way. It can take a minute, and check your spam folder.`}>
+      <form noValidate onSubmit={step === "email" ? send : verify}>
+        {step === "email" ? (
+          <TextField label="Email address" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} error={error} />
+        ) : (
+          <TextField label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} error={error} />
+        )}
+        <Button type="submit" block disabled={busy}>{busy ? "Please wait…" : step === "email" ? "Email me a code" : "Sign in"}</Button>
+        {step === "code" ? (
+          <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" block disabled={busy || wait > 0} onClick={() => send()}>{wait > 0 ? `Send a new code in ${wait}s` : "Send a new code"}</Button>
+            <Button type="button" variant="ghost" block onClick={() => { setStep("email"); setCode(""); setError(undefined); }}>Use a different email</Button>
+          </div>
+        ) : null}
+      </form>
+    </EntryShell>
   );
 }
