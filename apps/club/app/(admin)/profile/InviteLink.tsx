@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@rallix/ui";
 import { createInvite } from "../../../lib/actions";
 
@@ -7,7 +7,10 @@ export function InviteLink({ clubName, initialCode }: { clubName: string; initia
   const [code, setCode] = useState(initialCode);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
-  const url = code ? `${window.location.origin}/join/${code}` : null;
+  // window only exists in the browser: read the origin after mount so server rendering never touches it.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+  const url = code ? `${origin}/join/${code}` : null;
   async function make() { const r = await createInvite(); if (r.ok) setCode(r.code); else setError(r.error); }
   const wa = url ? `https://wa.me/?text=${encodeURIComponent(`Join ${clubName} on Rallix: ${url}`)}` : "#";
   return (

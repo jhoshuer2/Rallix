@@ -49,3 +49,15 @@ Reference: high-end sports club apps. What makes them feel expensive is **not de
 - [ ] Reduced motion tested; skeleton, empty, error and offline states exist.
 - [ ] No horizontal page scroll (only inside carousels); phone width 360 to 440px checked.
 - [ ] Run `rallix-a11y` and `design:design-critique`.
+
+## Admin screens
+The admin's job is "what needs attention, and how is the club doing". Same rules, different hero.
+- **Home hero:** `ClubBanner` (cover and logo placeholders from the club name, one big revenue figure, member count).
+- **Needs attention:** up to three `AttentionTile`s (a count and 2 to 3 words, e.g. "4 unpaid dues"), shown only when there is something to do. With nothing to do, show nothing, not "all good" text.
+- **Quick actions:** a row of three round `ActionButton`s with one-word labels. Never a stack of full-width ghost buttons.
+- **Lists of people:** `MemberCard` photo grid (rank badge, name, rating) with a sticky search box; never a text table on a phone.
+- **Settings and menus:** `TileLink` 2-column tiles with an icon and one or two words, not promo banners with sentences.
+- **Status rows:** one slim row with a coloured edge (green on, orange off) and one action button.
+- **Empty states:** one sentence and one button. Never an empty grid or a blank screen.
+- **Active tab:** match routes exactly or with a trailing slash (`/members` must not light up on `/membership`).
+- **Browser-only code:** never read `window` or `localStorage` while rendering; do it in an effect so server rendering cannot crash.

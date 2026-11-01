@@ -1,6 +1,6 @@
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import { countdown, initials, placeholderColors, scoreLine } from "./premium-utils";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
 
 const cx = (...a: Array<string | false | undefined | null>) => a.filter(Boolean).join(" ");
 
@@ -82,9 +82,9 @@ export function ResultCard({ a, b, scoreA, scoreB, winner, competition, when, hr
 }
 
 /** A competition: wide cover (placeholder until the club uploads one), name and one detail. */
-export function CoverCard({ name, detail, cover, href, linkAs: L = "a", tag }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string }) {
+export function CoverCard({ name, detail, cover, href, linkAs: L = "a", tag, className }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string; className?: string }) {
   return (
-    <L href={href} className="rx-ccard">
+    <L href={href} className={cx("rx-ccard", className)}>
       <div className="rx-ccard__cover"><Photo src={cover} name={name} kind="cover" alt="" className="rx-ccard__img" />{tag ? <span className="rx-ccard__tag">{tag}</span> : null}</div>
       <p className="rx-rcard__title">{name}</p>
       <p className="rx-rcard__sub">{detail}</p>
@@ -96,4 +96,64 @@ export function CoverCard({ name, detail, cover, href, linkAs: L = "a", tag }: {
 /** Placeholder block that holds the final layout's shape while data loads. Decorative: wrap a page in role="status". */
 export function Skeleton({ w = "100%", h = 16, round, className }: { w?: number | string; h?: number | string; round?: boolean; className?: string }) {
   return <span className={cx("rx-skel", className)} aria-hidden="true" style={{ width: w, height: h, borderRadius: round ? "50%" : undefined }} />;
+}
+
+/* ---------- Admin: club banner, attention tiles, actions, tiles ---------- */
+/** Admin hero: the club itself, with this month's revenue as the one big number. */
+export function ClubBanner({ name, logo, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; figure: string; figureLabel: string; members: number; membersLabel?: string }) {
+  return (
+    <section className="rx-cb" aria-label={`${name} overview`}>
+      <Photo src={null} name={name} kind="cover" alt="" className="rx-cb__cover" />
+      <div className="rx-cb__body">
+        <Photo src={logo} name={name} kind="club" alt={`${name} logo`} className="rx-cb__logo" />
+        <div className="rx-cb__main">
+          <p className="rx-cb__name">{name}</p>
+          <p className="rx-cb__figure">{figure}</p>
+          <p className="rx-cb__label">{figureLabel}</p>
+        </div>
+        <div className="rx-cb__side"><b>{members}</b><span>{membersLabel}</span></div>
+      </div>
+    </section>
+  );
+}
+
+/** One thing that needs the admin: a count, one short label, and where to go. Render nothing when there is nothing to do. */
+export function AttentionTile({ count, label, href, linkAs: L = "a", tone = "warn" }: { count?: number; label: string; href: string; linkAs?: ElementType; tone?: "warn" | "go" }) {
+  return (
+    <L href={href} className={cx("rx-attn", `rx-attn--${tone}`)}>
+      {count !== undefined ? <span className="rx-attn__n" aria-hidden="true">{count}</span> : <span className="rx-attn__n" aria-hidden="true"><Icon name="plus" size={22} /></span>}
+      <span className="rx-attn__l">{count !== undefined ? <span className="rx-vh">{count} </span> : null}{label}</span>
+    </L>
+  );
+}
+
+/** Round quick action with a one-word label under it. */
+export function ActionButton({ icon, label, href, linkAs: L = "a" }: { icon: IconName; label: string; href: string; linkAs?: ElementType }) {
+  return (
+    <L href={href} className="rx-act">
+      <span className="rx-act__circle" aria-hidden="true"><Icon name={icon} size={24} /></span>
+      <span className="rx-act__l">{label}</span>
+    </L>
+  );
+}
+
+/** Navigation tile: an icon and one or two words. Use in a 2-column grid. */
+export function TileLink({ icon, label, href, linkAs: L = "a" }: { icon: IconName; label: string; href: string; linkAs?: ElementType }) {
+  return (
+    <L href={href} className="rx-tile">
+      <Icon name={icon} size={26} aria-hidden="true" />
+      <span>{label}</span>
+    </L>
+  );
+}
+
+/** Member: photo first, rank as a corner badge, name and rating as the only two lines. */
+export function MemberCard({ rank, name, rating, photo, href, linkAs: L = "a" }: { rank: number; name: string; rating: number; photo?: string | null; href: string; linkAs?: ElementType }) {
+  return (
+    <L href={href} className="rx-mcard" aria-label={`${name}, rank ${rank}, rating ${rating}`}>
+      <Photo src={photo} name={name} alt="" className="rx-mcard__photo" />
+      <span className="rx-mcard__rank" aria-hidden="true">#{rank}</span>
+      <span className="rx-mcard__meta"><span className="rx-mcard__name">{name}</span><span className="rx-mcard__rating">{rating}</span></span>
+    </L>
+  );
 }

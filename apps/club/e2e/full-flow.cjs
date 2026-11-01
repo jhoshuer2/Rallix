@@ -40,7 +40,7 @@ await A.screenshot({path:SC+'/e_admin_home.png'});
 await A.goto(B+'/members');t=await text(A);
 ok(['Jide Taiwo','Pastor','Sule','Nurudeen','Dorathy','Nathaniel','Ade'].every(n=>new RegExp(n,'i').test(t)),'members page lists all 7 players from the database');
 await A.screenshot({path:SC+'/e_admin_members.png'});
-const firstMember=await A.locator('a.rx-rank').first().getAttribute('href');await A.goto(B+firstMember);t=await text(A);
+const firstMember=await A.locator('a.rx-mcard').first().getAttribute('href');await A.goto(B+firstMember);t=await text(A);
 ok(/Overview/i.test(t)&&/Rating/i.test(t),'member profile loads from a real membership id');
 await A.goto(B+'/membership/payments');t=await text(A);ok(/Paid|Pending|Failed/i.test(t),'payments page shows seeded dues');
 await A.goto(B+'/membership/subscriptions');t=await text(A);ok(/₦6,000/.test(t),'subscription plans show ₦6,000 from the database');

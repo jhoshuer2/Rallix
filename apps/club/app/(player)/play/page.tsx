@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { Carousel, CoverCard, HeroMatch, ResultCard, SectionTitle, Stories, type StoryItem } from "@rallix/ui";
+import { Carousel, CoverCard, HeroMatch, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
+import { buildStories, byRecent, dayLabel, isDone, winnerSide } from "../../../lib/highlights";
 import { listCompetitions, listDues, listMatches, listMembers, memberStats, naira, type MatchView } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
-const isDone = (m: MatchView) => (m.status === "completed" || m.status === "walkover") && !!m.p1 && !!m.p2;
 const when = (d: Date | null) => (d ? d.toLocaleString("en-NG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Date to be confirmed");
-const day = (d: Date | null) => (d ? d.toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "");
-const winnerSide = (m: MatchView) => (m.winnerId ? (m.winnerId === m.p1?.id ? ("a" as const) : ("b" as const)) : null);
+const day = dayLabel;
 
 export default async function PlayerHome() {
   const ctx = await requireClub();
@@ -24,17 +23,11 @@ export default async function PlayerHome() {
     comps: await listCompetitions(tx, ctx.club.clubId, me),
   }));
   const payOn = await payoutsEnabled(ctx);
-  const byRecent = (a: MatchView, b: MatchView) => (b.confirmedAt?.getTime() ?? 0) - (a.confirmedAt?.getTime() ?? 0);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
 
   // Highlights: live first, then the latest club results.
-  const live = d.clubMatches.filter((m) => m.status === "live" && m.p1 && m.p2);
   const done = d.clubMatches.filter(isDone).sort(byRecent).slice(0, 8);
-  const stories: StoryItem[] = [...live, ...done].map((m) => ({
-    id: m.id, live: m.status === "live", caption: m.status === "live" ? `${first(m.p1!.name)} v ${first(m.p2!.name)}` : `${first(m.p1!.name)} ${m.gamesP1}–${m.gamesP2} ${first(m.p2!.name)}`,
-    title: m.competitionName, subtitle: m.status === "live" ? m.round : `${m.round} · ${day(m.confirmedAt)}`, a: m.p1!, b: m.p2!,
-    score: `${m.gamesP1}–${m.gamesP2}`, href: `/play/compete/${m.competitionId}`, cta: "See the draw",
-  }));
+  const stories = buildStories(d.clubMatches, (m) => `/play/compete/${m.competitionId}`, "See the draw");
 
   // Hero: my live match, else my next one.
   const mineOpen = mineAll.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2)

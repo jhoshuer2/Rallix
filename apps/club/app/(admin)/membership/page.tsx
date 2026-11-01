@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PromoCard } from "@rallix/ui";
+import { TileLink } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requireRole } from "../../../lib/context";
 import { payoutDetails } from "../../../lib/payment-queries";
@@ -17,18 +17,24 @@ export default async function Membership() {
   return (
     <>
       <ClubHeader />
-      <h1 className="rx-title" style={{ marginBottom: 16 }}>Membership</h1>
+      <h1 className="rx-title" style={{ margin: "8px 0 16px" }}>Membership</h1>
       <Revenue data={data as Record<string, { amount: string; bars: number[] }>} />
-      <div className="rx-card" style={{ marginBottom: 16 }}>
-        <strong>Online payments</strong>
-        <p style={{ margin: "8px 0 12px" }}>{payout ? `Active. Dues settle to ${payout.bank} ••${payout.last4} (${payout.name}).` : "Not set up. Players can’t pay dues in the app until you add a bank account."}</p>
-        <Link className="rx-btn rx-btn--small" href="/membership/payouts">{payout ? "Change account" : "Set up payouts"}</Link>
-      </div>
-      <PromoCard title="Manage your subscription" cta="Visit" href="/membership/subscriptions" linkAs={Link} />
-      <PromoCard title="Manage membership" cta="View" href="/membership/payments" tone="green" linkAs={Link} />
-      <div style={{ display: "grid", gap: 12 }}>
-        <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/membership/reminders">Dues reminders</Link>
-        <Link className="rx-btn rx-btn--ghost rx-btn--block" href="/membership/rallix">Your Rallix subscription and invoices</Link>
+      {payout ? (
+        <div className="rx-payrow rx-payrow--on">
+          <p><strong>Payouts on</strong><br />{payout.bank} ••{payout.last4}</p>
+          <Link className="rx-btn rx-btn--small" href="/membership/payouts">Change</Link>
+        </div>
+      ) : (
+        <div className="rx-payrow rx-payrow--off">
+          <p><strong>Online payments are off</strong><br />Add a bank account so players can pay in the app.</p>
+          <Link className="rx-btn rx-btn--small" href="/membership/payouts">Set up</Link>
+        </div>
+      )}
+      <div className="rx-tilegrid">
+        <TileLink icon="wallet" label="Payments" href="/membership/payments" linkAs={Link} />
+        <TileLink icon="tag" label="Plans" href="/membership/subscriptions" linkAs={Link} />
+        <TileLink icon="calendar" label="Reminders" href="/membership/reminders" linkAs={Link} />
+        <TileLink icon="money" label="Rallix invoices" href="/membership/rallix" linkAs={Link} />
       </div>
     </>
   );
