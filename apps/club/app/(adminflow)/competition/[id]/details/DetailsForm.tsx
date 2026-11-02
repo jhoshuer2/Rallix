@@ -35,7 +35,7 @@ export function DetailsForm({ id, draft, initial }: { id: string; draft: boolean
             <div><strong style={{ display: "block", fontWeight: 600 }}>Players can join themselves</strong><span className="rx-muted" style={{ fontSize: 13 }}>Switch off to close sign-up.</span></div>
             <Switch label="Players can join themselves" checked={v.openRegistration} onChange={(on) => set("openRegistration", on)} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+          <div className="rx-fieldpair rx-fieldpair--single" style={{ marginTop: 16 }}>
             <TextField label="Spot limit (optional)" inputMode="numeric" placeholder="E.g. 16" value={v.maxPlayers} onChange={(e) => set("maxPlayers", e.target.value.replace(/\D/g, ""))} />
             <TextField label="Sign-up closes (optional)" type="date" value={v.closesOn} onChange={(e) => set("closesOn", e.target.value)} />
           </div>

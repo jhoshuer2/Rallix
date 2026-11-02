@@ -43,7 +43,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
           <TextField label="What will you name this competition?" icon="search" placeholder="E.g. Paris Arena Open" value={name} onChange={(e) => setName(e.target.value)} error={tried && !name.trim() ? "Give the competition a name" : undefined} />
           <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
             <legend className="rx-label">Date of Competition</legend>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="rx-fieldpair">
               <TextField label="Start date" type="date" value={start} onChange={(e) => setStart(e.target.value)} error={tried && !start ? "Pick a start date" : undefined} />
               <TextField label="End date" type="date" value={end} onChange={(e) => setEnd(e.target.value)} error={dateBad ? "End must be after start" : tried && !end ? "Pick an end date" : undefined} />
             </div>
@@ -55,7 +55,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
             <Switch label="Players can join themselves" checked={openReg} onChange={(v) => { setOpenReg(v); if (!manual) setPicked(Object.fromEntries(members.map((p) => [p.id, !v]))); }} />
           </div>
           {openReg ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="rx-fieldpair rx-fieldpair--single" style={{ marginTop: 16 }}>
               <TextField label="Spot limit (optional)" inputMode="numeric" placeholder="E.g. 16" value={spots} onChange={(e) => setSpots(e.target.value.replace(/\D/g, ""))} error={spotsBad ? "2 to 128, and not fewer than the players picked" : undefined} />
               <TextField label="Sign-up closes (optional)" type="date" value={closes} onChange={(e) => setCloses(e.target.value)} />
             </div>

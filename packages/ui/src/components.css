@@ -728,3 +728,11 @@ button.rx-lrow { width: 100%; border-top: 0; border-left: 0; border-right: 0; fo
 
 .rx-linkbtn { background: none; border: 0; min-height: var(--rx-tap); padding: 0 var(--rx-space-3); color: var(--rx-ink-3); font: inherit; font-size: 15px; text-decoration: underline; cursor: pointer; justify-self: center; }
 .rx-spots { margin: var(--rx-space-3) var(--rx-space-1) var(--rx-space-4); }
+
+/* Inputs may shrink inside grids and cards: a native date field has a wide minimum size and must never push past its container. */
+.rx-field, .rx-input { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.rx-input input[type="date"], .rx-input input[type="time"] { min-width: 0; width: 100%; -webkit-appearance: none; appearance: none; text-align: left; }
+
+/* Two fields side by side only when there is room; on small phones they stack. */
+.rx-fieldpair { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--rx-space-3); }
+@media (min-width: 420px) { .rx-fieldpair:not(.rx-fieldpair--single) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
