@@ -70,3 +70,6 @@ Limits: 4 MB per file at the server (the browser shrinks photos to under 1.5 MB 
 4. Each phone: open the site, install it (iPhone: Share, then Add to Home Screen, and open it from the Home Screen; Android: Install app). Then Me, "At the court": turn on the switches and allow notifications.
 5. Admin: Profile, Court location: stand at the court and tap "Use my current location".
 A web app cannot track location in the background: arrival is a tap on "I've arrived", or automatic only while Rallix is open. Background arrival needs a native app (later).
+
+### Applying migrations without URL encoding
+`packages/db/scripts/supabase-migrate.sh` also accepts `SUPABASE_DB_PASSWORD` (your database password, any characters) together with `SUPABASE_POOLER_HOST` and `SUPABASE_PROJECT_REF`. Use it when the password contains symbols such as `@` that would break a connection URL.
