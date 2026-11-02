@@ -2,6 +2,8 @@
 
 Two Vercel projects from this one repo, plus a Postgres database (Supabase by default).
 
+> **Order matters:** run `packages/db/scripts/supabase-migrate.sh` BEFORE (or right after) every deploy that ships schema changes. Code that reads a new column fails every page with "Application error" until the migration is applied.
+
 ## 1. Database (Supabase project `dihsahdbmpkbyzisskrw`)
 Do this on your own machine (needs `psql`, `openssl`, `pnpm install`); the Supabase host is not reachable from the Claude sandbox, so this script has been tested against a local Postgres only.
 1. Supabase dashboard, **Connect**, tab **Session pooler**: copy the connection string for the `postgres` user (port 5432) and note the pooler host (e.g. `aws-0-<region>.pooler.supabase.com`). Use the database password you set when creating the project. Do not paste it into chat or commit it.
