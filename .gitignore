@@ -6,3 +6,6 @@ dist
 !.env.example
 *.tsbuildinfo
 .data/
+
+# Test screenshots written when OUT is unset
+/undefined/
