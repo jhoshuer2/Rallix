@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button, Icon, Photo, Sheet, clampOffset, cropRect, fitWithin } from "@rallix/ui";
 import { removePhoto, uploadPhoto } from "../lib/media-actions";
 
-type Kind = "me" | "member" | "club-logo" | "club-cover";
+type Kind = "me" | "member" | "club-logo" | "club-cover" | "competition-cover";
 const BOX = { square: { w: 264, h: 264 }, wide: { w: 320, h: 200 } } as const;
 const MAX_BYTES = 1.5 * 1024 * 1024;
 
@@ -12,7 +12,7 @@ const MAX_BYTES = 1.5 * 1024 * 1024;
  * Change or remove a picture. Tap the button, take or choose a photo, drag and zoom to frame it, then "Use photo".
  * The picture is shrunk in the browser first (so uploads stay fast on mobile data) and re-encoded again on the server.
  */
-export function PhotoUploader({ kind, membershipId, name, current, label, shape }: { kind: Kind; membershipId?: string; name: string; current: string | null; label: string; shape: "person" | "club" | "cover" }) {
+export function PhotoUploader({ kind, membershipId, competitionId, name, current, label, shape }: { kind: Kind; membershipId?: string; competitionId?: string; name: string; current: string | null; label: string; shape: "person" | "club" | "cover" }) {
   const router = useRouter();
   const box = shape === "cover" ? BOX.wide : BOX.square;
   const [open, setOpen] = useState(false);
@@ -59,7 +59,7 @@ export function PhotoUploader({ kind, membershipId, name, current, label, shape 
     for (const q of [0.86, 0.72, 0.58]) { blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", q)); if (blob && blob.size <= MAX_BYTES) break; }
     if (!blob) { setBusy(false); return setMsg({ ok: false, text: "We couldn’t prepare that picture. Please try another." }); }
     const fd = new FormData();
-    fd.set("kind", kind); if (membershipId) fd.set("membershipId", membershipId);
+    fd.set("kind", kind); if (membershipId) fd.set("membershipId", membershipId); if (competitionId) fd.set("competitionId", competitionId);
     fd.set("file", new File([blob], "photo.jpg", { type: "image/jpeg" }));
     const res = await uploadPhoto(fd);
     setBusy(false);
@@ -69,7 +69,7 @@ export function PhotoUploader({ kind, membershipId, name, current, label, shape 
 
   async function remove() {
     setBusy(true); setMsg(null);
-    const res = await removePhoto(kind, membershipId);
+    const res = await removePhoto(kind, membershipId, competitionId);
     setBusy(false);
     if (!res.ok) return setMsg({ ok: false, text: res.error });
     setUrl(null); setMsg({ ok: true, text: "Picture removed." }); setOpen(false); reset(); router.refresh();

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { SPECS, type PhotoKind } from "./kinds";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const KEY_RE = new RegExp(`^clubs/(${UUID})/(people|logo|cover)/(${UUID})\\.webp$`, "i");
+const KEY_RE = new RegExp(`^clubs/(${UUID})/(people|logo|cover|competition)/(${UUID})\\.webp$`, "i");
 
 /** Where an object lives. Never uses a name chosen by the user, so keys cannot collide or traverse. */
 export function objectKey(clubId: string, kind: PhotoKind, id: string = randomUUID()): string {

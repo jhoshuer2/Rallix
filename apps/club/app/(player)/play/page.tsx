@@ -8,8 +8,8 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { celebrations } from "@rallix/stats";
-import { listCompetitions, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
+import { celebrations, spotsLabel } from "@rallix/stats";
+import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
 const when = (d: Date | null) => (d ? d.toLocaleString("en-NG", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Date to be confirmed");
@@ -22,8 +22,7 @@ export default async function PlayerHome() {
     dues: await listDues(tx, ctx.club.clubId, me),
     stats: await memberStats(tx, ctx.club.clubId, me),
     members: await listMembers(tx, ctx.club.clubId),
-    comps: await listCompetitions(tx, ctx.club.clubId, me),
-    allComps: await listCompetitions(tx, ctx.club.clubId),
+    allComps: await listCompetitionsForPlayer(tx, ctx.club.clubId, me),
     venue: await getVenue(tx, ctx.club.clubId),
     here: await listHere(tx, ctx.club.clubId),
     arrival: await getArrivalSettings(tx, me),
@@ -96,7 +95,7 @@ export default async function PlayerHome() {
         <>
           <SectionTitle title="Upcoming competitions" href="/play/compete" linkAs={Link} label="See all competitions" />
           <Carousel label="Upcoming competitions">
-            {upcoming.map((c) => <MediaCard key={c.id} name={c.name} detail={c.startsOn ? `Starts ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.status === "active" ? "Active" : "Soon"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
+            {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
           </Carousel>
         </>
       ) : null}

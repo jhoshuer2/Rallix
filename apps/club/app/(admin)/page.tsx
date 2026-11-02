@@ -50,7 +50,7 @@ export default async function Home() {
       <SectionTitle title="Upcoming competitions" href="/competition" linkAs={Link} label="See all competitions" />
       {comps.length ? (
         <Carousel label="Upcoming competitions">
-          {comps.map((c) => <MediaCard key={c.id} name={c.name} detail={`${d.entries[c.id] ?? 0} registered${c.startsOn ? ` · ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : ""}`} tag={c.status === "active" ? "Active" : "Draft"} href={`/competition/${c.id}/groups`} linkAs={Link} />)}
+          {comps.map((c) => <MediaCard key={c.id} name={c.name} detail={`${d.entries[c.id] ?? 0} registered${c.startsOn ? ` · ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : ""}`} tag={c.status === "active" ? "Active" : c.openRegistration ? "Sign-up open" : "Draft"} cover={c.coverUrl} href={`/competition/${c.id}/groups`} linkAs={Link} />)}
         </Carousel>
       ) : <EmptyState compact title="No competitions yet" hint="Create one to get players registering." />}
 

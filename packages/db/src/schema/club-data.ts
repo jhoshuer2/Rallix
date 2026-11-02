@@ -99,6 +99,14 @@ export const competitions = pgTable("competitions", {
   status: competitionStatus("status").notNull().default("draft"),
   startsOn: date("starts_on"),
   endsOn: date("ends_on"),
+  /* Preview page, all optional and admin-written (admin_write policy). A draft with open_registration is the sign-up phase. */
+  summary: text("summary"),
+  prize: text("prize"),
+  rules: text("rules"),
+  coverUrl: text("cover_url"),
+  openRegistration: boolean("open_registration").notNull().default(false),
+  maxPlayers: smallint("max_players"),
+  registrationClosesOn: date("registration_closes_on"),
   createdBy: uuid("created_by"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -106,6 +114,11 @@ export const competitions = pgTable("competitions", {
   unique("competitions_id_club_uq").on(t.id, t.clubId),
   index("competitions_club_status_idx").on(t.clubId, t.status),
   check("competitions_dates", sql`${t.endsOn} IS NULL OR ${t.startsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
+  check("competitions_summary", sql`${t.summary} IS NULL OR char_length(${t.summary}) <= 140`),
+  check("competitions_prize", sql`${t.prize} IS NULL OR char_length(${t.prize}) <= 100`),
+  check("competitions_rules", sql`${t.rules} IS NULL OR char_length(${t.rules}) <= 8000`),
+  check("competitions_max_players", sql`${t.maxPlayers} IS NULL OR ${t.maxPlayers} BETWEEN 2 AND 128`),
+  check("competitions_cover_url", sql`${t.coverUrl} IS NULL OR ${t.coverUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
 ]);
 
 export const competitionEntries = pgTable("competition_entries", {

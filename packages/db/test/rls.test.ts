@@ -45,7 +45,7 @@ beforeAll(async () => {
   const [pl] = await svc.insert(s.plans).values([{ clubId: A!.id, name: "Monthly", priceKobo: 600000, period: "monthly" }, { clubId: B!.id, name: "B plan", priceKobo: 100, period: "monthly" }]).returning();
   ids.planA = pl!.id;
   const [cA, cB] = await svc.insert(s.competitions).values([
-    { clubId: A!.id, name: "A Cup", format: "group_stage" }, { clubId: B!.id, name: "B Cup", format: "knockout" },
+    { clubId: A!.id, name: "A Cup", format: "group_stage", status: "active" }, { clubId: B!.id, name: "B Cup", format: "knockout", status: "active" },
   ]).returning();
   ids.compA = cA!.id; ids.compB = cB!.id;
   const [mt] = await svc.insert(s.matches).values({ clubId: A!.id, competitionId: cA!.id, round: "R1", player1Id: ids.mP1, player2Id: ids.mP2 }).returning();
@@ -561,5 +561,104 @@ describe("arrival check-in", () => {
     expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`select * from push_subscriptions`)))).toBe("42501");
     expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ('playerA1', 'https://push.example/a', 'k', 'a')`)))).toBe("42501");
     expect(await denied(svc.execute(sql`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ('playerA1', 'http://push.example/a', 'k', 'a')`))).toBe("23514");
+  });
+});
+
+describe("competition sign-up", () => {
+  const P1 = () => ({ userId: "playerA1", clubId: ids.A });
+  const P2 = () => ({ userId: "playerA2", clubId: ids.A });
+  const MULTI = () => ({ userId: "multi", clubId: ids.A });
+  const ADMIN = () => ({ userId: "adminA", clubId: ids.A });
+  let n = 0;
+  beforeAll(async () => {
+    await svc.execute(sql`insert into player_profiles (membership_id, club_id) values (${ids.mP1}, ${ids.A}), (${ids.mP2}, ${ids.A}), (${ids.mMultiA}, ${ids.A}) on conflict (membership_id) do nothing`);
+    await svc.execute(sql`update player_profiles set level = 'junior' where membership_id in (${ids.mP1}, ${ids.mMultiA})`);
+    await svc.execute(sql`update player_profiles set level = 'senior' where membership_id = ${ids.mP2}`);
+  });
+  async function make(o: { status?: string; open?: boolean; max?: number | null; closes?: string | null; level?: string | null; club?: string } = {}) {
+    const r = await svc.execute(sql`insert into competitions (club_id, name, format, status, open_registration, max_players, registration_closes_on, level)
+      values (${o.club ?? ids.A}, ${`Signup ${++n}`}, 'group_stage', ${o.status ?? "draft"}, ${o.open ?? true}, ${o.max ?? null}, ${o.closes ?? null}, ${o.level ?? null}) returning id`);
+    return (r.rows[0] as { id: string }).id;
+  }
+  const join = async (ctx: { userId: string; clubId: string }, id: string) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.join_competition(${id}) as r`))).rows[0] as { r: string }).r;
+  const leave = async (ctx: { userId: string; clubId: string }, id: string) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.leave_competition(${id}) as r`))).rows[0] as { r: string }).r;
+  const count = async (id: string) => Number(((await svc.execute(sql`select count(*)::int as n from competition_entries where competition_id = ${id}`)).rows[0] as { n: number }).n);
+  const today = async () => ((await svc.execute(sql`select (now() at time zone 'Africa/Lagos')::date::text as d`)).rows[0] as { d: string }).d;
+  const shift = async (days: number) => ((await svc.execute(sql`select ((now() at time zone 'Africa/Lagos')::date + ${days}::int)::text as d`)).rows[0] as { d: string }).d;
+
+  it("a player joins an open draft once, and joining again changes nothing", async () => {
+    const id = await make();
+    expect(await join(P1(), id)).toBe("joined");
+    expect(await join(P1(), id)).toBe("already");
+    expect(await count(id)).toBe(1);
+  });
+  it("players still cannot write competition entries directly", async () => {
+    const id = await make();
+    expect(await denied(withTenant(app, P1(), (tx) => tx.execute(sql`insert into competition_entries (club_id, competition_id, membership_id) values (${ids.A}, ${id}, ${ids.mP1})`)))).toBe("42501");
+    expect(await count(id)).toBe(0);
+  });
+  it("stops at the spot limit, and people racing for the last spots cannot take more than exist", async () => {
+    const id = await make({ max: 2 });
+    const res = await Promise.all([join(P1(), id), join(P2(), id), join(MULTI(), id)]);
+    expect(res.filter((r) => r === "joined")).toHaveLength(2);
+    expect(res.filter((r) => r === "full")).toHaveLength(1);
+    expect(await count(id)).toBe(2);
+  });
+  it("closes the day after the closing date, not on it", async () => {
+    expect(await join(P1(), await make({ closes: await today() }))).toBe("joined");
+    expect(await join(P1(), await make({ closes: await shift(-1) }))).toBe("closed");
+  });
+  it("only a draft with open registration can be joined", async () => {
+    expect(await join(P1(), await make({ status: "active" }))).toBe("closed");
+    expect(await join(P1(), await make({ status: "completed" }))).toBe("closed");
+    expect(await join(P1(), await make({ open: false }))).toBe("closed");
+  });
+  it("enforces the level, and a combined competition takes everyone", async () => {
+    const senior = await make({ level: "senior" });
+    expect(await join(P1(), senior)).toBe("level"); // junior player
+    expect(await join(P2(), senior)).toBe("joined"); // senior player
+    expect(await join(P1(), await make({ level: null }))).toBe("joined");
+  });
+  it("refuses people from other clubs and signed-out callers", async () => {
+    const id = await make();
+    expect(await join({ userId: "adminB", clubId: ids.B }, id)).toBe("closed");
+    expect(await count(id)).toBe(0);
+    expect(await denied(withTenant(app, { userId: "", clubId: ids.A }, (tx) => tx.execute(sql`select app.join_competition(${id})`)))).toBe("28000");
+  });
+  it("leaving is allowed while it is a draft and refused once it is running", async () => {
+    const id = await make();
+    await join(P1(), id);
+    expect(await leave(P1(), id)).toBe("left");
+    expect(await count(id)).toBe(0);
+    await join(P1(), id);
+    await svc.execute(sql`update competitions set status = 'active' where id = ${id}`);
+    expect(await leave(P1(), id)).toBe("closed");
+    expect(await count(id)).toBe(1);
+  });
+  it("a player cannot make someone else leave", async () => {
+    const id = await make();
+    await join(P1(), id);
+    expect(await leave(P2(), id)).toBe("left"); // P2 was never in it: only their own entry is ever touched
+    expect(await count(id)).toBe(1);
+  });
+  it("a draft with registration off is invisible to players but visible to the admin, along with its entries", async () => {
+    const id = await make({ open: false });
+    await svc.execute(sql`insert into competition_entries (club_id, competition_id, membership_id) values (${ids.A}, ${id}, ${ids.mP2})`);
+    expect(await rows(app, P1(), sql`select id from competitions where id = ${id}`)).toHaveLength(0);
+    expect(await rows(app, P1(), sql`select id from competition_entries where competition_id = ${id}`)).toHaveLength(0);
+    expect(await rows(app, ADMIN(), sql`select id from competitions where id = ${id}`)).toHaveLength(1);
+    expect(await rows(app, ADMIN(), sql`select id from competition_entries where competition_id = ${id}`)).toHaveLength(1);
+    const open = await make({ open: true });
+    expect(await rows(app, P1(), sql`select id from competitions where id = ${open}`)).toHaveLength(1);
+  });
+  it("only an admin can edit the preview details, and bad values are refused", async () => {
+    const id = await make();
+    const set = (ctx: { userId: string; clubId: string }, frag: ReturnType<typeof sql>) => withTenant(app, ctx, (tx) => tx.execute(sql`update competitions set ${frag} where id = ${id} returning id`));
+    expect((await set(ADMIN(), sql`summary = 'A friendly open', prize = 'Trophy', rules = 'Best of five', max_players = 8`)).rows).toHaveLength(1);
+    expect((await set(P1(), sql`summary = 'hacked'`)).rows).toHaveLength(0);
+    expect(await denied(set(ADMIN(), sql`summary = ${"x".repeat(141)}`))).toBe("23514");
+    expect(await denied(set(ADMIN(), sql`max_players = 1`))).toBe("23514");
+    expect(await denied(set(ADMIN(), sql`cover_url = 'javascript:alert(1)'`))).toBe("23514");
+    await svc.execute(sql`insert into upload_log (user_id, kind, bytes) values ('adminA', 'competition-cover', 10)`); // the new picture kind is accepted
   });
 });

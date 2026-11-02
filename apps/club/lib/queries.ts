@@ -142,3 +142,31 @@ export async function recentPayments(tx: Tx, clubId: string, limit = 8) {
     .from(payments).innerJoin(memberships, eq(memberships.id, payments.membershipId)).innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(payments.clubId, clubId), eq(payments.status, "paid"))).orderBy(desc(payments.paidAt)).limit(limit);
 }
+
+export type CompetitionCard = typeof competitions.$inferSelect & { entries: number; registered: boolean };
+
+/** Every competition this player may see (row-level security hides hidden drafts), with the sign-up count and whether they are in it. */
+export async function listCompetitionsForPlayer(tx: Tx, clubId: string, me: string): Promise<CompetitionCard[]> {
+  const rows = await tx.select().from(competitions).where(eq(competitions.clubId, clubId)).orderBy(desc(competitions.createdAt));
+  const counts = await entryCounts(tx, clubId);
+  const mine = await tx.select({ id: competitionEntries.competitionId }).from(competitionEntries).where(eq(competitionEntries.membershipId, me));
+  const inIt = new Set(mine.map((m) => m.id));
+  return rows.map((c) => ({ ...c, entries: counts[c.id] ?? 0, registered: inIt.has(c.id) }));
+}
+
+export type Participant = { id: string; name: string; photo: string | null };
+
+/** Everything the competition preview page needs in one place. Null when the competition does not exist or is hidden from this player. */
+export async function getCompetitionPreview(tx: Tx, clubId: string, id: string, me: string) {
+  const c = await getCompetition(tx, id);
+  if (!c) return null;
+  const people = await tx.select({ id: memberships.id, name: users.name, photo: playerProfiles.photoUrl })
+    .from(competitionEntries)
+    .innerJoin(memberships, eq(memberships.id, competitionEntries.membershipId))
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(playerProfiles, eq(playerProfiles.membershipId, memberships.id))
+    .where(eq(competitionEntries.competitionId, id))
+    .orderBy(asc(competitionEntries.createdAt));
+  const [profile] = await tx.select({ level: playerProfiles.level }).from(playerProfiles).where(eq(playerProfiles.membershipId, me)).limit(1);
+  return { c, participants: people as Participant[], registered: people.some((p) => p.id === me), myLevel: profile?.level ?? null };
+}

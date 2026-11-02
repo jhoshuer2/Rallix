@@ -134,7 +134,7 @@ describe("createStore", () => {
   });
 });
 
-import { authorizeTarget } from "./index";
+import { SPECS, authorizeTarget } from "./index";
 describe("authorizeTarget", () => {
   const player = { roles: ["player"], membershipId: ID };
   const admin = { roles: ["admin", "player"], membershipId: ID };
@@ -160,3 +160,20 @@ describe("authorizeTarget", () => {
     expect(authorizeTarget(admin, { kind: "everything" } as never)).toHaveProperty("error");
   });
 });
+
+describe("competition covers", () => {
+  const COMP = "33333333-3333-4333-8333-333333333333";
+  it("has its own size and folder, and keys stay inside the club", () => {
+    expect(SPECS["competition-cover"]).toEqual({ width: 1600, height: 1000, folder: "competition" });
+    const key = objectKey(CLUB, "competition-cover", ID);
+    expect(key).toBe(`clubs/${CLUB}/competition/${ID}.webp`);
+    expect(isOurKey(key)).toBe(true);
+    expect(clubOfKey(key)).toBe(CLUB);
+  });
+  it("only a club admin may change a competition picture, and the id must be a uuid", () => {
+    expect(authorizeTarget({ roles: ["admin"], membershipId: ID }, { kind: "competition-cover", competitionId: COMP })).toEqual({ kind: "competition-cover", membershipId: null, competitionId: COMP });
+    for (const roles of [["player"], ["scorer"], ["coach"], []]) expect(authorizeTarget({ roles, membershipId: ID }, { kind: "competition-cover", competitionId: COMP })).toHaveProperty("error");
+    expect(authorizeTarget({ roles: ["admin"], membershipId: ID }, { kind: "competition-cover", competitionId: "../x" })).toHaveProperty("error");
+  });
+});
+

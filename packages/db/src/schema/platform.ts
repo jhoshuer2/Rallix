@@ -202,12 +202,12 @@ export const uploadLog = pgTable("upload_log", {
   id: id(),
   userId: text("user_id").notNull(),
   clubId: uuid("club_id"),
-  kind: text("kind").notNull(), // person | club-logo | club-cover
+  kind: text("kind").notNull(), // person | club-logo | club-cover | competition-cover
   bytes: integer("bytes").notNull(),
   createdAt: createdAt(),
 }, (t) => [
   index("upload_log_user_idx").on(t.userId, t.createdAt),
-  check("upload_log_kind", sql`${t.kind} IN ('person','club-logo','club-cover')`),
+  check("upload_log_kind", sql`${t.kind} IN ('person','club-logo','club-cover','competition-cover')`),
 ]);
 
 /** A phone or browser that can receive Web Push for a user. Service role only (no app-role grants): endpoint and keys are secrets. */

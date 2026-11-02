@@ -1,5 +1,5 @@
 "use client";
-import { ActionButton, AttentionTile, Carousel, ClubBanner, EmptyState, HeroMatch, IconBadge, ListGroup, ListRow, MediaCard, MemberCard, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, ResultCard, SectionTitle, SelectSheet, Skeleton, Stories, TileLink, type StoryItem } from "@rallix/ui";
+import { ActionButton, AttentionTile, Carousel, ClubBanner, CompetitionBanner, EmptyState, HeroMatch, IconBadge, ListGroup, ListRow, MediaCard, MemberCard, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, ResultCard, SectionTitle, SelectSheet, Skeleton, SpotsBar, Stories, TileLink, type StoryItem } from "@rallix/ui";
 import { useState } from "react";
 
 const a = { name: "Ada Obi" }, b = { name: "Tunde Bello" };
@@ -17,6 +17,9 @@ export function Demo() {
       <SectionTitle title="Cards" href="#" />
       <h3 className="rx-panel__title">MetricCard</h3>
       <MetricGrid><MetricCard label="Club rank" value="#7" hint="Rating 1150" /><MetricCard label="Win rate" value="50%" tone="good" hint="Streak: 2 wins" /></MetricGrid>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>CompetitionBanner and SpotsBar</h3>
+      <CompetitionBanner name="Spring Open" summary="Our season opener. Everyone welcome." status={<Pill tone="success">Open for sign-up</Pill>} />
+      <SpotsBar percent={60} />
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>EmptyState</h3>
       <Panel><div id="kit-empty"><EmptyState title="No competitions yet" hint="Create your first one in a minute." action={<a className="rx-btn" href="#">Create a competition</a>} /></div></Panel>
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ListRow</h3>

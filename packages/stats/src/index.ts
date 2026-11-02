@@ -5,3 +5,4 @@ export * from "./fixtures";
 export * from "./celebrations";
 export * from "./overview";
 export * from "./geo";
+export * from "./registration";

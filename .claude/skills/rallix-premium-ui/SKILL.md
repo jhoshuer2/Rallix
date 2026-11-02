@@ -71,6 +71,9 @@ Live match first, then the latest results. Ring means unseen, muted ring means s
 ## Empty states
 `EmptyState` (rackets and ball, 144x96 art, one line, optional hint, at most one button; `compact` for panels and filtered lists). Every fully empty list uses it (a test fails on "No ..." muted paragraphs), and its button replaces any toolbar "+ New" while the list is empty. Static under reduced motion. Use for fully empty lists; inline hints in a populated screen stay plain text.
 
+## Competition preview recipe
+`CompetitionBanner` hero (cover or placeholder, status Pill, name, one-line summary) in `PageShell lead`, then ONE main button from `registrationState` (Join, Registered with a quiet Leave, Full, closed), then a `ListGroup` of icon rows (dates with countdown, closing date, format and level, prize, spots) with a `SpotsBar`, a Rules row that opens a sheet, a players avatar row, and fixtures only once it is running. Hide any row that has no value.
+
 ## Screen recipes
 - **Dashboard (Home):** band with stories, one hero, one attention strip or due notice, 2 metrics, 1 to 2 carousels.
 - **List (Members, Ranks):** `flat` page, search or segmented control, `ListGroup` or photo grid.

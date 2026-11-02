@@ -9,6 +9,7 @@ import { normalizePhone } from "@rallix/config/phone";
 import { CLUB_COOKIE, canScore, getCtx, inClub, isAdmin, requireClub } from "./context";
 import { appDb, serviceDb } from "./db";
 import { listMembers } from "./queries";
+import { seedAndGenerate } from "./competition-core";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -162,32 +163,34 @@ export async function billMembers(planId: string): Promise<Result<{ created: num
 /* ---------- Competitions ---------- */
 export async function createCompetition(input: {
   name: string; level: "junior" | "intermediate" | "senior" | null; format: "group_stage" | "one_on_one"; startsOn: string; endsOn: string; memberIds: string[];
-}): Promise<Result<{ id: string }>> {
+  /** Players sign up themselves; the competition stays a draft until an admin starts it. */
+  openRegistration?: boolean; maxPlayers?: number | null; closesOn?: string | null;
+}): Promise<Result<{ id: string; draft: boolean }>> {
   const ctx = await requireClub();
   if (!isAdmin(ctx.club)) return fail("Only club admins can create competitions.");
   const name = input.name.trim();
   if (name.length < 2) return fail("Give the competition a name.");
   if (input.endsOn < input.startsOn) return fail("The end date must be on or after the start date.");
   const ids = [...new Set(input.memberIds)];
-  if (ids.length < 2) return fail("Pick at least two players.");
+  const open = !!input.openRegistration;
+  if (!open && ids.length < 2) return fail("Pick at least two players.");
+  const max = open && input.maxPlayers ? Math.floor(Number(input.maxPlayers)) : null;
+  if (max !== null && (!Number.isFinite(max) || max < 2 || max > 128)) return fail("Spots must be between 2 and 128.");
+  if (max !== null && ids.length > max) return fail("You picked more players than there are spots.");
+  const closes = open && input.closesOn ? input.closesOn : null;
+  if (closes !== null && !/^\d{4}-\d{2}-\d{2}$/.test(closes)) return fail("Choose a valid closing date.");
   try {
     const id = await inClub(ctx, async (tx) => {
       const roster = await listMembers(tx, ctx.club.clubId); // RLS-scoped; also gives seed order by rating
       const valid = roster.filter((m) => ids.includes(m.id));
       if (valid.length !== ids.length) throw new Error("INVALID_PLAYERS");
-      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, status: "active", startsOn: input.startsOn, endsOn: input.endsOn, createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
-      await tx.insert(competitionEntries).values(valid.map((m, i) => ({ clubId: ctx.club.clubId, competitionId: c!.id, membershipId: m.id, seed: i + 1, groupLabel: null })));
-      const groups = input.format === "group_stage" ? snakeGroups(valid, Math.max(1, Math.ceil(valid.length / 4))) : [valid];
-      const rows: Array<typeof matches.$inferInsert> = [];
-      groups.forEach((g, gi) => {
-        const label = input.format === "group_stage" ? `Group ${String.fromCharCode(65 + gi)}` : "One on one";
-        roundRobin(g).forEach((round, ri) => round.forEach(([a, b], si) => rows.push({ clubId: ctx.club.clubId, competitionId: c!.id, round: label, roundOrder: ri + 1, slot: si + 1, player1Id: a.id, player2Id: b.id })));
-      });
-      if (rows.length) await tx.insert(matches).values(rows);
+      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, status: open ? "draft" : "active", openRegistration: open, maxPlayers: max, registrationClosesOn: closes, startsOn: input.startsOn, endsOn: input.endsOn, createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
+      if (open) { if (valid.length) await tx.insert(competitionEntries).values(valid.map((m) => ({ clubId: ctx.club.clubId, competitionId: c!.id, membershipId: m.id }))); }
+      else await seedAndGenerate(tx, ctx.club.clubId, c!.id, input.format, valid);
       return c!.id;
     });
     revalidatePath("/competition");
-    return { ok: true, id };
+    return { ok: true, id, draft: open };
   } catch (e) {
     if ((e as Error).message === "INVALID_PLAYERS") return fail("One or more players are not in this club.");
     return fail("Could not create the competition.");

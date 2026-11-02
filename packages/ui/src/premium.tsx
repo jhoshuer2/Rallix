@@ -207,15 +207,16 @@ export function Panel({ children, className, title }: { children: ReactNode; cla
 }
 
 /** ListRow: avatar or icon, a title, one detail line, and a value or chevron on the right. Rows stack inside a `ListGroup`. */
-export function ListRow({ media, title, subtitle, eyebrow, size, trailing, href, linkAs: L = "a", tone, current, ariaLabel }: { media?: ReactNode; title: string; subtitle?: string; /** Small blue category label above the title, like "PODCAST". */ eyebrow?: string; /** `lg`: a bigger rectangular picture on the left, like a news row. */ size?: "lg"; trailing?: ReactNode; href?: string; linkAs?: ElementType; tone?: "good" | "bad" | "warn"; current?: boolean; ariaLabel?: string }) {
+export function ListRow({ media, title, subtitle, eyebrow, size, trailing, href, onClick, linkAs: L = "a", tone, current, ariaLabel }: { media?: ReactNode; title: string; subtitle?: string; /** Small blue category label above the title, like "PODCAST". */ eyebrow?: string; /** `lg`: a bigger rectangular picture on the left, like a news row. */ size?: "lg"; trailing?: ReactNode; href?: string; /** Makes the row a button (opens a sheet, for example). */ onClick?: () => void; linkAs?: ElementType; tone?: "good" | "bad" | "warn"; current?: boolean; ariaLabel?: string }) {
   const body = (
     <>
       {media ? <span className="rx-lrow__media" aria-hidden="true">{media}</span> : null}
       <span className="rx-lrow__text">{eyebrow ? <span className="rx-lrow__eyebrow">{eyebrow}</span> : null}<span className="rx-lrow__title">{title}</span>{subtitle ? <span className="rx-lrow__sub">{subtitle}</span> : null}</span>
-      {trailing ? <span className={cx("rx-lrow__end", tone && `is-${tone}`)}>{trailing}</span> : href ? <Icon name="forward" size={20} className="rx-lrow__chev" aria-hidden="true" /> : null}
+      {trailing ? <span className={cx("rx-lrow__end", tone && `is-${tone}`)}>{trailing}</span> : href || onClick ? <Icon name="forward" size={20} className="rx-lrow__chev" aria-hidden="true" /> : null}
     </>
   );
   const cls = cx("rx-lrow", size === "lg" && "rx-lrow--lg", current && "is-current");
+  if (onClick && !href) return <button type="button" className={cls} onClick={onClick} aria-label={ariaLabel}>{body}</button>;
   return href ? <L href={href} className={cls} aria-current={current ? "true" : undefined} aria-label={ariaLabel}>{body}</L> : <div className={cls}>{body}</div>;
 }
 /** `bare` drops the card background so rows can sit inside a Panel. */
@@ -344,4 +345,26 @@ export function EmptyState({ title, hint, action, compact }: { title: string; hi
       {action ? <div className="rx-es__action">{action}</div> : null}
     </div>
   );
+}
+
+
+/** Hero of a competition preview: cover picture (or a branded placeholder), status, title and the one-line summary. Sits in PageShell `lead`. */
+export function CompetitionBanner({ name, summary, cover, status }: { name: string; summary?: string | null; cover?: string | null; status?: ReactNode }) {
+  const safe = cover && /^(https:\/\/|\/(?!\/))[^"'()\s\\]+$/.test(cover);
+  const { from, to } = placeholderColors(name);
+  const bg: CSSProperties = safe
+    ? { backgroundImage: `linear-gradient(180deg, rgba(8,18,53,.15), rgba(8,18,53,.85)), url("${cover}")` }
+    : { backgroundImage: `linear-gradient(180deg, rgba(8,18,53,.05), rgba(8,18,53,.7)), linear-gradient(135deg, ${from}, ${to})` };
+  return (
+    <section className="rx-compban" style={bg} aria-label={`${name} competition`}>
+      {status ? <div className="rx-compban__status">{status}</div> : null}
+      <h2 className="rx-compban__name">{name}</h2>
+      {summary ? <p className="rx-compban__summary">{summary}</p> : null}
+    </section>
+  );
+}
+
+/** Thin bar showing how many spots are taken. Decorative: the number next to it carries the meaning. */
+export function SpotsBar({ percent }: { percent: number }) {
+  return <div className="rx-spots" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>;
 }

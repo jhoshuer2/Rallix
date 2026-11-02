@@ -134,6 +134,20 @@
       "when": 1793646171148,
       "tag": "0018_geofence_rls_and_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793648510483,
+      "tag": "0019_competition_signup",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793648511483,
+      "tag": "0020_competition_signup_functions",
+      "breakpoints": true
     }
   ]
 }

@@ -710,3 +710,21 @@ a.rx-lrow:active { background: rgba(15, 32, 56, .04); }
 .rx-es--compact { padding: var(--rx-space-5) var(--rx-space-4) var(--rx-space-4); }
 .rx-es--compact .rx-es__art { zoom: .78; margin-bottom: var(--rx-space-3); }
 .rx-es--compact .rx-es__title { font-size: 22px; }
+
+/* Competition preview hero and spots bar */
+.rx-compban { position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--rx-space-2); min-height: 220px; padding: var(--rx-space-5) var(--rx-space-4) var(--rx-space-4); border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; color: #fff; box-shadow: var(--rx-shadow-card); }
+.rx-compban__status { position: absolute; top: var(--rx-space-3); left: var(--rx-space-3); }
+.rx-compban__name { margin: 0; font-size: 40px; line-height: 1.02; color: #fff; overflow-wrap: anywhere; text-shadow: 0 1px 12px rgba(0,0,0,.35); }
+.rx-compban__summary { margin: 0; font-size: 16px; line-height: 1.35; color: #fff; max-width: 34ch; text-shadow: 0 1px 8px rgba(0,0,0,.4); }
+.rx-spots { height: 8px; border-radius: 999px; background: var(--rx-line); overflow: hidden; }
+.rx-spots span { display: block; height: 100%; border-radius: 999px; background: var(--rx-blue); }
+
+button.rx-lrow { width: 100%; border-top: 0; border-left: 0; border-right: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.rx-avstack { display: flex; align-items: center; padding: 4px 0; }
+.rx-avstack > * { margin-left: -10px; border: 2px solid var(--rx-surface); border-radius: 50%; width: 40px; flex: none; }
+.rx-avstack > *:first-child { margin-left: 0; }
+.rx-avstack__more { display: inline-flex; align-items: center; justify-content: center; height: 40px; background: var(--rx-line); color: var(--rx-ink); font-weight: 700; font-size: 13px; }
+.rx-rules { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.55; color: var(--rx-ink); padding-bottom: var(--rx-space-5); }
+
+.rx-linkbtn { background: none; border: 0; min-height: var(--rx-tap); padding: 0 var(--rx-space-3); color: var(--rx-ink-3); font: inherit; font-size: 15px; text-decoration: underline; cursor: pointer; justify-self: center; }
+.rx-spots { margin: var(--rx-space-3) var(--rx-space-1) var(--rx-space-4); }
