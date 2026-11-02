@@ -196,3 +196,16 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   index("notification_deliveries_pending_idx").on(t.notificationId, t.status),
   check("notification_deliveries_status", sql`${t.status} IN ('pending','sent','failed')`),
 ]);
+
+/** One row per accepted picture upload, for a per-person daily limit. Service role only (no app-role grants). */
+export const uploadLog = pgTable("upload_log", {
+  id: id(),
+  userId: text("user_id").notNull(),
+  clubId: uuid("club_id"),
+  kind: text("kind").notNull(), // person | club-logo | club-cover
+  bytes: integer("bytes").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  index("upload_log_user_idx").on(t.userId, t.createdAt),
+  check("upload_log_kind", sql`${t.kind} IN ('person','club-logo','club-cover')`),
+]);

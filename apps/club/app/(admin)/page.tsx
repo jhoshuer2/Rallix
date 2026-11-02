@@ -1,67 +1,79 @@
 import Link from "next/link";
-import { ActionButton, AttentionTile, Carousel, Celebrations, ClubBanner, MediaCard, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { ActionButton, Carousel, ClubBanner, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Panel, Photo, SectionTitle, StackedBar } from "@rallix/ui";
+import { mergeActivity, membershipOverview, type Activity } from "@rallix/stats";
 import { ClubHeader } from "../../components/ClubHeader";
 import { inClub, requireRole } from "../../lib/context";
-import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../lib/highlights";
-import { celebrations } from "@rallix/stats";
-import { listCompetitions, listDues, listMatches, listMembers, naira, revenue } from "../../lib/queries";
+import { byRecent, dayLabel, isDone, todayInClub } from "../../lib/highlights";
+import { entryCounts, listCompetitions, listDues, listMatches, listMembers, naira, recentPayments, revenue } from "../../lib/queries";
 
 export default async function Home() {
   const ctx = await requireRole("admin");
-  const { members, comps, dues, month, matches } = await inClub(ctx, async (tx) => ({
-    members: await listMembers(tx, ctx.club.clubId),
-    comps: await listCompetitions(tx, ctx.club.clubId),
-    dues: await listDues(tx, ctx.club.clubId),
-    month: await revenue(tx, ctx.club.clubId, "Month"),
-    matches: await listMatches(tx, ctx.club.clubId),
+  const clubId = ctx.club.clubId;
+  const d = await inClub(ctx, async (tx) => ({
+    members: await listMembers(tx, clubId),
+    comps: await listCompetitions(tx, clubId),
+    dues: await listDues(tx, clubId),
+    month: await revenue(tx, clubId, "Month"),
+    matches: await listMatches(tx, clubId),
+    entries: await entryCounts(tx, clubId),
+    pays: await recentPayments(tx, clubId, 8),
   }));
-  const celebs = celebrations(members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
-  const unpaid = dues.filter((d) => d.status === "due" || d.status === "overdue").length;
-  const toScore = matches.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2).length;
-  const active = comps.filter((c) => c.status === "active");
-  const results = matches.filter(isDone).sort(byRecent).slice(0, 8);
-  const stories = buildStories(matches, (m) => `/competition/${m.competitionId}/groups`, "Open match");
-  const needs = unpaid > 0 || toScore > 0 || active.length === 0;
+  const today = todayInClub();
+  const ov = membershipOverview(d.dues, today);
+  const outstanding = d.dues.filter((x) => x.status === "due" || x.status === "overdue").reduce((a, x) => a + x.amountKobo, 0);
+  const comps = d.comps.filter((c) => c.status === "active" || c.status === "draft").slice(0, 8);
+  const feed = mergeActivity([
+    d.members.slice().sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime()).slice(0, 5).map<Activity>((m) => ({ id: `j${m.id}`, kind: "member", at: m.joinedAt, title: `${m.name} joined`, detail: "New registration", href: `/members/${m.id}` })),
+    d.pays.map<Activity>((p) => ({ id: `p${p.id}`, kind: "payment", at: p.paidAt ?? new Date(0), title: `${p.name} paid ${naira(p.amountKobo)}`, detail: "Payment", href: "/membership/payments" })),
+    d.matches.filter(isDone).sort(byRecent).slice(0, 5).map<Activity>((m) => ({ id: `m${m.id}`, kind: "result", at: m.confirmedAt ?? new Date(0), title: `${m.p1!.name} ${m.gamesP1}-${m.gamesP2} ${m.p2!.name}`, detail: m.competitionName, href: `/competition/${m.competitionId}/groups` })),
+  ], 8);
+  const top = d.members.slice(0, 5);
   return (
-    <PageShell home header={<ClubHeader />} band={<Stories items={stories} label="Match highlights" />}
-      lead={<ClubBanner name={ctx.club.name} logo={ctx.club.logoUrl} figure={naira(month.total)} figureLabel="Revenue, last 30 days" members={members.length} />}>
+    <PageShell home header={<ClubHeader />}
+      lead={<ClubBanner name={ctx.club.name} logo={ctx.club.logoUrl} cover={ctx.club.coverUrl} figure={naira(d.month.total)} figureLabel="Revenue, last 30 days" members={d.members.length} />}>
 
-      {celebs.length ? (
-        <>
-          <SectionTitle title="Celebrations" />
-          <Celebrations items={celebs} />
-        </>
-      ) : null}
+      <SectionTitle title="Club overview" />
+      <MetricGrid kpi>
+        <MetricCard label="Members" value={String(d.members.length)} />
+        <MetricCard label="Active memberships" value={String(ov.active)} hint={ov.total ? `of ${ov.total} on a plan` : undefined} />
+        <MetricCard label="Revenue (30 days)" value={naira(d.month.total)} tone="good" />
+        <MetricCard label="Outstanding" value={naira(outstanding)} tone={outstanding > 0 ? "bad" : undefined} hint={outstanding > 0 ? "Not yet paid" : undefined} />
+      </MetricGrid>
 
-      {needs ? (
-        <div className="rx-attn-row" aria-label="Needs your attention">
-          {unpaid > 0 ? <AttentionTile count={unpaid} label={unpaid === 1 ? "unpaid due" : "unpaid dues"} href="/membership/payments" linkAs={Link} /> : null}
-          {toScore > 0 ? <AttentionTile count={toScore} label={toScore === 1 ? "match to score" : "matches to score"} href="/competition" linkAs={Link} /> : null}
-          {active.length === 0 ? <AttentionTile label="Start a competition" href="/competition/new" tone="go" linkAs={Link} /> : null}
-        </div>
-      ) : null}
-
+      <SectionTitle title="Quick actions" />
       <div className="rx-actions">
-        <ActionButton icon="trophy" label="New event" href="/competition/new" linkAs={Link} />
-        <ActionButton icon="members" label="Invite" href="/profile" linkAs={Link} />
-        <ActionButton icon="money" label="Payments" href="/membership/payments" linkAs={Link} />
+        <ActionButton icon="user-add" label="Add member" href="/profile" linkAs={Link} />
+        <ActionButton icon="trophy" label="Competition" href="/competition/new" linkAs={Link} />
+        <ActionButton icon="play" label="Record match" href="/competition" linkAs={Link} />
       </div>
 
-      {active.length ? (
+      <SectionTitle title="Upcoming competitions" href="/competition" linkAs={Link} label="See all competitions" />
+      {comps.length ? (
+        <Carousel label="Upcoming competitions">
+          {comps.map((c) => <MediaCard key={c.id} name={c.name} detail={`${d.entries[c.id] ?? 0} registered${c.startsOn ? ` · ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : ""}`} tag={c.status === "active" ? "Active" : "Draft"} href={`/competition/${c.id}/groups`} linkAs={Link} />)}
+        </Carousel>
+      ) : <Panel><p className="rx-muted" style={{ margin: 0 }}>No competition yet. Create one to get players registering.</p></Panel>}
+
+      <SectionTitle title="Membership overview" href="/membership/payments" linkAs={Link} label="See payments" />
+      <Panel>
+        <StackedBar label="Membership status" parts={[{ label: "paid", value: ov.paid, tone: "good" }, { label: "expiring", value: ov.expiring, tone: "warn" }, { label: "unpaid", value: ov.unpaid, tone: "bad" }]} />
+      </Panel>
+
+      {feed.length ? (
         <>
-          <SectionTitle title="Competitions" href="/competition" linkAs={Link} label="See all competitions" />
-          <Carousel label="Active competitions">
-            {active.map((c) => <MediaCard key={c.id} name={c.name} detail={c.level ?? "In progress"} tag="Active" href={`/competition/${c.id}/groups`} linkAs={Link} />)}
-          </Carousel>
+          <SectionTitle title="Recent activity" href="/activity" linkAs={Link} label="See all activity" />
+          <ListGroup label="Recent activity">
+            {feed.map((a) => <ListRow key={a.id} media={<Photo name={a.title} alt="" />} title={a.title} subtitle={`${a.detail ?? ""} · ${dayLabel(a.at)}`} href={a.href} linkAs={Link} />)}
+          </ListGroup>
         </>
       ) : null}
 
-      {results.length ? (
+      {top.length ? (
         <>
-          <SectionTitle title="Latest results" href="/competition" linkAs={Link} label="See all competitions" />
-          <Carousel label="Recent results">
-            {results.map((m) => <ResultCard key={m.id} a={m.p1!} b={m.p2!} scoreA={m.gamesP1} scoreB={m.gamesP2} winner={winnerSide(m)} competition={m.competitionName} when={dayLabel(m.confirmedAt)} href={`/competition/${m.competitionId}/groups`} linkAs={Link} />)}
-          </Carousel>
+          <SectionTitle title="Top players" href="/members" linkAs={Link} label="See all members" />
+          <ListGroup label="Top players">
+            {top.map((m) => <ListRow key={m.id} media={<Photo src={m.photo} name={m.name} alt="" />} eyebrow={`#${m.rank}`} title={m.name} subtitle={`Rating ${m.rating}`} href={`/members/${m.id}`} linkAs={Link} />)}
+          </ListGroup>
         </>
       ) : null}
     </PageShell>

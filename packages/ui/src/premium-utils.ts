@@ -43,3 +43,33 @@ export function countdown(target: Date, now: Date = new Date()): string {
 export function scoreLine(a: number | null | undefined, b: number | null | undefined): string {
   return a == null || b == null ? "–" : `${a}–${b}`;
 }
+
+/* ---------- Picture cropping (pure, so it can be tested) ---------- */
+export type CropInput = { imgW: number; imgH: number; boxW: number; boxH: number; zoom: number; offsetX: number; offsetY: number };
+
+/** Scale at which the whole image just covers the crop box. */
+export function coverScale(imgW: number, imgH: number, boxW: number, boxH: number): number {
+  return Math.max(boxW / imgW, boxH / imgH);
+}
+
+/** Keeps the picture covering the box: the offset (image centre relative to box centre, in screen px) can never reveal empty space. */
+export function clampOffset(c: CropInput): { x: number; y: number } {
+  const s = coverScale(c.imgW, c.imgH, c.boxW, c.boxH) * Math.max(1, c.zoom);
+  const maxX = Math.max(0, (c.imgW * s - c.boxW) / 2), maxY = Math.max(0, (c.imgH * s - c.boxH) / 2);
+  return { x: Math.min(maxX, Math.max(-maxX, c.offsetX)), y: Math.min(maxY, Math.max(-maxY, c.offsetY)) };
+}
+
+/** The part of the original picture (in its own pixels) that the crop box is showing. */
+export function cropRect(c: CropInput): { sx: number; sy: number; sw: number; sh: number } {
+  const s = coverScale(c.imgW, c.imgH, c.boxW, c.boxH) * Math.max(1, c.zoom);
+  const { x, y } = clampOffset(c);
+  const sw = c.boxW / s, sh = c.boxH / s;
+  const cx = c.imgW / 2 - x / s, cy = c.imgH / 2 - y / s;
+  return { sx: Math.min(c.imgW - sw, Math.max(0, cx - sw / 2)), sy: Math.min(c.imgH - sh, Math.max(0, cy - sh / 2)), sw, sh };
+}
+
+/** Largest size with the same shape that fits in `max` on its long edge (never upscales). */
+export function fitWithin(w: number, h: number, max: number): { w: number; h: number } {
+  const k = Math.min(1, max / Math.max(w, h));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}

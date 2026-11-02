@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, RankChart } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
+import { PhotoUploader } from "../../../../components/PhotoUploader";
 import { inClub, requireRole } from "../../../../lib/context";
 import { ageOf, listMembers, memberStats, ratingHistory } from "../../../../lib/queries";
 
@@ -36,10 +37,11 @@ export default async function Member({ params }: { params: Promise<{ id: string 
         <MetricCard label="Win rate" value={r.played ? `${r.winPct}%` : "—"} />
         <MetricCard label="Streak" value={streakLabel(r.streak)} />
       </MetricGrid>
+      <Panel title="Picture"><PhotoUploader kind="member" membershipId={p.id} name={p.name} current={p.photo} label={`${p.name.split(" ")[0]}’s picture`} shape="person" /></Panel>
       {history.length >= 2 ? (
         <Panel title="Rating over time">
           <RankChart invert caption={`${p.name} rating after each match (higher is better)`} years={history.map((_, i) => String(i + 1))}
-            series={[{ label: "Rating", color: "#1450c8", points: history.map((h) => h.after) }]} />
+            series={[{ label: "Rating", color: "#1b6fe0", points: history.map((h) => h.after) }]} />
         </Panel>
       ) : <p className="rx-muted" style={{ marginTop: 16 }}>History appears after this player’s first two rated matches.</p>}
     </PageShell>

@@ -464,3 +464,54 @@ describe("dues reminders", () => {
     expect(t.subject).toContain("{{timing}}"); expect(t.body).toContain("{{pay_link}}");
   });
 });
+
+describe("picture uploads", () => {
+  const p1 = () => ({ userId: "playerA1", clubId: ids.A });
+  beforeAll(async () => { // members created directly by the test setup have no profile row yet
+    await svc.execute(sql`insert into player_profiles (membership_id, club_id) values (${ids.mP1}, ${ids.A}), (${ids.mP2}, ${ids.A}) on conflict (membership_id) do nothing`);
+  });
+  const setPhoto = (ctx: { userId: string; clubId: string }, membership: string, url: string | null) =>
+    withTenant(app, ctx, (tx) => tx.execute(sql`update player_profiles set photo_url = ${url} where membership_id = ${membership} returning membership_id`));
+  const photoOf = async (membership: string) => ((await svc.execute(sql`select photo_url from player_profiles where membership_id = ${membership}`)).rows[0] as { photo_url: string | null }).photo_url;
+
+  it("a player can set their own photo but not another player's", async () => {
+    expect((await setPhoto(p1(), ids.mP1, "https://cdn.example/a.webp")).rows).toHaveLength(1);
+    expect(await photoOf(ids.mP1)).toBe("https://cdn.example/a.webp");
+    expect((await setPhoto(p1(), ids.mP2, "https://cdn.example/evil.webp")).rows).toHaveLength(0); // row-level security hides it, so nothing updates
+    expect(await photoOf(ids.mP2)).not.toBe("https://cdn.example/evil.webp");
+  });
+  it("a club admin can set any member's photo in their own club, and an admin of another club cannot", async () => {
+    expect((await setPhoto({ userId: "adminA", clubId: ids.A }, ids.mP2, "https://cdn.example/b.webp")).rows).toHaveLength(1);
+    expect((await setPhoto({ userId: "adminB", clubId: ids.B }, ids.mP2, "https://cdn.example/x.webp")).rows).toHaveLength(0);
+    expect((await setPhoto({ userId: "adminB", clubId: ids.A }, ids.mP2, "https://cdn.example/x.webp")).rows).toHaveLength(0); // claiming club A does not help
+    expect(await photoOf(ids.mP2)).toBe("https://cdn.example/b.webp");
+  });
+  it("picture addresses must be web addresses or local paths, never javascript: or data:", async () => {
+    for (const bad of ["javascript:alert(1)", "data:text/html;base64,AAAA", "ftp://x/y.png", "//cdn.example/a.png"]) {
+      expect(await denied(setPhoto(p1(), ids.mP1, bad)), bad).toBe("23514");
+    }
+    expect((await setPhoto(p1(), ids.mP1, "/players/ade.png")).rows).toHaveLength(1);
+    expect((await setPhoto(p1(), ids.mP1, null)).rows).toHaveLength(1);
+  });
+  it("only a club's admins can change its logo and cover", async () => {
+    const setClub = (ctx: { userId: string; clubId: string }, col: "logo_url" | "cover_url", url: string) =>
+      withTenant(app, ctx, (tx) => tx.execute(sql.raw(`update clubs set ${col} = '${url}' where id = '${ids.A}' returning id`)));
+    expect((await setClub({ userId: "adminA", clubId: ids.A }, "cover_url", "https://cdn.example/cover.webp")).rows).toHaveLength(1);
+    expect((await setClub({ userId: "adminA", clubId: ids.A }, "logo_url", "https://cdn.example/logo.webp")).rows).toHaveLength(1);
+    expect((await setClub({ userId: "playerA1", clubId: ids.A }, "cover_url", "https://cdn.example/x.webp")).rows).toHaveLength(0);
+    expect((await setClub({ userId: "adminB", clubId: ids.B }, "cover_url", "https://cdn.example/x.webp")).rows).toHaveLength(0);
+    const back = (await svc.execute(sql`select cover_url, logo_url from clubs where id = ${ids.A}`)).rows[0] as Record<string, string>;
+    expect(back).toEqual({ cover_url: "https://cdn.example/cover.webp", logo_url: "https://cdn.example/logo.webp" });
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set cover_url = 'javascript:x' where id = ${ids.A}`)))).toBe("23514");
+  });
+  it("a member of another club cannot read this club's cover through the clubs table", async () => {
+    const r = await rows(app, { userId: "adminB", clubId: ids.B }, sql`select cover_url from clubs where id = ${ids.A}`);
+    expect(r).toHaveLength(0);
+  });
+  it("the app role can neither read nor write the upload log", async () => {
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`select * from upload_log`)))).toBe("42501");
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into upload_log (user_id, kind, bytes) values ('playerA1', 'person', 1)`)))).toBe("42501");
+    await svc.execute(sql`insert into upload_log (user_id, club_id, kind, bytes) values ('playerA1', ${ids.A}, 'person', 1234)`);
+    expect(await denied(svc.execute(sql`insert into upload_log (user_id, kind, bytes) values ('playerA1', 'video', 1)`))).toBe("23514");
+  });
+});

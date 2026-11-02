@@ -9,7 +9,7 @@ export function ClubSwitcher({ user, clubs, current, blocked }: { user: { name: 
   const cur = clubs.find((c) => c.id === current) ?? clubs[0]!;
   return (
     <>
-      <AppHeader clubName={cur.name} clubLogo={cur.logo ?? undefined} userName={user.name} userPhoto={user.image ?? undefined} onClubClick={() => setOpen(true)} />
+      <AppHeader clubName={cur.name} clubLogo={cur.logo ?? undefined} userName={user.name} userPhoto={user.image ?? undefined} onClubClick={() => setOpen(true)} bellHref="/activity" />
       <Sheet open={open} onClose={() => setOpen(false)} title="Your clubs">
         {/* Plain links on purpose: next/link would prefetch /switch and change the active club by itself. */}
         <ListGroup bare label="Your clubs">

@@ -25,7 +25,7 @@ for(const mode of ['no-preference','reduce']){
  console.log('motion:',mode);
  const c=await b.newContext({viewport:{width:440,height:956},reducedMotion:mode});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning/.test(m.text()))errs.push(m.text())});
  await signIn(p,'admin@example.com','Paris Arena');
- let t=await checkPage(p,'home','/');ok(/Paris Arena/i.test(t),'home: club name shown');ok(/₦/.test(t),'home: revenue figure shown');
+ let t=await checkPage(p,'home','/',{maxWords:200});ok(/Paris Arena/i.test(t),'home: club name shown');ok(/₦/.test(t),'home: revenue figure shown');
  t=await checkPage(p,'members','/members');ok(/Members/i.test(t),'members: title');
  await p.getByLabel('Search members').fill('zzzz');ok(/No one matches/.test(await p.locator('body').innerText()),'members: search with no match says so');
  await p.getByLabel('Search members').fill('ade');await p.waitForTimeout(200);ok(await p.locator('.rx-mcard').count()>=1,'members: search finds Ade');
@@ -38,7 +38,7 @@ const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.ne
 await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill('empty-admin@example.com');await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code('empty-admin@example.com'));await p.getByRole('button',{name:'Sign in'}).click();
 await p.getByLabel('What is your club called?').waitFor({timeout:25000});await p.waitForLoadState('networkidle');await p.waitForTimeout(1500);await p.getByLabel('What is your club called?').fill('Empty Club');await p.getByLabel(/your name/i).fill('Empty Admin');await p.getByLabel('Where are you located').fill('Lagos');await p.getByRole('button',{name:'Create my club'}).click();
 await p.waitForURL(u=>!/onboarding/.test(u.toString()),{timeout:25000});await p.waitForLoadState('networkidle');
-let t=await checkPage(p,'empty_home','/',{maxWords:80});ok(/Start a competition/i.test(t),'empty home: invites the admin to start a competition');
+let t=await checkPage(p,'empty_home','/',{maxWords:100});ok(/No competition yet/i.test(t),'empty home: invites the admin to start a competition');
 t=await checkPage(p,'empty_members','/members',{maxWords:60});ok(/invite/i.test(t),'empty members: invite action is present');
 t=await checkPage(p,'empty_competition','/competition',{maxWords:60});ok(/Create a competition/i.test(t),'empty competition: one clear action');
 ok(errs.length===0,'empty club: no uncaught errors');

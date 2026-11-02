@@ -1,0 +1,3 @@
+ALTER TABLE "clubs" ADD CONSTRAINT "clubs_logo_url" CHECK ("clubs"."logo_url" IS NULL OR "clubs"."logo_url" ~ '^(https://[^ ]+|/[^/ ][^ ]*)$');--> statement-breakpoint
+ALTER TABLE "clubs" ADD CONSTRAINT "clubs_cover_url" CHECK ("clubs"."cover_url" IS NULL OR "clubs"."cover_url" ~ '^(https://[^ ]+|/[^/ ][^ ]*)$');--> statement-breakpoint
+ALTER TABLE "player_profiles" ADD CONSTRAINT "player_profiles_photo_url" CHECK ("player_profiles"."photo_url" IS NULL OR "player_profiles"."photo_url" ~ '^(https://[^ ]+|/[^/ ][^ ]*)$');

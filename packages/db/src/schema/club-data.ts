@@ -25,6 +25,8 @@ export const playerProfiles = pgTable("player_profiles", {
 }, (t) => [
   foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "player_profiles_membership_fk" }).onDelete("cascade"),
   check("player_profiles_height", sql`${t.heightCm} IS NULL OR ${t.heightCm} BETWEEN 80 AND 260`),
+  // A picture address must be a web address or one of our own paths, never javascript: or data: (it ends up in <img src>).
+  check("player_profiles_photo_url", sql`${t.photoUrl} IS NULL OR ${t.photoUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
 ]);
 
 export const plans = pgTable("plans", {

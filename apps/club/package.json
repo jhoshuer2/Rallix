@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
     "@rallix/config": "workspace:*",
     "@rallix/db": "workspace:*",
     "@rallix/mailer": "workspace:*",
+    "@rallix/media": "workspace:*",
     "@rallix/payments": "workspace:*",
     "@rallix/stats": "workspace:*",
     "@rallix/ui": "workspace:*",
@@ -20,7 +22,8 @@
     "next": "^15.5.0",
     "pg": "^8.23.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

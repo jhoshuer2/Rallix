@@ -12,6 +12,8 @@ export const clubs = pgTable("clubs", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   logoUrl: text("logo_url"),
+  /** Wide banner picture. Uploaded by a club admin; app-role writes are limited to admins by the clubs_update policy. */
+  coverUrl: text("cover_url"),
   location: text("location"),
   timezone: text("timezone").notNull().default("Africa/Lagos"),
   status: clubStatus("status").notNull().default("active"),
@@ -32,6 +34,8 @@ export const clubs = pgTable("clubs", {
   check("clubs_payouts_need_subaccount", sql`${t.payoutsEnabledAt} IS NULL OR ${t.paystackSubaccountCode} IS NOT NULL`),
   // Slug becomes the subdomain, so keep it DNS-safe.
   check("clubs_slug_format", sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$'`),
+  check("clubs_logo_url", sql`${t.logoUrl} IS NULL OR ${t.logoUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
+  check("clubs_cover_url", sql`${t.coverUrl} IS NULL OR ${t.coverUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
 ]);
 
 /** A user's identity inside one club. All club data points at memberships.id, never users.id. */

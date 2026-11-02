@@ -6,6 +6,7 @@ import { ageOf, listMembers } from "../../../../lib/queries";
 import { ContactForm } from "../../../../components/ContactForm";
 import { ownEmailOptOut, ownPhone } from "../../../../lib/contact";
 import { EmailPrefs } from "../../../../components/EmailPrefs";
+import { PhotoUploader } from "../../../../components/PhotoUploader";
 
 export default async function Me() {
   const ctx = await requireClub();
@@ -17,6 +18,7 @@ export default async function Me() {
       <ListGroup>
         <ListRow media={<Photo src={mine?.photo ?? ctx.user.image} name={ctx.user.name} alt="" />} title={ctx.user.name} subtitle={facts} trailing={mine ? <Pill tone="warning">{mine.level}</Pill> : undefined} />
       </ListGroup>
+      <Panel title="Your picture"><PhotoUploader kind="me" name={ctx.user.name} current={mine?.photo ?? null} label="Profile picture" shape="person" /></Panel>
       <ListGroup label="Payments">
         <ListRow media={<IconBadge icon="wallet" />} title="Payments" subtitle="Dues, receipts and history" href="/play/me/payments" linkAs={Link} />
       </ListGroup>

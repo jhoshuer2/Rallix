@@ -37,3 +37,26 @@ Never set `MAIL_FAIL_ADDRESSES` or `PAYMENTS_PROVIDER=fake` in production (the a
 - Paystack dashboard: webhook URL `https://<club host>/api/webhooks/paystack`.
 - Run `pnpm --filter @rallix/payments smoke` with a TEST key, and `pnpm --filter @rallix/mailer send-test you@example.com`.
 - Grant yourself console access: `pnpm --filter @rallix/db make-platform-admin you@example.com "Name"`.
+
+
+## 6. Pictures (profile photos, club logo and cover)
+Pictures are stored in a public Supabase Storage bucket. The app re-encodes every upload on the server (JPEG, PNG or WebP only, location data removed, resized to WebP) before saving. Dashboard labels may differ slightly from these names.
+
+1. **Apply the new database changes** (new `cover_url` column, upload log, address checks). On your Mac, in the repo folder, with the same three `export` lines as in section 1:
+   ```bash
+   packages/db/scripts/supabase-migrate.sh
+   ```
+2. **Create the bucket:** Supabase → Storage → New bucket → name `rallix-media` → turn **Public bucket** on.
+3. **Create a storage-only access key:** Supabase → Storage → S3 Connection (or Settings → Storage → S3) → New access key. Copy the access key ID and secret now (the secret is shown once). Note the **endpoint** and **region** shown on that page. This key can only reach Storage, never your database.
+4. **Set these variables on the club project in Vercel** (Production), then redeploy:
+   | Variable | Value |
+   |---|---|
+   | `STORAGE_PROVIDER` | `supabase` |
+   | `S3_ENDPOINT` | `https://<project-ref>.storage.supabase.co/storage/v1/s3` (as shown on the S3 page) |
+   | `S3_REGION` | the region shown on that page, e.g. `eu-west-1` |
+   | `S3_BUCKET` | `rallix-media` |
+   | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | the key from step 3 |
+   | `MEDIA_PUBLIC_BASE` | `https://<project-ref>.supabase.co/storage/v1/object/public/rallix-media` |
+5. **Check it:** sign in, open Me, tap "Add a picture", choose a photo and tap "Use picture". Then open the picture's address in a new tab: it must load. If the page says "Picture storage is not configured", a variable above is missing.
+
+Limits: 4 MB per file at the server (the browser shrinks photos to under 1.5 MB first), 20 uploads per person per day (`UPLOAD_LIMIT_PER_DAY` to change).

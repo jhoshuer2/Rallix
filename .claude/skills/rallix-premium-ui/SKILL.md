@@ -45,16 +45,18 @@ Hero pieces (one per screen): `HeroMatch` (player), `ClubBanner` (admin), the re
 - Local helper components that style a card inside a page file. Add it to `packages/ui` and to `/kit` first.
 
 ## Type
-- **Newsreader** (serif): page titles, section titles, hero names and big numbers. Sentence case, regular weight, never bold or italic.
-- **Spotlight**: big score numerals only (`--rx-font-score`).
+- **Barlow Condensed** (700, uppercase titles): page titles, section titles, hero names, big numbers and scores. Body stays General Sans.
+- Numbers use tabular figures; scores use `--rx-font-score` (also Barlow Condensed).
 - **General Sans**: everything else, sentence case. Card titles 17px 600. Body 16px minimum, captions 13px, never below 12. Small category labels (`eyebrow`) are 12px bold uppercase blue.
 - No all-caps paragraphs.
 
 ## Colour
-- Blue `#1450C8` (table-tennis-table blue: hero block, buttons, active tab, section titles), night `#081235` (dark bands, scoring), canvas `#F1F3F8`, white surface, line `#DFE3EE`, ink navy `#0B1B4D` (never pure black), secondary text `--rx-ink-3`. Rust is only an accent on old blue-screen pieces. Primary buttons are blue (`--rx-action`).
+- Blue `#1B6FE0` (table-tennis-table blue: hero block, buttons, active tab, section titles), night `#081235` (dark bands, scoring), canvas `#F1F3F8`, white surface, line `#DFE3EE`, ink navy `#0B1B4D` (never pure black), secondary text `--rx-ink-3`. Rust is only an accent on old blue-screen pieces. Primary buttons are blue (`--rx-action`).
 - Green, orange, red only to say good, warning, bad or live. Never colour alone: add text or an icon.
 
 ## Pictures and placeholders
+Where a person or club can change a picture, use `PhotoUploader` (`apps/club/components`): current picture + "Change picture" button, a light sheet with Take a photo / Choose from library / Remove, then a drag-and-zoom crop. Never build a custom file input.
+
 Every picture slot uses `Photo` (`kind` person, club, cover). With no upload it shows a designed placeholder: brand gradient from the name, initials or the ball motif. Never a grey box, a broken image or empty space. Pass `alt=""` when the name is written next to it.
 
 ## Icons

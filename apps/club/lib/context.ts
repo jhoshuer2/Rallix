@@ -7,7 +7,7 @@ import { auth } from "./auth";
 import { appDb } from "./db";
 
 export type Role = "admin" | "scorer" | "coach" | "player";
-export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; roles: Role[] };
+export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null; roles: Role[] };
 export type BlockedClub = { name: string; status: "suspended" | "closed" };
 export type Ctx = { user: { id: string; name: string; email: string; image: string | null }; needsName: boolean; clubs: MyClub[]; club: MyClub | null; blocked: BlockedClub[] };
 
@@ -23,7 +23,7 @@ export const getCtx = cache(async (): Promise<Ctx | null> => {
   const user = await getSessionUser();
   if (!user) return null;
   const { rows, blocked } = await withTenant(appDb(), { userId: user.id }, async (tx) => ({
-    rows: await tx.select({ clubId: clubs.id, membershipId: memberships.id, name: clubs.name, slug: clubs.slug, logoUrl: clubs.logoUrl, roles: memberships.roles })
+    rows: await tx.select({ clubId: clubs.id, membershipId: memberships.id, name: clubs.name, slug: clubs.slug, logoUrl: clubs.logoUrl, coverUrl: clubs.coverUrl, roles: memberships.roles })
       .from(memberships).innerJoin(clubs, eq(clubs.id, memberships.clubId))
       .where(and(eq(memberships.userId, user.id), eq(memberships.status, "active")))
       .orderBy(clubs.name),

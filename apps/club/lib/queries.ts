@@ -128,3 +128,17 @@ export const naira = (kobo: number) => `₦${(kobo / 100).toLocaleString("en-NG"
 
 /** "28 Nov 2026" from a YYYY-MM-DD string or Date. */
 export const fmtDate = (d: string | Date) => (typeof d === "string" ? new Date(`${d}T12:00:00`) : d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+
+/** Registered players per competition (admin home cards). */
+export async function entryCounts(tx: Tx, clubId: string): Promise<Record<string, number>> {
+  const rows = await tx.select({ id: competitionEntries.competitionId, n: sql<number>`count(*)` }).from(competitionEntries)
+    .where(eq(competitionEntries.clubId, clubId)).groupBy(competitionEntries.competitionId);
+  return Object.fromEntries(rows.map((r) => [r.id, Number(r.n)]));
+}
+
+/** Latest paid payments with the payer's name (admin activity feed). */
+export async function recentPayments(tx: Tx, clubId: string, limit = 8) {
+  return tx.select({ id: payments.id, amountKobo: payments.amountKobo, paidAt: payments.paidAt, name: users.name })
+    .from(payments).innerJoin(memberships, eq(memberships.id, payments.membershipId)).innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(payments.clubId, clubId), eq(payments.status, "paid"))).orderBy(desc(payments.paidAt)).limit(limit);
+}

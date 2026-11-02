@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Carousel, Celebrations, HeroMatch, MediaCard, MetricCard, MetricGrid, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, Pill, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
@@ -21,29 +21,29 @@ export default async function PlayerHome() {
     stats: await memberStats(tx, ctx.club.clubId, me),
     members: await listMembers(tx, ctx.club.clubId),
     comps: await listCompetitions(tx, ctx.club.clubId, me),
+    allComps: await listCompetitions(tx, ctx.club.clubId),
   }));
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
   const celebs = celebrations(d.members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
   const done = d.clubMatches.filter(isDone).sort(byRecent).slice(0, 8);
   const stories = buildStories(d.clubMatches, (m) => `/play/compete/${m.competitionId}`, "See the draw");
-  const hero = mineAll.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2)
-    .sort((a, b) => (a.status === "live" ? -1 : 0) - (b.status === "live" ? -1 : 0) || (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity))[0];
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
   const mine = d.members.find((m) => m.id === me);
   const r = d.stats.record;
   const myDone = mineAll.filter(isDone).sort(byRecent).slice(0, 8);
   const results = myDone.length ? myDone : done;
-  const active = d.comps.filter((c) => c.status === "active");
+  const upcoming = d.allComps.filter((c) => c.status === "active" || c.status === "draft").slice(0, 8);
+  const top5 = d.members.slice(0, 5);
+  const lastWin = done[0] ? (winnerSide(done[0]) === "a" ? done[0].p1 : done[0].p2) : null;
+  const lastWinner = lastWin ? d.members.find((m) => m.id === lastWin.id) ?? null : null;
+  const next = mineAll.filter((m) => (m.status === "scheduled" || m.status === "live") && m.p1 && m.p2)
+    .sort((a, b) => (a.status === "live" ? -1 : 0) - (b.status === "live" ? -1 : 0) || (a.scheduledAt?.getTime() ?? Infinity) - (b.scheduledAt?.getTime() ?? Infinity)).slice(0, 8);
   const dueDay = due ? dayLabel(new Date(`${due.dueDate}T12:00:00`)) : "";
 
+  const vs = (m: (typeof next)[number]) => `${first(m.p1!.id === me ? m.p2!.name : m.p1!.name)}`;
   return (
-    <PageShell home header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={<Stories items={stories} label="Match highlights" />}
-      lead={hero ? (
-        <HeroMatch competition={hero.competitionName} whenLabel={when(hero.scheduledAt)} startsAt={hero.status === "live" ? null : hero.scheduledAt} live={hero.status === "live"}
-          a={hero.p1!} b={hero.p2!} scoreA={hero.status === "live" ? hero.gamesP1 : null} scoreB={hero.status === "live" ? hero.gamesP2 : null}
-          href={`/play/compete/${hero.competitionId}`} linkAs={Link} cta={hero.status === "live" ? "Follow live" : "Match details"} />
-      ) : null}>
+    <PageShell home header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={<Stories items={stories} label="Match highlights" />}>
       {due ? (
         <div className="rx-duebar" role="status">
           <p>{naira(due.amountKobo)} {due.status === "overdue" ? "overdue" : `due ${dueDay}`}</p>
@@ -51,38 +51,62 @@ export default async function PlayerHome() {
         </div>
       ) : null}
 
-      {celebs.length ? (
-        <>
-          <SectionTitle title="Celebrations" />
-          <Celebrations items={celebs} />
-        </>
-      ) : null}
-
-      <SectionTitle title="My standing" href="/play/stats" linkAs={Link} label="See my stats" />
-      <MetricGrid>
-        <MetricCard label="Club rank" value={mine ? `#${mine.rank}` : "—"} hint={mine ? `Rating ${mine.rating}` : undefined} />
+      <SectionTitle title="My performance" href="/play/stats" linkAs={Link} label="See my stats" />
+      <MetricGrid kpi>
+        <MetricCard label="Ranking" value={mine ? `#${mine.rank}` : "—"} hint={mine ? `of ${d.members.length}` : undefined} />
+        <MetricCard label="Rating" value={mine ? String(mine.rating) : "—"} hint="points" />
         <MetricCard label="Win rate" value={r.played ? `${r.winPct}%` : "—"} hint={r.played ? `Streak: ${streakLabel(r.streak)}` : undefined} tone={r.played && r.winPct >= 50 ? "good" : undefined} />
       </MetricGrid>
 
+      {next.length ? (
+        <>
+          <SectionTitle title="Upcoming matches" href="/play/compete" linkAs={Link} label="See all competitions" />
+          <Carousel label="Upcoming matches">
+            {next.map((m) => <MediaCard key={m.id} name={`vs ${vs(m)}`} detail={`${m.competitionName} · ${m.status === "live" ? "Live now" : when(m.scheduledAt)}`} tag={m.status === "live" ? "Live" : "Next"} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
+          </Carousel>
+        </>
+      ) : null}
+
       {results.length ? (
         <>
-          <SectionTitle title={myDone.length ? "My results" : "Latest results"} href="/play/compete" linkAs={Link} label="See all competitions" />
+          <SectionTitle title="Latest results" href="/play/compete" linkAs={Link} label="See all competitions" />
           <Carousel label="Recent results">
             {results.map((m) => <ResultCard key={m.id} a={m.p1!} b={m.p2!} scoreA={m.gamesP1} scoreB={m.gamesP2} winner={winnerSide(m)} competition={m.competitionName} when={dayLabel(m.confirmedAt)} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
           </Carousel>
         </>
       ) : null}
 
-      {active.length ? (
+      {top5.length ? (
         <>
-          <SectionTitle title="My competitions" href="/play/compete" linkAs={Link} label="See all competitions" />
-          <Carousel label="My competitions">
-            {active.map((c) => <MediaCard key={c.id} name={c.name} detail={c.level ?? "In progress"} tag="Active" href={`/play/compete/${c.id}`} linkAs={Link} />)}
+          <SectionTitle title="Leaderboard" href="/play/ranks" linkAs={Link} label="See the full leaderboard" />
+          <ListGroup label="Top five players">
+            {top5.map((m) => <ListRow key={m.id} media={<Photo src={m.photo} name={m.name} alt="" />} eyebrow={`#${m.rank}`} title={m.id === me ? `${m.name} (you)` : m.name} subtitle={`Rating ${m.rating}`} current={m.id === me} href="/play/ranks" linkAs={Link} />)}
+          </ListGroup>
+        </>
+      ) : null}
+
+      {upcoming.length ? (
+        <>
+          <SectionTitle title="Upcoming competitions" href="/play/compete" linkAs={Link} label="See all competitions" />
+          <Carousel label="Upcoming competitions">
+            {upcoming.map((c) => <MediaCard key={c.id} name={c.name} detail={c.startsOn ? `Starts ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.status === "active" ? "Active" : "Soon"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
           </Carousel>
         </>
       ) : null}
 
-      {!hero && results.length === 0 && active.length === 0 ? <p className="rx-muted" style={{ marginTop: 24 }}>Nothing on yet. When your club schedules matches, they show up here.</p> : null}
+      {celebs.length || lastWinner ? (
+        <>
+          <SectionTitle title="Club updates" />
+          {celebs.length ? <Celebrations items={celebs} /> : null}
+          {lastWinner ? (
+            <ListGroup label="Featured player">
+              <ListRow media={<Photo src={lastWinner.photo} name={lastWinner.name} alt="" />} eyebrow="Featured player" title={lastWinner.name} subtitle={`Won the latest result · rating ${lastWinner.rating}`} trailing={<Pill tone="success">Winner</Pill>} />
+            </ListGroup>
+          ) : null}
+        </>
+      ) : null}
+
+      {!next.length && results.length === 0 && upcoming.length === 0 ? <p className="rx-muted" style={{ marginTop: 24 }}>Nothing on yet. When your club schedules matches, they show up here.</p> : null}
     </PageShell>
   );
 }

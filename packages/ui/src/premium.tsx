@@ -108,9 +108,11 @@ export function Skeleton({ w = "100%", h = 16, round, className }: { w?: number 
 
 /* ---------- Admin: club hero, attention tiles, actions, tiles ---------- */
 /** Admin hero on the blue block: the club's logo and name, this month's revenue as the one big number, members count. */
-export function ClubBanner({ name, logo, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; figure: string; figureLabel: string; members: number; membersLabel?: string }) {
+export function ClubBanner({ name, logo, cover, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; /** Optional wide picture shown behind the club details. */ cover?: string | null; figure: string; figureLabel: string; members: number; membersLabel?: string }) {
+  // Only plain web addresses or local paths go into CSS (the database enforces this too).
+  const bg = cover && /^(https:\/\/|\/(?!\/))[^"'()\s\\]+$/.test(cover) ? { backgroundImage: `linear-gradient(180deg, rgba(8,18,53,.35), rgba(8,18,53,.78)), url("${cover}")` } : undefined;
   return (
-    <section className="rx-cb" aria-label={`${name} overview`}>
+    <section className={cx("rx-cb", bg && "rx-cb--cover")} style={bg} aria-label={`${name} overview`}>
       <div className="rx-cb__head"><Photo src={logo} name={name} kind="club" alt={`${name} logo`} className="rx-cb__logo" /><p className="rx-cb__name">{name}</p></div>
       <div className="rx-cb__stats">
         <div><p className="rx-cb__figure">{figure}</p><p className="rx-cb__label">{figureLabel}</p></div>
@@ -231,7 +233,7 @@ export function MetricCard({ label, value, hint, tone }: { label: string; value:
     </div>
   );
 }
-export const MetricGrid = ({ children }: { children: ReactNode }) => <div className="rx-metricgrid">{children}</div>;
+export const MetricGrid = ({ children, kpi }: { children: ReactNode; kpi?: boolean }) => <div className={cx("rx-metricgrid", kpi && "rx-metricgrid--kpi")}>{children}</div>;
 
 /** One small status pill, four tones. The only badge style in the app. */
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "live" }) {
@@ -289,3 +291,19 @@ export function CheckRow({ media, title, subtitle, checked, onChange }: { media?
 
 /** Buttons that belong to the row above (for example "Paid cash" under an unpaid due). Sits inside a ListGroup. */
 export const ListActions = ({ children }: { children: ReactNode }) => <div className="rx-lactions">{children}</div>;
+
+
+/** One stacked bar with a legend: parts add up to the whole. Used for membership status. */
+export function StackedBar({ parts, label }: { parts: Array<{ label: string; value: number; tone: "good" | "warn" | "bad" }>; label: string }) {
+  const total = parts.reduce((a, p) => a + p.value, 0);
+  return (
+    <div className="rx-sbar">
+      <div className="rx-sbar__track" role="img" aria-label={`${label}: ${parts.map((p) => `${p.value} ${p.label}`).join(", ")}`}>
+        {total ? parts.filter((p) => p.value > 0).map((p) => <span key={p.label} className={`rx-sbar__part rx-sbar__part--${p.tone}`} style={{ flexGrow: p.value }} />) : null}
+      </div>
+      <ul className="rx-sbar__legend">
+        {parts.map((p) => <li key={p.label}><span className={`rx-sbar__dot rx-sbar__part--${p.tone}`} aria-hidden="true" /><b>{p.value}</b> {p.label}</li>)}
+      </ul>
+    </div>
+  );
+}

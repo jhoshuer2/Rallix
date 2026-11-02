@@ -8,7 +8,7 @@ Mobile-first PWA for table tennis clubs in Nigeria. Slack-style multi-tenancy: o
 - `packages/ui`: design tokens, fonts, shared components. `packages/db`, `stats`, `payments`, `mailer`, `config`
 - `design/admin-screens/`: source design frames (440x956 SVG, club admin side). Text is outlined, so render to PNG to read them.
 
-Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), General Sans Variable (body). Files go in `packages/ui/fonts/`.
+Tokens live in `packages/ui/src/tokens.css`. Fonts: Barlow Condensed 600/700 (headlines, big numbers, scores), General Sans Variable (body). Files go in `packages/ui/fonts/`.
 
 ## Stack
 - Next.js (App Router, TypeScript), PWA via serwist
@@ -72,6 +72,16 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Opt-out: `users.email_opt_out`. Every reminder carries a signed one-click unsubscribe link (`@rallix/mailer` `signUnsubscribeToken`, `List-Unsubscribe` headers). GET only shows a confirm page; POST acts. Players also have a switch on their Me page. The console's optional broadcasts honour it too.
 - `UNSUBSCRIBE_SECRET` must be identical in both apps; `CRON_SECRET` is only needed by the club app. Test: `apps/club/e2e/reminders.cjs` (needs both apps).
 
+## Home screens
+- Player home (`(player)/play/page.tsx`): header, My performance, Upcoming matches, Latest results, Top 5, Upcoming competitions, Club updates. Admin home (`(admin)/page.tsx`): overview KPIs, quick actions, competitions with registrations, membership overview, activity, top players. Pure helpers `membershipOverview` and `mergeActivity` live in `packages/stats/src/overview.ts`. The bell opens `/activity`, derived from real records (no unread counts).
+
+## Pictures (`packages/media`, `apps/club/lib/media*.ts`, `components/PhotoUploader.tsx`)
+- Every upload goes through `uploadPhoto` / `removePhoto` (`lib/media-actions.ts`) and `applyUpload` in `lib/media-core.ts`: authorise with `authorizeTarget` (player: own photo only; admin: any member and the club logo and cover), rate limit from `upload_log` (service-only), `processImage` (sharp: JPEG/PNG/WebP only, EXIF and GPS stripped, resized to WebP; SVG, GIF, HEIC refused), `store.put`, then the DB write runs AS THE USER so row-level security is a second lock, then best-effort delete of the old object (only our own keys, only in this club).
+- Keys are `clubs/{clubId}/{people|logo|cover}/{uuid}.webp` (never user filenames). Stores: `LocalStore` (dev and tests, served by `app/media/[...key]/route.ts`, 404 in production) and `S3Store` (Supabase Storage). `createStore` refuses local in production. Config: `STORAGE_PROVIDER`, `S3_*`, `MEDIA_PUBLIC_BASE`, `UPLOAD_LIMIT_PER_DAY` (see `DEPLOY.md` section 6).
+- `photo_url`, `logo_url`, `cover_url` have CHECK constraints: `https://...` or a local `/path` (never `//host`, `javascript:` or `data:`).
+- Do not use `instanceof` on store classes across bundles; compare `store.name`.
+- Tests: `pnpm --filter @rallix/media test`, RLS tests in `packages/db`, crop maths in `packages/ui`, and `apps/club/e2e/uploads.cjs`.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.
@@ -82,7 +92,7 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Spotlight (headings), Genera
 - Meet WCAG 2.1 AA, respect `prefers-reduced-motion`, and keep touch targets at least 44px in the club PWA.
 
 ## Skills
-Project skills live in `.claude/skills/`: `rallix-motion`, `figma-to-code`, `rallix-a11y`, `rallix-premium-ui` (the design system: use it for EVERY club-app screen. `PageShell`/`EntryShell` layouts, six card kinds, serif titles, Hugeicons, table blue `#1450C8`; `/kit` is the living style guide and `packages/ui/src/design-system.test.ts` fails on legacy cards). Also use `design:design-critique`, `design:accessibility-review`, `design:design-handoff`, `design:design-system` and `design:ux-copy`.
+Project skills live in `.claude/skills/`: `rallix-motion`, `figma-to-code`, `rallix-a11y`, `rallix-premium-ui` (the design system: use it for EVERY club-app screen. `PageShell`/`EntryShell` layouts, six card kinds, condensed uppercase titles, Hugeicons, table blue `#1B6FE0`; `/kit` is the living style guide and `packages/ui/src/design-system.test.ts` fails on legacy cards). Also use `design:design-critique`, `design:accessibility-review`, `design:design-handoff`, `design:design-system` and `design:ux-copy`.
 
 ## Phases
 0 design intake and foundation, 1 MVP (clubs, invites, profiles, dues, competitions, scoring, club leaderboard), 2 point-by-point and Elo and global leaderboard, 3 AI video analysis, 4 coach, spectator and inter-club features.

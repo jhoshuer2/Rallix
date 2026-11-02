@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Splash: full blue, serif wordmark, one white button. */
+/** Splash: full blue, condensed wordmark, one white button. */
 export default function Welcome() {
   return (
     <main className="rx-splash">

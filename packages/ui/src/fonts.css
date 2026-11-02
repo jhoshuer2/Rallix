@@ -1,9 +1,7 @@
 /* Fonts (all committed in packages/ui/fonts):
    - General Sans Variable (Fontshare, free): body and UI text.
-   - Newsreader Variable (SIL OFL 1.1): serif for titles, section headings and big names.
-   - Spotlight: big score numerals only (licence held by the owner for web/app use). */
+   - Barlow Condensed 600/700 (SIL OFL 1.1): headlines, big numbers, scores. */
 @font-face { font-family: "General Sans"; src: url("../fonts/GeneralSans-Variable.woff2") format("woff2"); font-weight: 200 700; font-style: normal; font-display: swap; }
 @font-face { font-family: "General Sans"; src: url("../fonts/GeneralSans-VariableItalic.woff2") format("woff2"); font-weight: 200 700; font-style: italic; font-display: swap; }
-@font-face { font-family: "Newsreader"; src: url("../fonts/Newsreader-Variable.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; }
-@font-face { font-family: "Newsreader"; src: url("../fonts/Newsreader-VariableItalic.woff2") format("woff2"); font-weight: 200 800; font-style: italic; font-display: swap; }
-@font-face { font-family: "Spotlight"; src: url("../fonts/Spotlight.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/BarlowCondensed-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("../fonts/BarlowCondensed-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }

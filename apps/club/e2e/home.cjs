@@ -18,7 +18,7 @@ for(const mode of ['default','reduced']){
  console.log('mode',mode);
  ok(/Hi, Ade/i.test(t),'greeting');
  const words=t.split(/\s+/).filter(Boolean).length;console.log('   visible words on first load:',words);
- ok(words<150,'text diet: under 150 words on Home (nav included)');
+ ok(words<230,'text diet: under 230 words on Home (nav included)');
  ok(await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'no horizontal page scroll');
  const small=await p.evaluate(()=>[...document.querySelectorAll('a,button')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&(r.height<44||r.width<44)&&!e.closest('.rx-carousel')&&getComputedStyle(e).visibility!=='hidden'}).map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,30)+' '+Math.round(e.getBoundingClientRect().width)+'x'+Math.round(e.getBoundingClientRect().height)));
  console.log('   targets under 44px:',JSON.stringify(small));

@@ -97,7 +97,7 @@ export function Ball() { return <span className="rx-ball" aria-hidden="true" />;
 
 /* ---------- Members ---------- */
 /* ---------- Header + navigation ---------- */
-export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick, onSearch }: { clubName: string; clubLogo?: string; userName: string; userPhoto?: string; onClubClick?: () => void; onSearch?: () => void }) {
+export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick, bellHref }: { clubName: string; clubLogo?: string; userName: string; userPhoto?: string; onClubClick?: () => void; bellHref?: string }) {
   return (
     <header className="rx-header">
       <button type="button" className="rx-header__club" onClick={onClubClick} aria-label={`Switch club, current: ${clubName}`}>
@@ -106,7 +106,7 @@ export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick
         <Icon name="chevron-down" size={16} />
       </button>
       <span className="rx-header__spacer" />
-      <IconButton icon="search" label="Search" onClick={onSearch} />
+      {bellHref ? <a href={bellHref} className="rx-iconbtn" aria-label="Activity"><Icon name="bell" size={20} /></a> : null}
       <Avatar src={userPhoto} name={userName} large />
     </header>
   );
