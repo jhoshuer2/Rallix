@@ -9,6 +9,9 @@ import { ownEmailOptOut, ownPhone } from "../../../lib/contact";
 import { EmailPrefs } from "../../../components/EmailPrefs";
 import { PhotoUploader } from "../../../components/PhotoUploader";
 import { myPhoto } from "../../../lib/media-queries";
+import { VenueSetup } from "../../../components/VenueSetup";
+import { ArrivalSettings } from "../../../components/ArrivalSettings";
+import { getArrivalSettings, getVenue } from "../../../lib/arrival-queries";
 
 export default async function Profile() {
   const ctx = await requireRole("admin");
@@ -24,6 +27,8 @@ export default async function Profile() {
           <PhotoUploader kind="club-cover" name={ctx.club.name} current={ctx.club.coverUrl} label="Club cover" shape="cover" />
         </div>
       </Panel>
+      <Panel title="Court location"><VenueSetup venue={await inClub(ctx, (tx) => getVenue(tx, ctx.club.clubId))} /></Panel>
+      <Panel title="At the court"><ArrivalSettings initial={await inClub(ctx, (tx) => getArrivalSettings(tx, ctx.club.membershipId))} vapidKey={process.env.VAPID_PUBLIC_KEY ?? null} /></Panel>
       <Panel title="Invite players"><InviteLink clubName={ctx.club.name} initialCode={inv?.code ?? null} /></Panel>
       <Panel title="Contact details"><ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} /></Panel>
       <Panel title="Email"><EmailPrefs optedOut={await ownEmailOptOut(ctx.user.id)} /></Panel>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { check, doublePrecision, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { clubStatus, memberRole, memberStatus, suspensionReason } from "./enums";
 
@@ -15,6 +15,11 @@ export const clubs = pgTable("clubs", {
   /** Wide banner picture. Uploaded by a club admin; app-role writes are limited to admins by the clubs_update policy. */
   coverUrl: text("cover_url"),
   location: text("location"),
+  /* Court location for arrival check-in. Set by a club admin (clubs_update policy). Never stores any player's position. */
+  venueLabel: text("venue_label"),
+  venueLat: doublePrecision("venue_lat"),
+  venueLng: doublePrecision("venue_lng"),
+  venueRadiusM: integer("venue_radius_m").notNull().default(100),
   timezone: text("timezone").notNull().default("Africa/Lagos"),
   status: clubStatus("status").notNull().default("active"),
   /* Why the platform suspended this club. Console-written, service-only: decides whether paying an overdue invoice reactivates it. */
@@ -35,6 +40,8 @@ export const clubs = pgTable("clubs", {
   // Slug becomes the subdomain, so keep it DNS-safe.
   check("clubs_slug_format", sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$'`),
   check("clubs_logo_url", sql`${t.logoUrl} IS NULL OR ${t.logoUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
+  check("clubs_venue_point", sql`(${t.venueLat} IS NULL) = (${t.venueLng} IS NULL) AND (${t.venueLat} IS NULL OR (${t.venueLat} BETWEEN -90 AND 90 AND ${t.venueLng} BETWEEN -180 AND 180))`),
+  check("clubs_venue_radius", sql`${t.venueRadiusM} BETWEEN 25 AND 500`),
   check("clubs_cover_url", sql`${t.coverUrl} IS NULL OR ${t.coverUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
 ]);
 

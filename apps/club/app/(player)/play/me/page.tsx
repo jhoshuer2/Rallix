@@ -7,6 +7,8 @@ import { ContactForm } from "../../../../components/ContactForm";
 import { ownEmailOptOut, ownPhone } from "../../../../lib/contact";
 import { EmailPrefs } from "../../../../components/EmailPrefs";
 import { PhotoUploader } from "../../../../components/PhotoUploader";
+import { ArrivalSettings } from "../../../../components/ArrivalSettings";
+import { getArrivalSettings } from "../../../../lib/arrival-queries";
 
 export default async function Me() {
   const ctx = await requireClub();
@@ -28,6 +30,7 @@ export default async function Me() {
         </ListGroup>
         <p className="rx-muted" style={{ fontSize: 13, margin: "12px 0 0" }}>Your stats and payments are kept separately for each club.</p>
       </Panel>
+      <Panel title="At the court"><ArrivalSettings initial={await inClub(ctx, (tx) => getArrivalSettings(tx, ctx.club.membershipId))} vapidKey={process.env.VAPID_PUBLIC_KEY ?? null} /></Panel>
       <Panel title="Contact details"><ContactForm email={ctx.user.email} phone={await ownPhone(ctx.user.id)} /></Panel>
       <Panel title="Email"><EmailPrefs optedOut={await ownEmailOptOut(ctx.user.id)} /></Panel>
       <a className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 16, boxSizing: "border-box" }} href="/sign-out">Sign out</a>

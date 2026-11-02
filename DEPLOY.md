@@ -62,3 +62,11 @@ Pictures are stored in a public Supabase Storage bucket. The app re-encodes ever
 5. **Check it:** sign in, open Me, tap "Add a picture", choose a photo and tap "Use picture". Then open the picture's address in a new tab: it must load. If the page says "Picture storage is not configured", a variable above is missing.
 
 Limits: 4 MB per file at the server (the browser shrinks photos to under 1.5 MB first), 20 uploads per person per day (`UPLOAD_LIMIT_PER_DAY` to change).
+
+## 7. Lock-screen alerts (arrival check-in)
+1. On your computer run `npx web-push generate-vapid-keys`. It prints a public and a private key.
+2. In the Vercel **club** project add: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (keep it secret), `VAPID_SUBJECT` (`mailto:` plus your email) and `PUSH_PROVIDER=web`. Redeploy.
+3. Run `packages/db/scripts/supabase-migrate.sh` first (migrations 0017 and 0018 add the court location, arrivals and push subscriptions).
+4. Each phone: open the site, install it (iPhone: Share, then Add to Home Screen, and open it from the Home Screen; Android: Install app). Then Me, "At the court": turn on the switches and allow notifications.
+5. Admin: Profile, Court location: stand at the court and tap "Use my current location".
+A web app cannot track location in the background: arrival is a tap on "I've arrived", or automatic only while Rallix is open. Background arrival needs a native app (later).

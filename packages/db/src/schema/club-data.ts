@@ -20,6 +20,10 @@ export const playerProfiles = pgTable("player_profiles", {
   country: text("country").notNull().default("NGR"),
   bio: text("bio"),
   photoUrl: text("photo_url"),
+  /* Arrival check-in, all opt-in and per club. */
+  shareArrival: boolean("share_arrival").notNull().default(false),
+  notifyArrivals: boolean("notify_arrivals").notNull().default(false),
+  autoArrival: boolean("auto_arrival").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
@@ -257,4 +261,22 @@ export const reminderLog = pgTable("reminder_log", {
   unique("reminder_log_due_offset_uq").on(t.dueId, t.offsetDays),
   index("reminder_log_club_idx").on(t.clubId, t.createdAt),
   check("reminder_log_status", sql`${t.status} IN ('sending','sent','failed')`),
+]);
+
+/** When a player says they are at the court. No coordinates are stored, only the time. One open row per member. */
+export const arrivals = pgTable("arrivals", {
+  id: id(),
+  clubId: clubId(),
+  membershipId: uuid("membership_id").notNull(),
+  arrivedAt: timestamp("arrived_at", { withTimezone: true }).notNull().defaultNow(),
+  leftAt: timestamp("left_at", { withTimezone: true }),
+  method: text("method").notNull().default("manual"),
+  /* Set by the service role when other players were alerted; stops repeat alerts within two hours. */
+  alertedAt: timestamp("alerted_at", { withTimezone: true }),
+}, (t) => [
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "arrivals_membership_fk" }).onDelete("cascade"),
+  uniqueIndex("arrivals_one_open").on(t.membershipId).where(sql`${t.leftAt} IS NULL`),
+  index("arrivals_club_idx").on(t.clubId, t.arrivedAt),
+  check("arrivals_method", sql`${t.method} IN ('manual','auto')`),
+  check("arrivals_left_after", sql`${t.leftAt} IS NULL OR ${t.leftAt} >= ${t.arrivedAt}`),
 ]);

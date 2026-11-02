@@ -3,6 +3,8 @@ import { Carousel, Celebrations, EmptyState, ListGroup, ListRow, MediaCard, Metr
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
+import { ArrivalCard } from "../../../components/ArrivalCard";
+import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-queries";
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
@@ -22,6 +24,9 @@ export default async function PlayerHome() {
     members: await listMembers(tx, ctx.club.clubId),
     comps: await listCompetitions(tx, ctx.club.clubId, me),
     allComps: await listCompetitions(tx, ctx.club.clubId),
+    venue: await getVenue(tx, ctx.club.clubId),
+    here: await listHere(tx, ctx.club.clubId),
+    arrival: await getArrivalSettings(tx, me),
   }));
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
@@ -57,6 +62,8 @@ export default async function PlayerHome() {
         <MetricCard label="Rating" value={mine ? String(mine.rating) : "—"} hint="points" />
         <MetricCard label="Win rate" value={r.played ? `${r.winPct}%` : "—"} hint={r.played ? `Streak: ${streakLabel(r.streak)}` : undefined} tone={r.played && r.winPct >= 50 ? "good" : undefined} />
       </MetricGrid>
+
+      {d.venue ? <ArrivalCard venueLabel={d.venue.label} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> : null}
 
       {next.length ? (
         <>

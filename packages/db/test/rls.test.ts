@@ -515,3 +515,51 @@ describe("picture uploads", () => {
     expect(await denied(svc.execute(sql`insert into upload_log (user_id, kind, bytes) values ('playerA1', 'video', 1)`))).toBe("23514");
   });
 });
+
+describe("arrival check-in", () => {
+  const p1 = () => ({ userId: "playerA1", clubId: ids.A });
+  const p2 = () => ({ userId: "playerA2", clubId: ids.A });
+  const arrive = (ctx: { userId: string; clubId: string }, membership: string) =>
+    withTenant(app, ctx, (tx) => tx.execute(sql`insert into arrivals (club_id, membership_id, method) values (${ctx.clubId}, ${membership}, 'manual') returning id`));
+  const leave = (ctx: { userId: string; clubId: string }, membership: string) =>
+    withTenant(app, ctx, (tx) => tx.execute(sql`update arrivals set left_at = now() where membership_id = ${membership} and left_at is null returning id`));
+
+  it("a player can record and close their own arrival only", async () => {
+    expect((await arrive(p1(), ids.mP1)).rows).toHaveLength(1);
+    expect(await denied(arrive(p1(), ids.mP2))).toBe("42501"); // row-level security refuses someone else's identity
+    expect(await denied(arrive(p1(), ids.mP1))).toBe("23505"); // only one open arrival at a time
+    expect((await leave(p2(), ids.mP1)).rows).toHaveLength(0); // cannot close another player's
+    expect((await leave(p1(), ids.mP1)).rows).toHaveLength(1);
+  });
+  it("club members see arrivals in their own club, other clubs do not", async () => {
+    await arrive(p2(), ids.mP2);
+    expect((await rows(app, p1(), sql`select id from arrivals`)).length).toBeGreaterThan(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from arrivals`)).toHaveLength(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.A }, sql`select id from arrivals`)).toHaveLength(0);
+    await leave(p2(), ids.mP2);
+  });
+  it("the app role cannot backdate an arrival or write the alert marker", async () => {
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into arrivals (club_id, membership_id, arrived_at) values (${ids.A}, ${ids.mP1}, now() - interval '3 hours')`)))).toBe("42501");
+    await arrive(p1(), ids.mP1);
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`update arrivals set alerted_at = now() where membership_id = ${ids.mP1}`)))).toBe("42501");
+    await leave(p1(), ids.mP1);
+  });
+  it("only a club's admins can set the court location, and bad values are refused", async () => {
+    const setVenue = (ctx: { userId: string; clubId: string }, lat: number, lng: number) =>
+      withTenant(app, ctx, (tx) => tx.execute(sql`update clubs set venue_lat = ${lat}, venue_lng = ${lng}, venue_label = 'Court' where id = ${ids.A} returning id`));
+    expect((await setVenue({ userId: "adminA", clubId: ids.A }, 9.0765, 7.3986)).rows).toHaveLength(1);
+    expect((await setVenue(p1(), 1, 1)).rows).toHaveLength(0);
+    expect((await setVenue({ userId: "adminB", clubId: ids.B }, 1, 1)).rows).toHaveLength(0);
+    expect(await denied(setVenue({ userId: "adminA", clubId: ids.A }, 91, 7))).toBe("23514");
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set venue_lat = null where id = ${ids.A}`)))).toBe("23514"); // lat without lng
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set venue_radius_m = 5000 where id = ${ids.A}`)))).toBe("23514");
+  });
+  it("a player can switch their own arrival settings but not read push subscriptions", async () => {
+    await svc.execute(sql`insert into player_profiles (membership_id, club_id) values (${ids.mP1}, ${ids.A}) on conflict (membership_id) do nothing`);
+    const r = await withTenant(app, p1(), (tx) => tx.execute(sql`update player_profiles set share_arrival = true, notify_arrivals = true where membership_id = ${ids.mP1} returning membership_id`));
+    expect(r.rows).toHaveLength(1);
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`select * from push_subscriptions`)))).toBe("42501");
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ('playerA1', 'https://push.example/a', 'k', 'a')`)))).toBe("42501");
+    expect(await denied(svc.execute(sql`insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ('playerA1', 'http://push.example/a', 'k', 'a')`))).toBe("23514");
+  });
+});

@@ -120,6 +120,20 @@
       "when": 1793587977399,
       "tag": "0016_uploads_rls_and_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793646170148,
+      "tag": "0017_geofence",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793646171148,
+      "tag": "0018_geofence_rls_and_grants",
+      "breakpoints": true
     }
   ]
 }

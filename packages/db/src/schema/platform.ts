@@ -209,3 +209,18 @@ export const uploadLog = pgTable("upload_log", {
   index("upload_log_user_idx").on(t.userId, t.createdAt),
   check("upload_log_kind", sql`${t.kind} IN ('person','club-logo','club-cover')`),
 ]);
+
+/** A phone or browser that can receive Web Push for a user. Service role only (no app-role grants): endpoint and keys are secrets. */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: id(),
+  userId: text("user_id").notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: createdAt(),
+  lastOkAt: timestamp("last_ok_at", { withTimezone: true }),
+}, (t) => [
+  index("push_subscriptions_user_idx").on(t.userId),
+  check("push_subscriptions_endpoint", sql`${t.endpoint} ~ '^https://[^ ]+$'`),
+]);

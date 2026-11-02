@@ -23,6 +23,10 @@
     "test": {}
   },
   "globalPassThroughEnv": [
+    "VAPID_PUBLIC_KEY",
+    "VAPID_PRIVATE_KEY",
+    "VAPID_SUBJECT",
+    "PUSH_PROVIDER",
     "DATABASE_URL_APP",
     "DATABASE_URL_SERVICE",
     "DATABASE_URL_OWNER",
