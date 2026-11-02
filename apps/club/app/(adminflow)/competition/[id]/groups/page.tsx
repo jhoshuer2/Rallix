@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BackButton, PageShell } from "@rallix/ui";
+import { BackButton, EmptyState, PageShell } from "@rallix/ui";
 import { RoundResults } from "../../../../../components/RoundResults";
 import { canScore, inClub, requireRole } from "../../../../../lib/context";
 import { getCompetition, listMatches } from "../../../../../lib/queries";
@@ -21,7 +21,7 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
   const open = (m: (typeof data.ms)[number]) => mayScore && m.status !== "completed" && !!m.p1 && !!m.p2;
   return (
     <PageShell back={<BackButton href="/competition" linkAs={Link} />} title={data.c.name}>
-      {data.ms.length === 0 ? <p className="rx-muted" style={{ margin: 0 }}>No matches yet.</p> : (
+      {data.ms.length === 0 ? <EmptyState compact title="No matches yet" hint="Fixtures appear once the draw is made." /> : (
         <RoundResults matches={data.ms} hrefFor={(m) => (open(m) ? `/competition/${id}/score?match=${m.id}` : undefined)} actionFor={(m) => (open(m) ? "Score" : undefined)} />
       )}
       <Link className="rx-btn rx-btn--block" style={{ marginTop: 32 }} href={`/competition/${id}/bracket`}>Results</Link>

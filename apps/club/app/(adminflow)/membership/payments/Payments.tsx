@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ListActions, ListGroup, ListRow, Photo, Pill, Segmented } from "@rallix/ui";
+import { Button, EmptyState, ListActions, ListGroup, ListRow, Photo, Pill, Segmented } from "@rallix/ui";
 import { recordManualPayment } from "../../../../lib/payment-actions";
 
 const filters = ["all", "paid", "pending", "failed", "refunded"] as const;
@@ -31,7 +31,7 @@ export function Payments({ rows }: { rows: Row[] }) {
   return (
     <>
       <Segmented scroll label="Payment status" value={f} onChange={setF} options={filters.map((v) => ({ value: v, label: label[v] }))} />
-      {shown.length === 0 ? <p className="rx-muted" style={{ marginTop: 16 }}>{rows.length === 0 ? "No dues yet. Open Plans and tap Bill all members." : `Nothing ${label[f].toLowerCase()}.`}</p> : (
+      {shown.length === 0 ? (rows.length === 0 ? <EmptyState compact title="No dues yet" hint="Open Plans and tap Bill all members." action={<a className="rx-btn" href="/membership/subscriptions">Open plans</a>} /> : <EmptyState compact title={`Nothing ${label[f].toLowerCase()}`} />) : (
         <ListGroup label="Member payments">
           {shown.flatMap((p) => [
             <ListRow key={p.dueId} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} subtitle={p.detail} trailing={<>{p.amount} {p.status !== "paid" ? <Pill tone={tone[p.status]}>{label[p.status]}</Pill> : <Pill tone="success">Paid</Pill>}</>} />,

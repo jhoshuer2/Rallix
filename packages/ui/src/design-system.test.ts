@@ -30,6 +30,7 @@ describe("every club screen follows the design system", () => {
       const src = readFileSync(f, "utf8");
       const imports = [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*"@rallix\/ui"/g)].flatMap((m) => m[1]!.split(",").map((x) => x.trim().split(/\s+as\s+/)[0]!));
       expect(imports.filter((n) => LEGACY.includes(n))).toEqual([]);
+      expect(/<p className="rx-muted"[^>]*>\s*(No (?!one matches)|Nothing )/.test(src), "empty list text must use EmptyState").toBe(false);
       for (const c of RAW) expect(new RegExp(`className=\\{?["'\`][^"'\`]*\\b${c}(?![\\w-])`).test(src), `${c} used as a class`).toBe(false);
     });
   }

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Icon, Panel, Segmented, Switch, TextField } from "@rallix/ui";
+import { Button, EmptyState, Icon, Panel, Segmented, Switch, TextField } from "@rallix/ui";
 import { billMembers, savePlan, setPlanActive } from "../../../../lib/actions";
 
 type Plan = { id: string; name: string; priceKobo: number; period: "monthly" | "yearly"; perks: string[]; active: boolean };
@@ -24,7 +24,7 @@ export function Plans({ plans }: { plans: Plan[] }) {
     <>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <div style={{ flex: 1 }}><Segmented label="Billing period" value={period} onChange={setPeriod} options={[{ value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }]} /></div>
-        <Button onClick={() => { setAdding(!adding); setName(""); setPrice(""); }}>+ New</Button>
+        {shown.length > 0 || adding ? <Button onClick={() => { setAdding(!adding); setName(""); setPrice(""); }}>+ New</Button> : null}
       </div>
       {adding ? (
         <Panel title="New plan">
@@ -54,7 +54,7 @@ export function Plans({ plans }: { plans: Plan[] }) {
           )}
         </Panel>
       ))}
-      {shown.length === 0 && !adding ? <p className="rx-muted" style={{ marginTop: 16 }}>No {period} plans yet. Tap + New to add one.</p> : null}
+      {shown.length === 0 && !adding ? <EmptyState compact title={`No ${period} plans yet`} hint="Add a plan so you can bill your members." action={<Button onClick={() => { setAdding(true); setName(""); setPrice(""); }}>Add a {period} plan</Button>} /> : null}
       <p role="status" aria-live="polite" className="rx-muted">{msg}</p>
     </>
   );

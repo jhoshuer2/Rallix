@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ListGroup, ListRow, Photo, Pill, Segmented } from "@rallix/ui";
+import { EmptyState, ListGroup, ListRow, Photo, Pill, Segmented } from "@rallix/ui";
 
 type R = { id: string; name: string; rank: number; points: number; photo: string | null };
 
@@ -10,7 +10,7 @@ export function Ranks({ clubName, club, global, meId, meUserId }: { clubName: st
   return (
     <>
       <Segmented label="Leaderboard" value={scope} onChange={setScope} options={[{ value: "club", label: clubName }, { value: "global", label: "Global" }]} />
-      {rows.length === 0 ? <p className="rx-muted" style={{ marginTop: 16 }}>No rated players yet.</p> : (
+      {rows.length === 0 ? <EmptyState compact title="No rated players yet" hint="Ratings start after the first confirmed match." /> : (
         <ListGroup label={scope === "club" ? "Club leaderboard" : "Global leaderboard"}>
           {rows.map((p) => {
             const you = scope === "club" ? p.id === meId : p.id === meUserId;

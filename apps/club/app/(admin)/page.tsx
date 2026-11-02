@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ActionButton, Carousel, ClubBanner, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Panel, Photo, SectionTitle, StackedBar } from "@rallix/ui";
+import { ActionButton, Carousel, ClubBanner, EmptyState, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Panel, Photo, SectionTitle, StackedBar } from "@rallix/ui";
 import { mergeActivity, membershipOverview, type Activity } from "@rallix/stats";
 import { ClubHeader } from "../../components/ClubHeader";
 import { inClub, requireRole } from "../../lib/context";
@@ -52,7 +52,7 @@ export default async function Home() {
         <Carousel label="Upcoming competitions">
           {comps.map((c) => <MediaCard key={c.id} name={c.name} detail={`${d.entries[c.id] ?? 0} registered${c.startsOn ? ` · ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : ""}`} tag={c.status === "active" ? "Active" : "Draft"} href={`/competition/${c.id}/groups`} linkAs={Link} />)}
         </Carousel>
-      ) : <Panel><p className="rx-muted" style={{ margin: 0 }}>No competition yet. Create one to get players registering.</p></Panel>}
+      ) : <EmptyState compact title="No competitions yet" hint="Create one to get players registering." />}
 
       <SectionTitle title="Membership overview" href="/membership/payments" linkAs={Link} label="See payments" />
       <Panel>

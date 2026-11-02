@@ -69,7 +69,7 @@ Birthdays and club anniversaries use `Celebrations` (bubble above a round photo,
 Live match first, then the latest results. Ring means unseen, muted ring means seen, red LIVE tag for live. Viewer is a native `<dialog>`: progress bars, 5 s auto-advance, hold to pause, tap left or right, Esc closes and focus returns to the ring. With reduced motion there is no auto-advance. Seen state lives in `localStorage` inside try/catch.
 
 ## Empty states
-`EmptyState` (rackets and ball, 144x96 art, one line, optional hint, at most one button). Static under reduced motion. Use for fully empty lists; inline hints in a populated screen stay plain text.
+`EmptyState` (rackets and ball, 144x96 art, one line, optional hint, at most one button; `compact` for panels and filtered lists). Every fully empty list uses it (a test fails on "No ..." muted paragraphs), and its button replaces any toolbar "+ New" while the list is empty. Static under reduced motion. Use for fully empty lists; inline hints in a populated screen stay plain text.
 
 ## Screen recipes
 - **Dashboard (Home):** band with stories, one hero, one attention strip or due notice, 2 metrics, 1 to 2 carousels.

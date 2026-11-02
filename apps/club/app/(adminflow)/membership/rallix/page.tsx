@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BackButton, IconBadge, ListActions, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Pill } from "@rallix/ui";
+import { BackButton, EmptyState, IconBadge, ListActions, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Pill } from "@rallix/ui";
 import { requireRole } from "../../../../lib/context";
 import { rallixBilling } from "../../../../lib/payment-queries";
 import { naira } from "../../../../lib/queries";
@@ -16,7 +16,7 @@ export default async function RallixBilling() {
           <MetricCard label="Your plan" value={naira(s.amountKobo)} hint={`per ${s.period === "monthly" ? "month" : "year"}`} />
           <MetricCard label={s.status === "active" ? "Renews" : "Status"} value={s.status === "active" ? fmt(s.currentPeriodEnd).replace(/ \d{4}$/, "") : s.status.replace("_", " ")} tone={s.status === "active" ? "good" : "bad"} hint={s.status === "active" ? "Active" : `Period ends ${fmt(s.currentPeriodEnd)}`} />
         </MetricGrid>
-      ) : <p className="rx-muted" style={{ margin: 0 }}>No subscription yet. Rallix will contact you to set one up.</p>}
+      ) : <EmptyState compact title="No subscription yet" hint="Rallix will contact you to set one up." />}
       {invoices.length > 0 ? (
         <>
           <h2 className="rx-panel__title" style={{ margin: "32px 0 0" }}>Invoices</h2>
@@ -28,7 +28,7 @@ export default async function RallixBilling() {
             ])}
           </ListGroup>
         </>
-      ) : <p className="rx-muted" style={{ marginTop: 16 }}>No invoices yet.</p>}
+      ) : <EmptyState compact title="No invoices yet" hint="Invoices from Rallix will show up here." />}
     </PageShell>
   );
 }

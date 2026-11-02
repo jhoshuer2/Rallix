@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BackButton, IconBadge, ListGroup, ListRow, PageShell, Pill } from "@rallix/ui";
+import { BackButton, EmptyState, IconBadge, ListGroup, ListRow, PageShell, Pill } from "@rallix/ui";
 import { describeOffset } from "@rallix/payments";
 import { requireRole } from "../../../../lib/context";
 import { reminderOverview, reminderSettingsFor } from "../../../../lib/reminder-queries";
@@ -14,7 +14,7 @@ export default async function Reminders() {
       <p className="rx-muted" style={{ margin: "0 0 16px" }}>Email members who haven’t paid, before and after their due date. Anyone who has paid, left the club, or switched reminders off never gets one, and nobody gets the same reminder twice.</p>
       <ReminderForm enabled={settings.enabled} offsets={settings.offsets} unpaid={ov.unpaid} optedOut={ov.optedOut} />
       <h2 className="rx-panel__title" style={{ margin: "32px 0 0" }}>Recently sent</h2>
-      {ov.recent.length === 0 ? <p className="rx-muted">Nothing sent yet.</p> : (
+      {ov.recent.length === 0 ? <EmptyState compact title="Nothing sent yet" hint="Reminders you send will be listed here." /> : (
         <ListGroup label="Recently sent reminders">
           {ov.recent.map((r, i) => (
             <ListRow key={i} media={<IconBadge icon="mail" />} title={r.name} subtitle={`${describeOffset(r.offset)} the due date · ${when(r.at)}`}

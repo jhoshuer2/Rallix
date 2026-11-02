@@ -38,7 +38,7 @@ const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.ne
 await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill('empty-admin@example.com');await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code('empty-admin@example.com'));await p.getByRole('button',{name:'Sign in'}).click();
 await p.getByLabel('What is your club called?').waitFor({timeout:25000});await p.waitForLoadState('networkidle');await p.waitForTimeout(1500);await p.getByLabel('What is your club called?').fill('Empty Club');await p.getByLabel(/your name/i).fill('Empty Admin');await p.getByLabel('Where are you located').fill('Lagos');await p.getByRole('button',{name:'Create my club'}).click();
 await p.waitForURL(u=>!/onboarding/.test(u.toString()),{timeout:25000});await p.waitForLoadState('networkidle');
-let t=await checkPage(p,'empty_home','/',{maxWords:100});ok(/No competition yet/i.test(t),'empty home: invites the admin to start a competition');
+let t=await checkPage(p,'empty_home','/',{maxWords:100});ok(/No competitions yet/i.test(t),'empty home: invites the admin to start a competition');
 t=await checkPage(p,'empty_members','/members',{maxWords:60});ok(/invite/i.test(t),'empty members: invite action is present');
 t=await checkPage(p,'empty_competition','/competition',{maxWords:60});ok(/Create a competition/i.test(t),'empty competition: one clear action');
 ok(errs.length===0,'empty club: no uncaught errors');

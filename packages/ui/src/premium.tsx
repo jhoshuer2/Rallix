@@ -331,9 +331,9 @@ const RacketB = () => (
 );
 
 /** Quiet empty state: a small rally animation, one line of text, at most one button. Decorative art is hidden from screen readers. */
-export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
+export function EmptyState({ title, hint, action, compact }: { title: string; hint?: string; action?: ReactNode; /** Smaller art and title, for use inside a panel or under a toolbar. */ compact?: boolean }) {
   return (
-    <div className="rx-es">
+    <div className={cx("rx-es", compact && "rx-es--compact")}>
       <div className="rx-es__art" aria-hidden="true">
         <span className="rx-es__racket rx-es__racket--a"><RacketA /></span>
         <span className="rx-es__racket rx-es__racket--b"><RacketB /></span>

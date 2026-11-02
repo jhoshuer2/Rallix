@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BackButton, IconBadge, ListGroup, ListRow, PageShell, Panel, Pill, SectionTitle } from "@rallix/ui";
+import { BackButton, EmptyState, IconBadge, ListGroup, ListRow, PageShell, Panel, Pill, SectionTitle } from "@rallix/ui";
 import { PayButton } from "../../../../../components/PayButton";
 import { inClub, requireClub } from "../../../../../lib/context";
 import { payoutsEnabled } from "../../../../../lib/payment-queries";
@@ -22,7 +22,7 @@ export default async function PlayerPayments() {
           {due.status === "overdue" ? <p style={{ margin: "0 0 12px" }}><Pill tone="warning">Overdue</Pill></p> : null}
           <PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />
         </Panel>
-      ) : <Panel><p style={{ margin: 0 }}>{d.dues.length ? "You’re all paid up." : "No dues yet."}</p></Panel>}
+      ) : <EmptyState compact title={d.dues.length ? "You’re all paid up" : "No dues yet"} hint={d.dues.length ? "Nothing to pay right now." : "Dues your club bills you will show up here."} />}
       {optedOut ? <p className="rx-muted" style={{ fontSize: 14 }}>You’ve turned off reminder emails, so check here for what’s due. <Link href="/play/me" style={{ textDecoration: "underline" }}>Change this</Link></p> : null}
       {d.pays.length > 0 ? (
         <>

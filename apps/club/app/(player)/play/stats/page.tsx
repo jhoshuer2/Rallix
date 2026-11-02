@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FormChips, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Panel, Photo, RankChart, StatBar } from "@rallix/ui";
+import { EmptyState, FormChips, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Panel, Photo, RankChart, StatBar } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../../components/ClubHeader";
 import { inClub, requireClub } from "../../../../lib/context";
@@ -20,7 +20,7 @@ export default async function Stats() {
         <MetricCard label="Played" value={String(r.played)} />
         <MetricCard label="Streak" value={streakLabel(r.streak)} />
       </MetricGrid>
-      {r.played === 0 ? <p className="rx-muted" style={{ marginTop: 16 }}>Your stats appear after your first confirmed match.</p> : (
+      {r.played === 0 ? <EmptyState compact title="No stats yet" hint="They appear after your first confirmed match." /> : (
         <>
           <Panel title={`Last ${r.form.length}, newest first`}><FormChips results={r.form} /></Panel>
           <Panel title="Games and points">

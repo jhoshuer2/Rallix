@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { BackButton, CheckRow, ChoiceToggle, ListGroup, PageShell, Panel, Photo, TextField } from "@rallix/ui";
+import { BackButton, CheckRow, ChoiceToggle, ListGroup, PageShell, Panel, Photo, TextField, EmptyState } from "@rallix/ui";
 import { createCompetition } from "../../../../../../lib/actions";
 
 type M = { id: string; name: string; rank: number; photo: string | null };
@@ -47,7 +47,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
             options={[{ value: "group_stage", label: "Group Stage", icon: "grid" }, { value: "one_on_one", label: "One on One", icon: "members" }]} />
         </Panel>
         <h2 className="rx-panel__title" style={{ margin: "32px 0 0" }}>Players ({ids.length})</h2>
-        {members.length === 0 ? <p className="rx-muted">No players at this level yet. Share your invite link, or pick “Combine levels”.</p> : (
+        {members.length === 0 ? <EmptyState compact title="No players at this level yet" hint="Share your invite link, or pick “Combine levels”." /> : (
           <ListGroup label="Players participating in the competition">
             {members.map((p) => <CheckRow key={p.id} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} subtitle={`Rank ${p.rank}`} checked={!!picked[p.id]} onChange={(v) => setPicked({ ...picked, [p.id]: v })} />)}
           </ListGroup>

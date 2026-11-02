@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BackButton, ListGroup, ListRow, PageShell, Photo, Pill, SectionTitle } from "@rallix/ui";
+import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo, Pill, SectionTitle } from "@rallix/ui";
 import { inClub, requireClub } from "../../../../../lib/context";
 import { getCompetition, listMatches } from "../../../../../lib/queries";
 
@@ -36,7 +36,7 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
             })}
           </ListGroup>
         </>
-      ) : <p className="rx-muted" style={{ marginTop: 0 }}>You have no fixtures in this competition yet.</p>}
+      ) : <EmptyState compact title="No fixtures yet" hint="Your matches will be listed here." />}
       {rounds.map((round) => (
         <div key={round}>
           <SectionTitle title={round} />

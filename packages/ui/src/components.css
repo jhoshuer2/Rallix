@@ -706,3 +706,7 @@ a.rx-lrow:active { background: rgba(15, 32, 56, .04); }
 .rx-sheetdlg__body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
 .rx-pick__search { flex: none; position: static; margin-bottom: var(--rx-space-2); }
 .rx-pick__list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+.rx-es--compact { padding: var(--rx-space-5) var(--rx-space-4) var(--rx-space-4); }
+.rx-es--compact .rx-es__art { zoom: .78; margin-bottom: var(--rx-space-3); }
+.rx-es--compact .rx-es__title { font-size: 22px; }
