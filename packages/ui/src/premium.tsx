@@ -1,3 +1,4 @@
+import { BALL_SRC } from "./empty-ball";
 import type { CSSProperties, ElementType, ReactNode } from "react";
 import { countdown, initials, placeholderColors, scoreLine } from "./premium-utils";
 import { Icon, type IconName } from "./icons";
@@ -304,6 +305,43 @@ export function StackedBar({ parts, label }: { parts: Array<{ label: string; val
       <ul className="rx-sbar__legend">
         {parts.map((p) => <li key={p.label}><span className={`rx-sbar__dot rx-sbar__part--${p.tone}`} aria-hidden="true" /><b>{p.value}</b> {p.label}</li>)}
       </ul>
+    </div>
+  );
+}
+
+
+/* ---------- Empty state: two rackets rallying a ball ---------- */
+const RacketA = () => (
+  <svg viewBox="0 0 89 94" width="64" height="68" aria-hidden="true" focusable="false">
+    <path d="M17.55 76.58C20.73 73.97 33.63 56.88 29.54 47.13L48.83 62.61c-.03.19-.1.56-.12.58C38.31 61.3 24.6 77.75 22.73 81.41z" fill="#D8C6AC" stroke="#D8C6AC" strokeWidth="2" />
+    <path d="M32.81 57.44l5.85 4.7L22.62 81.32l-5.85-4.7z" fill="#D57440" />
+    <path d="M32.86 58.77l4.39 3.52L22.56 79.99l-4.39-3.52z" fill="#BE4A1D" />
+    <ellipse cx="50.88" cy="37.33" rx="23.5" ry="29" transform="rotate(38.75 50.88 37.33)" fill="#62D8F7" />
+    <ellipse cx="51.66" cy="37.95" rx="23.5" ry="29" transform="rotate(38.75 51.66 37.95)" fill="#D03241" />
+  </svg>
+);
+const RacketB = () => (
+  <svg viewBox="0 0 85 95" width="62" height="69" aria-hidden="true" focusable="false">
+    <path d="M62.01 81.74c-1.47-3.85-13.55-21.52-24.09-20.76l20.82-13.34c.17.09.5.28.51.3-5.1 9.25 6.11 27.49 8.99 30.43z" fill="#D8C6AC" stroke="#D8C6AC" strokeWidth="2" />
+    <path d="M48.73 61.18l6.32-4.05 13.07 21.32-6.32 4.05z" fill="#D57440" />
+    <path d="M50.01 61.55l4.74-3.04 12.09 19.57-4.74 3.03z" fill="#BE4A1D" />
+    <ellipse cx="35.43" cy="37.64" rx="23.5" ry="29" transform="rotate(-32.65 35.43 37.64)" fill="#62D8F7" />
+    <ellipse cx="36.27" cy="37.1" rx="23.5" ry="29" transform="rotate(-32.65 36.27 37.1)" fill="#1d1d22" />
+  </svg>
+);
+
+/** Quiet empty state: a small rally animation, one line of text, at most one button. Decorative art is hidden from screen readers. */
+export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
+  return (
+    <div className="rx-es">
+      <div className="rx-es__art" aria-hidden="true">
+        <span className="rx-es__racket rx-es__racket--a"><RacketA /></span>
+        <span className="rx-es__racket rx-es__racket--b"><RacketB /></span>
+        <span className="rx-es__ball"><img src={BALL_SRC} width={36} height={36} alt="" draggable={false} /></span>
+      </div>
+      <p className="rx-es__title">{title}</p>
+      {hint ? <p className="rx-es__hint">{hint}</p> : null}
+      {action ? <div className="rx-es__action">{action}</div> : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MediaCard, PageShell, SectionTitle } from "@rallix/ui";
+import { EmptyState, MediaCard, PageShell, SectionTitle } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requireRole } from "../../../lib/context";
 import { listCompetitions } from "../../../lib/queries";
@@ -20,10 +20,7 @@ export default async function Competition() {
           <Link className="rx-btn rx-btn--block" style={{ marginTop: 16, boxSizing: "border-box" }} href={`/competition/${latest.id}/groups`}>{latest.status === "active" ? "Resume" : "Open"}</Link>
         </>
       ) : (
-        <div style={{ marginTop: 24, textAlign: "center" }}>
-          <p className="rx-muted" style={{ margin: "0 0 16px" }}>No competitions yet. Create your first one in a minute.</p>
-          <Link className="rx-btn" href="/competition/new">Create a competition</Link>
-        </div>
+        <EmptyState title="No competitions yet" hint="Create your first one in a minute." action={<Link className="rx-btn" href="/competition/new">Create a competition</Link>} />
       )}
       {rest.length ? (
         <>

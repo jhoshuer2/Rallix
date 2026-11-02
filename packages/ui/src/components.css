@@ -396,7 +396,7 @@
 .rx-lrow:last-child { border-bottom: 0; }
 a.rx-lrow:active { background: rgba(15, 32, 56, .04); }
 .rx-lrow:focus-visible { outline: 3px solid var(--rx-blue); outline-offset: -3px; }
-.rx-lrow.is-current { background: rgba(59, 108, 167, .1); }
+.rx-lrow.is-current { background: rgba(27, 111, 224, .1); }
 .rx-lrow__media { flex: none; width: 44px; display: inline-flex; }
 .rx-lrow__media .rx-photo { width: 44px; }
 .rx-lrow__media .rx-photo__mono { font-size: 16px; }
@@ -668,3 +668,34 @@ a.rx-lrow:active { background: rgba(15, 32, 56, .04); }
 .rx-iconbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: inherit; text-decoration: none; }
 .rx-metricgrid--kpi .rx-metric__value { font-size: 40px; }
 .rx-metricgrid--kpi > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* Empty state: 144x96 art box, rackets 64px, ball 36px. Static by default; the rally only plays when motion is allowed. */
+.rx-es { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--rx-space-6) var(--rx-space-4) var(--rx-space-5); }
+.rx-es__art { position: relative; width: 144px; height: 96px; margin-bottom: var(--rx-space-4); }
+.rx-es__racket { position: absolute; top: 28px; display: block; }
+.rx-es__racket--a { left: 8px; transform-origin: 22% 88%; }
+.rx-es__racket--b { right: 8px; transform-origin: 78% 88%; }
+.rx-es__ball { position: absolute; left: 54px; top: 14px; width: 36px; height: 36px; display: block; }
+.rx-es__ball img { display: block; width: 36px; height: 36px; transform-origin: 50% 100%; }
+.rx-es__title { margin: 0; max-width: 28ch; font-family: var(--rx-font-display); font-weight: 700; font-size: 26px; line-height: 1.1; text-transform: uppercase; letter-spacing: .015em; color: var(--rx-ink); }
+.rx-es__hint { margin: var(--rx-space-2) 0 0; max-width: 32ch; font-size: 15px; line-height: 1.4; color: var(--rx-ink-3); }
+.rx-es__action { margin-top: var(--rx-space-4); }
+@media (prefers-reduced-motion: no-preference) {
+  .rx-es__ball { left: 27px; top: 22px; animation: rx-es-x 1.2s linear infinite alternate; }
+  .rx-es__ball img { animation: rx-es-y 1.2s infinite; }
+  .rx-es__racket--a { animation: rx-es-hit-a 2.4s ease-out infinite; }
+  .rx-es__racket--b { animation: rx-es-hit-b 2.4s ease-out 1.2s infinite; }
+}
+@keyframes rx-es-x { from { transform: translateX(0); } to { transform: translateX(53px); } }
+@keyframes rx-es-y {
+  0%   { transform: translateY(0) scale(1.08, .92); animation-timing-function: cubic-bezier(.2, .6, .4, 1); }
+  8%   { transform: translateY(-3px) scale(1); animation-timing-function: cubic-bezier(.2, .6, .4, 1); }
+  50%  { transform: translateY(-26px); animation-timing-function: cubic-bezier(.6, 0, .8, .4); }
+  92%  { transform: translateY(-3px) scale(1); animation-timing-function: ease-in; }
+  100% { transform: translateY(0) scale(1.08, .92); }
+}
+@keyframes rx-es-hit-a { 0% { transform: rotate(9deg); } 14% { transform: rotate(0); } 100% { transform: rotate(0); } }
+@keyframes rx-es-hit-b { 0% { transform: rotate(-9deg); } 14% { transform: rotate(0); } 100% { transform: rotate(0); } }
+
+/* A highlighted row inside a bare group needs its own side padding, or the picture and pill touch the tint's edge. */
+.rx-lgroup--bare .rx-lrow.is-current { padding-left: var(--rx-space-3); padding-right: var(--rx-space-3); border-radius: 12px; border-bottom-color: transparent; }

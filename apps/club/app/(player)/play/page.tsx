@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Carousel, Celebrations, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, Pill, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, EmptyState, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, Pill, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
@@ -106,7 +106,7 @@ export default async function PlayerHome() {
         </>
       ) : null}
 
-      {!next.length && results.length === 0 && upcoming.length === 0 ? <p className="rx-muted" style={{ marginTop: 24 }}>Nothing on yet. When your club schedules matches, they show up here.</p> : null}
+      {!next.length && results.length === 0 && upcoming.length === 0 ? <EmptyState title="Nothing on yet" hint="When your club schedules matches, they show up here." /> : null}
     </PageShell>
   );
 }
