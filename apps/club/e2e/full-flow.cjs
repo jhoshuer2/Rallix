@@ -46,7 +46,7 @@ await A.goto(B+'/membership/payments');t=await text(A);ok(/Paid|Pending|Failed/i
 await A.goto(B+'/membership/subscriptions');t=await text(A);ok(/₦6,000/.test(t),'subscription plans show ₦6,000 from the database');
 await A.screenshot({path:SC+'/e_admin_plans.png'});
 await A.goto(B+'/membership');await A.getByRole('radio',{name:'Year'}).click();t=await text(A);ok(/₦/.test(t),'revenue card renders period totals');
-await A.goto(B+'/profile');await A.getByRole('button',{name:/Create (invite link|a new link)/}).click();await A.waitForTimeout(1500);t=await text(A);
+await A.goto(B+'/profile');await A.getByRole('button',{name:/Create (invite link|a new link)/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});t=await text(A);
 const inv=(t.match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!inv,'admin created an invite link ('+inv+')');
 // ===== B. create competition + score =====
 console.log('B. create a competition, then score a match');
