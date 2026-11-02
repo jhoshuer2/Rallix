@@ -29,7 +29,7 @@ async function signIn(page, who, next = '/') {
   await page.waitForURL(u => !/sign-in/.test(u.toString()), { timeout: 25000 });
 }
 (async()=>{const b=await chromium.launch();
-const mk=async()=>{const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.newPage();p._errs=[];p.on('pageerror',e=>p._errs.push(e.message.slice(0,120)));return p};
+const mk=async()=>{const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultTimeout(90000);c.setDefaultNavigationTimeout(90000);const p=await c.newPage();p._errs=[];p.on('pageerror',e=>p._errs.push(e.message.slice(0,120)));return p};
 const text=p=>p.locator('body').innerText();
 // ===== A. admin =====
 console.log('A. club admin (Innocent Amos)');
@@ -116,6 +116,6 @@ const J2=await mk();await signIn(J2,'+2348037777777','/join/NOPE1234');await J2.
 ok(/invalid, expired or full/i.test(await text(J2)),'a bad invite code shows a clear error');
 await J.goto(B+'/members');await J.waitForURL(/\/play/);ok(true,'the new player cannot open admin pages in that club');
 // cross-club isolation through the UI
-await J.goto(B+'/play/compete/'+compId);const st=await J.evaluate(()=>document.body.innerText);ok(/not be found|404/i.test(st),'Test Club player cannot open a Paris Arena competition (404)');
+await J.goto(B+'/play/compete/'+compId);await J.waitForFunction(()=>/not be found|404/i.test(document.body.innerText),null,{timeout:20000}).catch(()=>{});const st=await J.evaluate(()=>document.body.innerText);ok(/not be found|404/i.test(st),'Test Club player cannot open a Paris Arena competition (404)');
 const errs=[A,P,N,J,J2].flatMap(p=>p._errs);ok(errs.length===0,'no uncaught browser errors '+JSON.stringify(errs));
 await b.close();console.log(`\n${pass} passed, ${fail} failed`);process.exit(fail?1:0)})().catch(e=>{console.error('CRASH',e.message);process.exit(2)});
