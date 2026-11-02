@@ -89,6 +89,7 @@ Never read `window` or `localStorage` while rendering. Do it in an effect so ser
 ## Before shipping
 - [ ] Uses `PageShell` and only the six card kinds. `/kit` updated if you added a component.
 - [ ] One hero, one primary action, under about 150 words.
+- [ ] No redundant controls: one visible entry point per action per screen. An empty-state button replaces the header action (omit `action` when the list is empty); never show both.
 - [ ] Every image slot looks finished with no uploads.
 - [ ] Contrast 4.5:1 (3:1 for large text and icons); the contrast test passes.
 - [ ] 44px targets, visible focus, Esc closes viewers and sheets.

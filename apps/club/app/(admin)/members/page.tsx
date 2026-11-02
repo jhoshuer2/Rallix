@@ -9,7 +9,7 @@ export default async function Members() {
   const ctx = await requireRole("admin");
   const members = await inClub(ctx, (tx) => listMembers(tx, ctx.club.clubId));
   return (
-    <PageShell flat header={<ClubHeader />} title={`Members · ${members.length}`} action={<Link className="rx-btn rx-btn--small" href="/profile" aria-label="Invite players">+ Invite</Link>}>
+    <PageShell flat header={<ClubHeader />} title={`Members · ${members.length}`} action={members.length ? <Link className="rx-btn rx-btn--small" href="/profile" aria-label="Invite players">+ Invite</Link> : undefined}>
       {members.length === 0 ? (
         <div style={{ marginTop: 16, textAlign: "center" }}>
           <p className="rx-muted" style={{ margin: "0 0 16px" }}>No players yet. Share your invite link and they will appear here.</p>

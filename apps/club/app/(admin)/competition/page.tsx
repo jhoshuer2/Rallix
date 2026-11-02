@@ -13,7 +13,7 @@ export default async function Competition() {
   const latest = comps.find((c) => c.status === "active") ?? comps[0];
   const rest = comps.filter((c) => c.id !== latest?.id);
   return (
-    <PageShell header={<ClubHeader />} title="Competitions" action={<Link className="rx-btn rx-btn--small" href="/competition/new">+ New</Link>} flat={!latest}>
+    <PageShell header={<ClubHeader />} title="Competitions" action={comps.length ? <Link className="rx-btn rx-btn--small" href="/competition/new">+ New</Link> : undefined} flat={!latest}>
       {latest ? (
         <>
           <MediaCard name={latest.name} detail={range(latest.startsOn, latest.endsOn)} tag={latest.status === "active" ? "Active" : latest.status} href={`/competition/${latest.id}/groups`} linkAs={Link} className="rx-ccard--wide" />
