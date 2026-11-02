@@ -106,7 +106,7 @@ ok(/Test Club/i.test(await text(N)),'new club created, user is its admin');
 ok(sql(`select slug from clubs where name='Test Club'`)==='test-club','club slug generated');
 await N.goto(B+'/members');{const rt=await text(N);ok(/Ngozi Test/i.test(rt)&&!/Jide|Pastor|Sule|Nurudeen|Dorathy|Nathaniel/i.test(rt),'new club roster is just its founder, none of Paris Arena’s players');}
 await N.goto(B+'/competition');ok(!/Senior Cup|Group Stage/i.test(await text(N)),'new club sees none of Paris Arena’s competitions');
-await N.goto(B+'/profile');await N.getByRole('button',{name:/Create invite link/}).click();await N.waitForTimeout(1500);
+await N.goto(B+'/profile');await N.getByRole('button',{name:/Create invite link/}).click();await N.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});
 const code=((await text(N)).match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!code,'new club admin created invite '+code);
 const J=await mk();await signIn(J,'+2348038888888','/join/'+code);await J.waitForLoadState('networkidle');
 await J.getByLabel('Full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();

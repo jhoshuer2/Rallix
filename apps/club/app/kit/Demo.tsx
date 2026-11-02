@@ -39,7 +39,7 @@ export function Demo() {
       <div className="rx-mgrid"><MemberCard rank={1} name="Ada Obi" rating={1300} href="#" /><MemberCard rank={2} name="Tunde Bello" rating={1275} href="#" /></div>
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ClubBanner</h3>
       <ClubBanner name="Lagos Spin Club" figure="₦18,000" figureLabel="Revenue, last 30 days" members={7} />
-      <Panel title="Panel and controls"><SelectSheet label="Bank" value={v} onChange={setV} options={[{ value: "1", label: "Access Bank" }, { value: "2", label: "GTBank" }]} searchable placeholder="Choose your bank" />
+      <Panel title="Panel and controls"><SelectSheet label="Bank" value={v} onChange={setV} options={["Access Bank","GTBank","Zenith Bank","First Bank","UBA","Fidelity Bank","Union Bank","Sterling Bank","Stanbic IBTC","Wema Bank","Polaris Bank","Kuda","Opay","Moniepoint","Palmpay","Providus","Keystone","Ecobank","Heritage","Jaiz"].map((n, i) => ({ value: String(i + 1), label: n }))} searchable placeholder="Choose your bank" />
         <p style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Pill>Neutral</Pill><Pill tone="success">Success</Pill><Pill tone="warning">Warning</Pill><Pill tone="live">Live</Pill></p></Panel>
       <SectionTitle title="Loading" />
       <div style={{ display: "flex", gap: 12 }}><Skeleton h={80} /><Skeleton h={80} /></div>

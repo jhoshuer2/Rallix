@@ -19,7 +19,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
           <h2 className="rx-title" style={{ fontSize: 18 }}>{title}</h2>
           <button type="button" className="rx-iconbtn" aria-label="Close" onClick={onClose}><Icon name="close" size={20} /></button>
         </div>
-        {children}
+        <div className="rx-sheetdlg__body">{children}</div>
       </div>
     </dialog>
   );
