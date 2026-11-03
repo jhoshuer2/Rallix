@@ -19,7 +19,9 @@ const PUBLIC=[['sign-in','/sign-in'],['welcome','/welcome'],['pay-link','/pay/in
 async function crawl(p,role,routes,errs,max){
   for(const [name,path0] of routes){
     const path=path0.replace('{token}',PAYTOKEN).replace('{comp}',ids.comp()).replace('{match}',ids.match()).replace('{member}',ids.member());
-    await p.goto(B+path);await p.waitForLoadState('networkidle');await p.waitForTimeout(250);
+    // The dev server restarts itself when its memory fills up during a long crawl; a dropped connection is retried a few times.
+    for(let a=0;;a++){try{await p.goto(B+path);break}catch(e){if(a>=3||!/ERR_CONNECTION|ERR_ABORTED/.test(e.message))throw e;await p.waitForTimeout(8000)}}
+    await p.waitForLoadState('networkidle');await p.waitForTimeout(250);
     const words=(await p.locator('body').innerText()).split(/\s+/).filter(Boolean).length;
     const noscroll=await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth);
     const small=await p.evaluate(()=>[...document.querySelectorAll('a,button,input,select')].filter(e=>{const r=e.getBoundingClientRect();const cs=getComputedStyle(e);return r.width>0&&r.height>0&&r.height<44&&!e.closest('.rx-carousel')&&!e.classList.contains('rx-btn--small')&&cs.visibility!=='hidden'&&e.type!=='checkbox'&&e.type!=='hidden'}).map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,22)+' '+Math.round(e.getBoundingClientRect().height)));
