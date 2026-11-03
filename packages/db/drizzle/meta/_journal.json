@@ -148,6 +148,20 @@
       "when": 1793648511483,
       "tag": "0020_competition_signup_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793678810695,
+      "tag": "0021_club_pages_applications",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793678811695,
+      "tag": "0022_applications_functions",
+      "breakpoints": true
     }
   ]
 }

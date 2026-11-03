@@ -662,3 +662,102 @@ describe("competition sign-up", () => {
     await svc.execute(sql`insert into upload_log (user_id, kind, bytes) values ('adminA', 'competition-cover', 10)`); // the new picture kind is accepted
   });
 });
+
+describe("club pages and applications", () => {
+  const ADMIN = () => ({ userId: "adminA", clubId: ids.A });
+  const P1 = () => ({ userId: "playerA1", clubId: ids.A });
+  const ADMIN_B = () => ({ userId: "adminB", clubId: ids.B });
+  const anyone = (u: string) => ({ userId: u });
+  let n = 0;
+  const mkUser = async () => { const id = `appl${++n}`; await svc.execute(sql`insert into users (id, name, email) values (${id}, ${`Applicant ${n}`}, ${`appl${n}@x.com`})`); return id; };
+  const mkInvite = async (club: string) => { const code = `APPLY${String(++n).padStart(3, "0")}`; await svc.execute(sql`insert into invites (club_id, code) values (${club}, ${code})`); return code; };
+  const setMode = (club: string, mode: "review" | "open") => svc.execute(sql`insert into club_pages (club_id, join_mode) values (${club}, ${mode}) on conflict (club_id) do update set join_mode = ${mode}`);
+  const apply = async (u: string, code: string, level = "junior", msg = "Hi") => ((await withTenant(app, anyone(u), (tx) => tx.execute(sql`select app.apply_to_club(${code}, 'Some Name', ${level}::player_level, ${msg}) as r`))).rows[0] as { r: string }).r;
+  const decide = async (ctx: { userId: string; clubId?: string }, id: string, yes: boolean) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.decide_application(${id}, ${yes}, 'ok') as r`))).rows[0] as { r: string }).r;
+  const appId = async (u: string, club: string) => ((await svc.execute(sql`select id from membership_applications where user_id = ${u} and club_id = ${club} order by created_at desc limit 1`)).rows[0] as { id: string }).id;
+  const isMember = async (u: string, club: string) => Number(((await svc.execute(sql`select count(*)::int n from memberships where user_id = ${u} and club_id = ${club} and status = 'active'`)).rows[0] as { n: number }).n) === 1;
+
+  it("club admins write the club page, members read it, players cannot write, other clubs cannot read", async () => {
+    expect((await withTenant(app, ADMIN(), (tx) => tx.execute(sql`insert into club_pages (club_id, about, rules, join_mode, published) values (${ids.A}, 'We play on Saturdays', 'Be kind', 'review', true) on conflict (club_id) do update set about = excluded.about, rules = excluded.rules, published = true returning club_id`))).rows).toHaveLength(1);
+    expect(await rows(app, P1(), sql`select about from club_pages where club_id = ${ids.A}`)).toHaveLength(1);
+    expect((await withTenant(app, P1(), (tx) => tx.execute(sql`update club_pages set rules = 'hacked' where club_id = ${ids.A} returning club_id`))).rows).toHaveLength(0);
+    expect(await rows(app, ADMIN_B(), sql`select about from club_pages where club_id = ${ids.A}`)).toHaveLength(0);
+    expect(await denied(withTenant(app, ADMIN(), (tx) => tx.execute(sql`update club_pages set join_mode = 'whatever' where club_id = ${ids.A}`)))).toBe("23514");
+    expect(await denied(withTenant(app, ADMIN(), (tx) => tx.execute(sql`update club_pages set rules = ${"x".repeat(8001)} where club_id = ${ids.A}`)))).toBe("23514");
+  });
+  it("a review club records an application instead of a membership, once", async () => {
+    await setMode(ids.A, "review");
+    const u = await mkUser(), code = await mkInvite(ids.A);
+    expect(await apply(u, code)).toBe("applied");
+    expect(await isMember(u, ids.A)).toBe(false);
+    expect(await apply(u, code)).toBe("pending");
+    expect(Number(((await svc.execute(sql`select count(*)::int n from membership_applications where user_id = ${u} and status = 'pending'`)).rows[0] as { n: number }).n)).toBe(1);
+  });
+  it("applicants see only their own applications; the club's admins see theirs; other clubs' admins see none", async () => {
+    await setMode(ids.A, "review");
+    const u1 = await mkUser(), u2 = await mkUser(), code = await mkInvite(ids.A);
+    await apply(u1, code); await apply(u2, code);
+    expect((await rows(app, anyone(u1), sql`select user_id from membership_applications`)).every((r) => (r as { user_id: string }).user_id === u1)).toBe(true);
+    expect((await rows(app, ADMIN(), sql`select user_id from membership_applications`)).length).toBeGreaterThanOrEqual(2);
+    expect(await rows(app, ADMIN_B(), sql`select id from membership_applications where club_id = ${ids.A}`)).toHaveLength(0);
+    expect(await rows(app, P1(), sql`select id from membership_applications where club_id = ${ids.A}`)).toHaveLength(0);
+  });
+  it("applications cannot be written directly", async () => {
+    const u = await mkUser();
+    expect(await denied(withTenant(app, anyone(u), (tx) => tx.execute(sql`insert into membership_applications (club_id, user_id, name) values (${ids.A}, ${u}, 'x')`)))).toBe("42501");
+    expect(await denied(withTenant(app, ADMIN(), (tx) => tx.execute(sql`update membership_applications set status = 'approved'`)))).toBe("42501");
+  });
+  it("an admin of the club approves: the membership and profile are created with the chosen level", async () => {
+    await setMode(ids.A, "review");
+    const u = await mkUser(), code = await mkInvite(ids.A);
+    await apply(u, code, "senior");
+    const id = await appId(u, ids.A);
+    expect(await decide(P1(), id, true)).toBe("closed"); // a player cannot decide
+    expect(await decide(ADMIN_B(), id, true)).toBe("closed"); // neither can another club's admin
+    expect(await isMember(u, ids.A)).toBe(false);
+    expect(await decide(ADMIN(), id, true)).toBe("approved");
+    expect(await isMember(u, ids.A)).toBe(true);
+    expect(((await svc.execute(sql`select p.level from player_profiles p join memberships m on m.id = p.membership_id where m.user_id = ${u} and m.club_id = ${ids.A}`)).rows[0] as { level: string }).level).toBe("senior");
+    expect(await decide(ADMIN(), id, true)).toBe("closed"); // already decided
+    expect(await apply(u, code)).toBe("member");
+  });
+  it("declining creates no membership and records who decided", async () => {
+    await setMode(ids.A, "review");
+    const u = await mkUser(), code = await mkInvite(ids.A);
+    await apply(u, code);
+    const id = await appId(u, ids.A);
+    expect(await decide(ADMIN(), id, false)).toBe("declined");
+    expect(await isMember(u, ids.A)).toBe(false);
+    const r = (await svc.execute(sql`select status, decided_by is not null as by, decision_note from membership_applications where id = ${id}`)).rows[0] as { status: string; by: boolean; decision_note: string };
+    expect(r).toMatchObject({ status: "declined", by: true, decision_note: "ok" });
+    expect(await apply(u, code)).toBe("applied"); // may apply again after a decline
+  });
+  it("an open club joins people straight away", async () => {
+    await setMode(ids.B, "open");
+    const u = await mkUser(), code = await mkInvite(ids.B);
+    expect(await apply(u, code)).toBe("joined");
+    expect(await isMember(u, ids.B)).toBe(true);
+  });
+  it("invalid codes, suspended members and the daily limit are handled", async () => {
+    const u = await mkUser();
+    expect(await apply(u, "NOSUCHCODE")).toBe("invalid");
+    await setMode(ids.A, "review");
+    const code = await mkInvite(ids.A);
+    await svc.execute(sql`insert into memberships (club_id, user_id, status) values (${ids.A}, ${u}, 'suspended')`);
+    expect(await apply(u, code)).toBe("blocked");
+    const v = await mkUser();
+    const codes = await Promise.all([ids.A, ids.A, ids.A, ids.A, ids.A].map((c) => mkInvite(c)));
+    for (let i = 0; i < 5; i++) { await svc.execute(sql`insert into membership_applications (club_id, user_id, name, status) values (${ids.A}, ${v}, 'x', 'declined')`); }
+    expect(await apply(v, codes[0]!)).toBe("limit");
+  });
+  it("an applicant can withdraw their own pending application only", async () => {
+    await setMode(ids.A, "review");
+    const u = await mkUser(), other = await mkUser(), code = await mkInvite(ids.A);
+    await apply(u, code);
+    const id = await appId(u, ids.A);
+    const wd = async (who: string) => ((await withTenant(app, anyone(who), (tx) => tx.execute(sql`select app.withdraw_application(${id}) as r`))).rows[0] as { r: string }).r;
+    expect(await wd(other)).toBe("closed");
+    expect(await wd(u)).toBe("withdrawn");
+    expect(await wd(u)).toBe("closed");
+  });
+});

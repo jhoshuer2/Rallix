@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
-import { check, doublePrecision, index, integer, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, doublePrecision, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
-import { clubStatus, memberRole, memberStatus, suspensionReason } from "./enums";
+import { clubStatus, level, memberRole, memberStatus, suspensionReason } from "./enums";
 
 const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -75,4 +75,49 @@ export const invites = pgTable("invites", {
 }, (t) => [
   index("invites_club_idx").on(t.clubId),
   check("invites_uses_nonneg", sql`${t.uses} >= 0`),
+]);
+
+
+/**
+ * What a club tells people before they join: the public face of the club, written by its admins.
+ * Fees are not stored here, they come from the club's plans. Members can read it; people outside the club read the published
+ * version through a service-side lookup that returns only these columns plus the club's name and pictures.
+ */
+export const clubPages = pgTable("club_pages", {
+  clubId: uuid("club_id").primaryKey().references(() => clubs.id, { onDelete: "cascade" }),
+  about: text("about"),
+  schedule: text("schedule"), // when we play, meeting times
+  dressCode: text("dress_code"),
+  equipment: text("equipment"), // bring your own racket? how to get one
+  rules: text("rules"), // rules and guidelines
+  contact: text("contact"),
+  /** review: people apply and an admin decides. open: people join straight away after reading the page. */
+  joinMode: text("join_mode").notNull().default("review"),
+  published: boolean("published").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  check("club_pages_join_mode", sql`${t.joinMode} IN ('review','open')`),
+  check("club_pages_lengths", sql`char_length(coalesce(${t.about}, '')) <= 1000 AND char_length(coalesce(${t.schedule}, '')) <= 2000 AND char_length(coalesce(${t.dressCode}, '')) <= 1000 AND char_length(coalesce(${t.equipment}, '')) <= 1000 AND char_length(coalesce(${t.rules}, '')) <= 8000 AND char_length(coalesce(${t.contact}, '')) <= 500`),
+]);
+
+/** Someone asked to join a club that reviews applications. Created and decided only through app.apply_to_club / app.decide_application. */
+export const membershipApplications = pgTable("membership_applications", {
+  id: id(),
+  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  level: level("level").notNull().default("junior"),
+  message: text("message"),
+  status: text("status").notNull().default("pending"),
+  decidedBy: uuid("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decisionNote: text("decision_note"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("applications_one_pending").on(t.clubId, t.userId).where(sql`${t.status} = 'pending'`),
+  index("applications_club_idx").on(t.clubId, t.status, t.createdAt),
+  index("applications_user_idx").on(t.userId, t.createdAt),
+  check("applications_status", sql`${t.status} IN ('pending','approved','declined','withdrawn')`),
+  check("applications_message", sql`${t.message} IS NULL OR char_length(${t.message}) <= 500`),
+  check("applications_note", sql`${t.decisionNote} IS NULL OR char_length(${t.decisionNote}) <= 300`),
 ]);

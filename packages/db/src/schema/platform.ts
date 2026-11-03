@@ -169,7 +169,7 @@ export const paymentEvents = pgTable("payment_events", {
 export const emailLog = pgTable("email_log", {
   id: id(),
   toEmail: text("to_email").notNull(),
-  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast
+  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast | application
   templateKey: text("template_key"),
   status: text("status").notNull(), // sent | failed
   error: text("error"),
@@ -178,7 +178,7 @@ export const emailLog = pgTable("email_log", {
 }, (t) => [
   index("email_log_related_idx").on(t.relatedId, t.createdAt),
   index("email_log_created_idx").on(t.createdAt),
-  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast')`),
+  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast','application')`),
   check("email_log_status", sql`${t.status} IN ('sent','failed')`),
 ]);
 
