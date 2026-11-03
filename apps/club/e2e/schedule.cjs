@@ -62,6 +62,7 @@ ok(sql(`select count(*) from club_events where title='Club social night'`)==='1'
 
 // Player calendar
 await ade.p.goto(B+'/play/calendar',{waitUntil:'networkidle'});
+await ade.p.getByRole('radio',{name:'This month'}).click();
 ok(await ade.p.getByText('Tomorrow').first().isVisible(),'player: tomorrow is labelled');
 ok(await ade.p.getByText('Public holiday').isVisible(),'player: closure is shown');
 ok(await ade.p.getByText('Tuesday night').count()>=1&&await ade.p.getByText('Tuesday night').count()<=5,'player: weekly session repeats across the month');
