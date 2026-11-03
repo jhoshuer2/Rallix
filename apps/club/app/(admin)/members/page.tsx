@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EmptyState, PageShell, SectionTitle } from "@rallix/ui";
+import { EmptyState, IconBadge, ListGroup, ListRow, PageShell, SectionTitle } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requirePermission } from "../../../lib/context";
 import { listMembers } from "../../../lib/queries";
@@ -21,6 +21,8 @@ export default async function Members() {
           <div style={{ height: 8 }} />
         </>
       ) : null}
+      {members.length ? <ListGroup label="Attendance"><ListRow media={<IconBadge icon="check" />} title="Attendance" subtitle="Who is here, door check-in, history" href="/members/attendance" linkAs={Link} /></ListGroup> : null}
+      {members.length ? <div style={{ height: 16 }} /> : null}
       {members.length === 0 ? (
         <EmptyState title="No players yet" hint="Share your invite link and they will appear here." action={<Link className="rx-btn" href="/profile/invite">Get invite link</Link>} />
       ) : <MembersGrid members={members.map((m) => ({ id: m.id, name: m.name, rank: m.rank, rating: m.rating, photo: m.photo ?? null }))} />}

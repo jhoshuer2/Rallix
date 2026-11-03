@@ -21,6 +21,9 @@ export default async function Me() {
         <ListRow media={<Photo src={mine?.photo ?? ctx.user.image} name={ctx.user.name} alt="" />} title={ctx.user.name} subtitle={facts} trailing={mine ? <Pill tone="warning">{mine.level}</Pill> : undefined} />
       </ListGroup>
       <Panel title="Your picture"><PhotoUploader kind="me" name={ctx.user.name} current={mine?.photo ?? null} label="Profile picture" shape="person" /></Panel>
+      <ListGroup label="Membership">
+        <ListRow media={<IconBadge icon="card" />} title="Member card" subtitle="Show it at the door" href="/play/card" linkAs={Link} />
+      </ListGroup>
       <ListGroup label="Payments">
         <ListRow media={<IconBadge icon="wallet" />} title="Payments" subtitle="Dues, receipts and history" href="/play/me/payments" linkAs={Link} />
       </ListGroup>
