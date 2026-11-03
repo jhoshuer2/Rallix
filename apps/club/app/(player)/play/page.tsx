@@ -8,7 +8,8 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { celebrationTiles, celebrations, playerStart, spotsLabel } from "@rallix/stats";
+import { closureNotice, celebrationTiles, celebrations, playerStart, spotsLabel } from "@rallix/stats";
+import { listScheduleEvents } from "../../../lib/schedule-queries";
 import { listMyChallenges, needsMe } from "../../../lib/friendly-queries";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
@@ -28,7 +29,9 @@ export default async function PlayerHome() {
     here: await listHere(tx, ctx.club.clubId),
     arrival: await getArrivalSettings(tx, me),
     friendlies: await listMyChallenges(tx, ctx.club.clubId, me),
+    schedule: await listScheduleEvents(tx, ctx.club.clubId),
   }));
+  const closed = closureNotice(d.schedule, todayInClub());
   const asks = needsMe(d.friendlies, me);
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
@@ -93,6 +96,7 @@ export default async function PlayerHome() {
           a={hero.p1!} b={hero.p2!} scoreA={hero.status === "live" ? hero.gamesP1 : null} scoreB={hero.status === "live" ? hero.gamesP2 : null}
           href={`/play/compete/${hero.competitionId}`} linkAs={Link} cta={hero.status === "live" ? "Follow live" : "Match details"} />
       ) : null}>
+      {closed ? <p className="rx-muted" role="status" style={{ margin: "0 0 12px" }}>{closed}</p> : null}
       {due ? (
         <div className="rx-duebar" role="status">
           <p>{naira(due.amountKobo)} {due.status === "overdue" ? "overdue" : `due ${dueDay}`}</p>
