@@ -293,3 +293,41 @@ export const arrivals = pgTable("arrivals", {
   check("arrivals_method", sql`${t.method} IN ('manual','auto')`),
   check("arrivals_left_after", sql`${t.leftAt} IS NULL OR ${t.leftAt} >= ${t.arrivedAt}`),
 ]);
+
+/** A friendly one-on-one between two members, outside any competition. Rated only when BOTH players agree. */
+export const challenges = pgTable("challenges", {
+  id: id(),
+  clubId: clubId(),
+  challengerId: uuid("challenger_id").notNull(),
+  opponentId: uuid("opponent_id").notNull(),
+  /* proposed -> accepted -> awaiting (one side entered the score) -> confirmed; or declined / cancelled. */
+  status: text("status").notNull().default("proposed"),
+  proposedFor: timestamp("proposed_for", { withTimezone: true }),
+  message: text("message"),
+  bestOf: smallint("best_of").notNull().default(3),
+  challengerRated: boolean("challenger_rated").notNull().default(false),
+  opponentRated: boolean("opponent_rated").notNull().default(false),
+  challengerGames: smallint("challenger_games"),
+  opponentGames: smallint("opponent_games"),
+  enteredBy: uuid("entered_by"),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  /* Set once, by the service role, when Elo was applied (idempotent claim). */
+  ratedAt: timestamp("rated_at", { withTimezone: true }),
+  challengerBefore: integer("challenger_before"),
+  challengerAfter: integer("challenger_after"),
+  opponentBefore: integer("opponent_before"),
+  opponentAfter: integer("opponent_after"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("challenges_id_club_uq").on(t.id, t.clubId),
+  foreignKey({ columns: [t.challengerId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "challenges_challenger_fk" }),
+  foreignKey({ columns: [t.opponentId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "challenges_opponent_fk" }),
+  index("challenges_challenger_idx").on(t.challengerId),
+  index("challenges_opponent_idx").on(t.opponentId),
+  check("challenges_distinct", sql`${t.challengerId} <> ${t.opponentId}`),
+  check("challenges_status", sql`${t.status} IN ('proposed','accepted','awaiting','confirmed','declined','cancelled')`),
+  check("challenges_best_of", sql`${t.bestOf} IN (1,3,5)`),
+  check("challenges_message", sql`${t.message} IS NULL OR char_length(${t.message}) <= 140`),
+]);

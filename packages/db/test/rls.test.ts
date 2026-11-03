@@ -838,3 +838,100 @@ describe("admin team and responsibilities", () => {
     expect(await can(x.ctx, "finance")).toBe(true);
   });
 });
+
+describe("friendly challenges", () => {
+  const p1 = () => ({ userId: "playerA1", clubId: ids.A });
+  const p2 = () => ({ userId: "playerA2", clubId: ids.A });
+  const fn = async (ctx: { userId: string; clubId: string }, q: ReturnType<typeof sql>) =>
+    String((await rows(app, ctx, q))[0]!.r);
+  const propose = (ctx: { userId: string; clubId: string }, opp: string, rated = false, bestOf = 3) =>
+    fn(ctx, sql`select app.propose_challenge(${opp}::uuid, now() + interval '1 day', 'Fancy a game?', ${bestOf}, ${rated}) as r`);
+  const latest = async () => (await svc.execute(sql`select * from challenges where club_id = ${ids.A} order by created_at desc limit 1`)).rows[0] as Record<string, unknown>;
+  const reset = () => svc.execute(sql`delete from challenges`);
+
+  it("a player challenges another member; only the two players can read it", async () => {
+    await reset();
+    expect(await propose(p1(), ids.mP2)).toBe("sent");
+    expect(await rows(app, p1(), sql`select id from challenges`)).toHaveLength(1);
+    expect(await rows(app, p2(), sql`select id from challenges`)).toHaveLength(1);
+    expect(await rows(app, { userId: "multi", clubId: ids.A }, sql`select id from challenges`)).toHaveLength(0); // another member
+    expect(await rows(app, { userId: "adminA", clubId: ids.A }, sql`select id from challenges`)).toHaveLength(0); // even the club admin
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from challenges`)).toHaveLength(0);
+  });
+  it("nobody writes challenges directly, and the rules of a challenge are enforced", async () => {
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into challenges (club_id, challenger_id, opponent_id) values (${ids.A}, ${ids.mP1}, ${ids.mP2})`)))).toBe("42501");
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`update challenges set status = 'confirmed'`)))).toBe("42501");
+    expect(await propose(p1(), ids.mP1)).toBe("self");
+    expect(await propose(p1(), ids.mP2)).toBe("exists"); // one open challenge per pair, in either direction
+    expect(await propose(p2(), ids.mP1)).toBe("exists");
+    expect(await propose(p1(), ids.mAdminB)).toBe("unknown"); // a member of another club
+    expect(await propose(p1(), ids.mMultiA, false, 4)).toBe("invalid");
+    expect(await fn(p1(), sql`select app.propose_challenge(${ids.mMultiA}::uuid, now() - interval '2 days', null, 3, false) as r`)).toBe("past");
+    expect(await fn({ userId: "stranger", clubId: ids.A }, sql`select app.propose_challenge(${ids.mP1}::uuid, null, null, 3, false) as r`)).toBe("denied");
+  });
+  it("only the challenged player answers; accepting records their own rating choice", async () => {
+    const c = await latest();
+    expect(await fn(p1(), sql`select app.respond_challenge(${c.id}::uuid, true, true) as r`)).toBe("denied");
+    expect(await fn({ userId: "multi", clubId: ids.A }, sql`select app.respond_challenge(${c.id}::uuid, true, true) as r`)).toBe("denied");
+    expect(await fn(p2(), sql`select app.respond_challenge(${c.id}::uuid, true, true) as r`)).toBe("accepted");
+    expect(await fn(p2(), sql`select app.respond_challenge(${c.id}::uuid, true, true) as r`)).toBe("closed");
+    const after = await latest();
+    expect(after.status).toBe("accepted");
+    expect(after.opponent_rated).toBe(true);
+    expect(after.challenger_rated).toBe(false);
+  });
+  it("a result is entered by one player and confirmed by the other; the same player cannot confirm their own score", async () => {
+    const c = await latest();
+    expect(await fn({ userId: "multi", clubId: ids.A }, sql`select app.record_challenge_result(${c.id}::uuid, 2, 0) as r`)).toBe("denied");
+    expect(await fn(p1(), sql`select app.record_challenge_result(${c.id}::uuid, 3, 0) as r`)).toBe("invalid"); // best of 3 needs 2
+    expect(await fn(p1(), sql`select app.record_challenge_result(${c.id}::uuid, 2, 2) as r`)).toBe("invalid");
+    expect(await fn(p1(), sql`select app.record_challenge_result(${c.id}::uuid, 1, 1) as r`)).toBe("invalid");
+    expect(await fn(p1(), sql`select app.record_challenge_result(${c.id}::uuid, 2, 1) as r`)).toBe("recorded");
+    const mid = await latest();
+    expect(mid.status).toBe("awaiting");
+    expect([mid.challenger_games, mid.opponent_games]).toEqual([2, 1]);
+    expect(await fn(p1(), sql`select app.confirm_challenge_result(${c.id}::uuid, true, true) as r`)).toBe("denied");
+    expect(await fn(p2(), sql`select app.record_challenge_result(${c.id}::uuid, 2, 0) as r`)).toBe("closed"); // already waiting for confirmation
+  });
+  it("disputing clears the score; confirming makes it final, and it counts only if both agreed", async () => {
+    const c = await latest();
+    expect(await fn(p2(), sql`select app.confirm_challenge_result(${c.id}::uuid, false, false) as r`)).toBe("disputed");
+    expect(await latest()).toMatchObject({ status: "accepted", challenger_games: null, opponent_games: null });
+    // The opponent enters it this time (they won 2-1): scores are stored from the challenger's point of view.
+    expect(await fn(p2(), sql`select app.record_challenge_result(${c.id}::uuid, 2, 1) as r`)).toBe("recorded");
+    expect(await latest()).toMatchObject({ challenger_games: 1, opponent_games: 2 });
+    expect(await fn(p1(), sql`select app.confirm_challenge_result(${c.id}::uuid, true, false) as r`)).toBe("confirmed");
+    const done = await latest();
+    expect(done.status).toBe("confirmed");
+    expect(done.challenger_rated).toBe(false); // the challenger said no, so it will not count
+    expect(done.opponent_rated).toBe(true);
+    expect(await fn(p1(), sql`select app.cancel_challenge(${c.id}::uuid) as r`)).toBe("closed");
+  });
+  it("withdrawing: only the challenger cancels an unanswered challenge; either may call off an accepted one", async () => {
+    await reset();
+    await propose(p1(), ids.mP2);
+    const c = await latest();
+    expect(await fn(p2(), sql`select app.cancel_challenge(${c.id}::uuid) as r`)).toBe("denied");
+    expect(await fn(p1(), sql`select app.cancel_challenge(${c.id}::uuid) as r`)).toBe("cancelled");
+    await propose(p1(), ids.mP2);
+    const d = await latest();
+    await fn(p2(), sql`select app.respond_challenge(${d.id}::uuid, false, false) as r`);
+    expect((await latest()).status).toBe("declined");
+    await propose(p2(), ids.mP1);
+    const e = await latest();
+    await fn(p1(), sql`select app.respond_challenge(${e.id}::uuid, true, false) as r`);
+    expect(await fn(p1(), sql`select app.cancel_challenge(${e.id}::uuid) as r`)).toBe("cancelled");
+  });
+  it("a player has at most five unanswered challenges, and a suspended club blocks everything", async () => {
+    await reset();
+    const users = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6"];
+    await svc.insert(s.users).values(users.map((u) => ({ id: u, name: u, email: `${u}@x.com` })));
+    const ms = await svc.insert(s.memberships).values(users.map((u) => ({ clubId: ids.A, userId: u }))).returning();
+    for (const m of ms.slice(0, 5)) expect(await propose(p1(), m.id)).toBe("sent");
+    expect(await propose(p1(), ms[5]!.id)).toBe("limit");
+    await reset();
+    await svc.execute(sql`update clubs set status = 'suspended', suspension_reason = 'other' where id = ${ids.A}`);
+    expect(await propose(p1(), ids.mP2)).toBe("denied");
+    await svc.execute(sql`update clubs set status = 'active', suspension_reason = null where id = ${ids.A}`);
+  });
+});
