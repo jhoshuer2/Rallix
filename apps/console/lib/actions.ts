@@ -20,7 +20,6 @@ const pgCode = (e: unknown) => (e as { cause?: { code?: string }; code?: string 
 async function audit(actor: string, action: string, entity: string, entityId: string | null, meta: Record<string, unknown> = {}) {
   await db().execute(sql`insert into audit_log (actor_id, action, entity, entity_id, meta) values (${actor}, ${action}, ${entity}, ${entityId}, ${JSON.stringify(meta)}::jsonb)`);
 }
-const uuidLike = (v: string) => uuid.test(v);
 const nairaToKobo = (n: number) => Math.round(n * 100);
 const validMoney = (k: number) => Number.isFinite(k) && k >= 0 && k <= 100_000_000_00;
 
@@ -233,7 +232,7 @@ export async function addTeamMember(emailInput: string, role: string = "support"
 /** Change someone's role. Only owners reach this; the database refuses to demote the last owner. */
 export async function setTeamRole(userId: string, role: string): Promise<Res> {
   const staff = await requireAdmin("team");
-  if (!uuidLike(userId) || !isStaffRole(role)) return fail("Invalid request.");
+  if (!/^[\w-]{1,64}$/.test(userId) || !isStaffRole(role)) return fail("Invalid request."); // user ids are random strings, not UUIDs
   try {
     const r = await db().execute(sql`update platform_admins set role = ${role} where user_id = ${userId} returning user_id`);
     if (!r.rows.length) return fail("That person is not on the team.");
