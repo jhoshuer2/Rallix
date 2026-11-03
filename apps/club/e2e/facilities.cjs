@@ -52,7 +52,7 @@ await admin.p.keyboard.press('Escape');
 
 // Table out of service
 await admin.p.getByText('Table 1').click();await admin.p.getByRole('radio',{name:'Out of service'}).click();await admin.p.getByRole('button',{name:'Save'}).click();
-await admin.p.getByText('Out of service').first().waitFor();
+for(let k=0;k<40&&sql(`select status from facility_items where name='Table 1'`)!=='out';k++)await admin.p.waitForTimeout(250);
 ok(sql(`select status from facility_items where name='Table 1'`)==='out','table is out of service');
 
 // Home: needs attention (admin only)
