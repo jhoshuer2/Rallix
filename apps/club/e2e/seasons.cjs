@@ -53,7 +53,7 @@ await admin.p.getByLabel('Points for a win').fill('1');await admin.p.getByLabel(
 await admin.p.getByRole('button',{name:'Save details'}).click();
 ok(await admin.p.getByText('A loss can’t be worth more than a win.').waitFor({timeout:15000}).then(()=>true).catch(()=>false),'a loss worth more than a win is refused');
 await admin.p.getByLabel('Points for a win').fill('2');await admin.p.getByLabel('Points for a loss').fill('1');
-await admin.p.getByRole('button',{name:/Season/}).click();await admin.p.getByRole('option',{name:'E2E Season'}).click();
+await admin.p.getByRole('button',{name:/Season/}).click();await admin.p.getByRole('radio',{name:'E2E Season'}).click();
 await admin.p.getByRole('button',{name:'Save details'}).click();await admin.p.getByText('Saved.').waitFor();
 ok(sql(`select points_win||'|'||points_loss||'|'||(season_id is not null) from competitions where id='${id}'`)==='2|1|true','win 2, loss 1 and the season are saved');
 
