@@ -107,6 +107,19 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Barlow Condensed 600/700 (he
 - Pure rules (score validity, next step, record, Elo helper) are in `packages/stats/src/friendly.ts` and must agree with the SQL. UI: Ranks rows open the challenge form, `/play/friendlies` lists Needs you / Coming up / Played, Home shows a short "waiting for you" list only when something needs the player.
 - Cross-club challenges wait for the global leaderboard phase. Test: `apps/club/e2e/friendlies.cjs`.
 
+## Schedule, facilities, attendance (`lib/schedule-*`, `lib/facility-*`, `lib/attendance-*`, `lib/card.ts`)
+- Schedule: `club_events` (kind `play` | `event` | `closed`; weekly repeat only for `play`; optional `doors_open`). Facilities admin writes it, every member reads it. The pure `occurrences` (`packages/stats/src/schedule.ts`) expands weekly sessions and hides sessions on closed days. Player `/play/calendar` has Today / This week / This month chips and an "I'm coming" button per session or event (`app.rsvp`: the day must be real, not closed, today to 60 days ahead; RSVPs are private: your own, or everyone's for the Members admin).
+- Facilities: `facility_items` and the append-only `facility_log`, Facilities admin only. Stock changes go through `app.adjust_stock` (logged in the same step, never below zero).
+- Attendance: door check-in is `app.door_check_in/out` (Members admin, method `door`). The member card QR is a signed token (`@rallix/config/card-token`: HMAC over club, member and the current minute, valid two minutes, key derived from `BETTER_AUTH_SECRET`). The scan (`lookupCard`) shows standing only (paid up or not), never amounts, and never blocks: the admin decides. Camera scanning needs HTTPS and permission; it is not covered by an automated test.
+- Tests: `schedule.cjs`, `facilities.cjs`, `attendance.cjs`, `rsvp.cjs`.
+
+## Competition formats, points, awards, seasons, waitlist
+- Knockout (`packages/stats/src/knockout.ts`): `buildKnockout` (byes to top seeds, standard seed placement, feeds), `drawOrder` (seeded or raffle, the raffle is drawn once at start and `drawn_at` is set). `generateKnockout` in `lib/competition-core.ts` inserts the final first so each match knows what it feeds. `saveResult` moves the winner into the next match in the same transaction.
+- Points and awards: `standings` (win/loss points per competition, tie-breaks head-to-head, game difference, point difference), `seasonTable`, `awardsFromTable`, `awardsFromKnockout`. `finishIfDone` (`lib/competition-finish.ts`, service role, idempotent) completes a competition when every match is decided and records the podium in `competition_awards` (written only by the server). Group stage completes without awards.
+- Seasons: `seasons` plus `competitions.season_id` (composite FK, own club only). Never deleted. Ranks shows the running season as an extra option once it has results.
+- Waitlist: `competition_waitlist`, written only by `app.join_waitlist` / `leave_waitlist`. A trigger on `competition_entries` promotes the oldest eligible waiter whenever a spot opens (leave, admin removal) and `app.promote_waitlist` is called after the admin raises the limit. `registrationState` has `waitlist` and `waiting`. The competition preview's one main action is a sticky bottom bar (`StickyBar`).
+- Tests: `knockout.cjs`, `seasons.cjs`, `waitlist.cjs`.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.
