@@ -108,6 +108,10 @@ export const competitions = pgTable("competitions", {
   /* How seeds were decided when it started: by rating, or a random raffle. drawnAt is set once. */
   drawMethod: text("draw_method").notNull().default("seeded"),
   drawnAt: timestamp("drawn_at", { withTimezone: true }),
+  /* League points: what a win and a loss are worth in this competition. */
+  pointsWin: smallint("points_win").notNull().default(3),
+  pointsLoss: smallint("points_loss").notNull().default(0),
+  seasonId: uuid("season_id"),
   maxPlayers: smallint("max_players"),
   registrationClosesOn: date("registration_closes_on"),
   createdBy: uuid("created_by"),
@@ -120,6 +124,7 @@ export const competitions = pgTable("competitions", {
   check("competitions_summary", sql`${t.summary} IS NULL OR char_length(${t.summary}) <= 140`),
   check("competitions_prize", sql`${t.prize} IS NULL OR char_length(${t.prize}) <= 100`),
   check("competitions_rules", sql`${t.rules} IS NULL OR char_length(${t.rules}) <= 8000`),
+  check("competitions_points", sql`${t.pointsWin} BETWEEN 0 AND 10 AND ${t.pointsLoss} BETWEEN 0 AND 10 AND ${t.pointsLoss} <= ${t.pointsWin}`),
   check("competitions_draw_method", sql`${t.drawMethod} IN ('seeded','raffle')`),
   check("competitions_max_players", sql`${t.maxPlayers} IS NULL OR ${t.maxPlayers} BETWEEN 2 AND 128`),
   check("competitions_cover_url", sql`${t.coverUrl} IS NULL OR ${t.coverUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
@@ -400,4 +405,33 @@ export const facilityLog = pgTable("facility_log", {
   index("facility_log_item_idx").on(t.itemId, t.createdAt),
   check("facility_log_kind", sql`${t.kind} IN ('maintenance','stock','note')`),
   check("facility_log_note", sql`${t.note} IS NULL OR char_length(${t.note}) <= 280`),
+]);
+
+/** A season groups competitions; its table adds up the points from all of them. */
+export const seasons = pgTable("seasons", {
+  id: id(),
+  clubId: clubId(),
+  name: text("name").notNull(),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("seasons_id_club_uq").on(t.id, t.clubId),
+  check("seasons_name", sql`char_length(${t.name}) BETWEEN 1 AND 60`),
+  check("seasons_range", sql`${t.endsOn} >= ${t.startsOn}`),
+]);
+
+/** Podium places, written by the server when a competition finishes. Third place can be shared (two losing semi-finalists). */
+export const competitionAwards = pgTable("competition_awards", {
+  id: id(),
+  clubId: clubId(),
+  competitionId: uuid("competition_id").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  place: smallint("place").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("competition_awards_uq").on(t.competitionId, t.membershipId),
+  foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "awards_competition_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "awards_membership_fk" }),
+  check("competition_awards_place", sql`${t.place} BETWEEN 1 AND 3`),
 ]);

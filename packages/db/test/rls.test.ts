@@ -1107,3 +1107,51 @@ describe("competition draw", () => {
     await svc.execute(sql`insert into matches (club_id, competition_id, round, round_order, slot, player1_id, winner_id, status) values (${ids.A}, ${ids.compA}, 'Round of 8', 1, 9, ${winner}, ${winner}, 'walkover')`); // a bye: one player, decided without playing
   });
 });
+
+describe("points, seasons and awards", () => {
+  let k = 0;
+  async function admin(perms: string[]) {
+    const u = `seas${++k}`;
+    await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`);
+    await svc.execute(sql`insert into memberships (club_id, user_id, roles, permissions) values (${ids.A}, ${u}, ARRAY['admin']::member_role[], ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)})`);
+    return { userId: u, clubId: ids.A };
+  }
+  const OWNER = () => ({ userId: "adminA", clubId: ids.A });
+  const player = () => ({ userId: "playerA1", clubId: ids.A });
+  const mkSeason = (ctx: { userId: string; clubId: string }, name = "2030 Season") =>
+    withTenant(app, ctx, (tx) => tx.execute(sql`insert into seasons (club_id, name, starts_on, ends_on) values (${ctx.clubId}, ${name}, '2030-01-01', '2030-12-31') returning id`));
+
+  it("only the Competitions admin creates or edits seasons; every member reads them; none can be deleted", async () => {
+    const comp = await admin(["competitions"]), fin = await admin(["finance"]);
+    const s = ((await mkSeason(comp)).rows[0] as { id: string }).id;
+    expect((await mkSeason(OWNER(), "Owner season")).rows).toHaveLength(1);
+    expect(await denied(mkSeason(fin))).toBe("42501");
+    expect(await denied(mkSeason(player()))).toBe("42501");
+    expect(await rows(app, player(), sql`select id from seasons`)).not.toHaveLength(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from seasons`)).toHaveLength(0);
+    expect(await rows(app, fin, sql`update seasons set name = 'x' where id = ${s} returning id`)).toHaveLength(0);
+    expect(await rows(app, comp, sql`update seasons set name = 'Renamed' where id = ${s} returning id`)).toHaveLength(1);
+    expect(await denied(withTenant(app, comp, (tx) => tx.execute(sql`delete from seasons where id = ${s}`)))).toBe("42501");
+    expect(await denied(withTenant(app, comp, (tx) => tx.execute(sql`insert into seasons (club_id, name, starts_on, ends_on) values (${ids.A}, 'Backwards', '2030-12-31', '2030-01-01')`)))).toBe("23514");
+  });
+  it("a competition can only join a season of its own club, and points rules stay sane", async () => {
+    const s = ((await mkSeason(OWNER(), "Attach me")).rows[0] as { id: string }).id;
+    const sB = ((await svc.execute(sql`insert into seasons (club_id, name, starts_on, ends_on) values (${ids.B}, 'B season', '2030-01-01', '2030-12-31') returning id`)).rows[0] as { id: string });
+    expect(await rows(app, OWNER(), sql`update competitions set season_id = ${s} where id = ${ids.compA} returning id`)).toHaveLength(1);
+    expect(await denied(withTenant(app, OWNER(), (tx) => tx.execute(sql`update competitions set season_id = ${sB.id} where id = ${ids.compA}`)))).toBe("23503");
+    expect(await denied(withTenant(app, OWNER(), (tx) => tx.execute(sql`update competitions set points_win = 11 where id = ${ids.compA}`)))).toBe("23514");
+    expect(await denied(withTenant(app, OWNER(), (tx) => tx.execute(sql`update competitions set points_win = 1, points_loss = 2 where id = ${ids.compA}`)))).toBe("23514");
+    expect(await rows(app, OWNER(), sql`update competitions set points_win = 2, points_loss = 1 where id = ${ids.compA} returning id`)).toHaveLength(1);
+    await svc.execute(sql`update competitions set season_id = null, points_win = 3, points_loss = 0 where id = ${ids.compA}`);
+  });
+  it("awards are readable by members, written only by the server, one per player and competition", async () => {
+    await svc.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mP1}, 1)`);
+    expect(await rows(app, player(), sql`select id from competition_awards`)).toHaveLength(1);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from competition_awards`)).toHaveLength(0);
+    expect(await denied(withTenant(app, OWNER(), (tx) => tx.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mP2}, 2)`)))).toBe("42501");
+    expect(await denied(withTenant(app, OWNER(), (tx) => tx.execute(sql`update competition_awards set place = 3`)))).toBe("42501");
+    expect(await denied(svc.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mP1}, 2)`))).toBe("23505");
+    expect(await denied(svc.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mP2}, 4)`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mAdminB}, 3)`))).toBe("23503"); // another club's member
+  });
+});
