@@ -1,6 +1,6 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { clubs, membershipApplications, clubPages, withTenant, type Tx } from "@rallix/db";
-import { appDb } from "./db";
+import { appDb, serviceDb } from "./db";
 
 export type PendingApplication = { id: string; name: string; level: string; message: string | null; createdAt: Date };
 
@@ -17,12 +17,18 @@ export async function pendingApplicationCount(tx: Tx, clubId: string): Promise<n
 
 export type MyApplication = { id: string; clubId: string; clubName: string; status: string; createdAt: Date };
 
-/** The signed-in person's own pending applications, across clubs. Runs as that user, with no club selected. */
+/**
+ * The signed-in person's own pending applications, across clubs. Runs as that user with no club selected. An applicant is not yet a member,
+ * so the app role cannot read the club row: names come from the service role, by the ids on the user's own applications only.
+ */
 export async function myPendingApplications(userId: string): Promise<MyApplication[]> {
-  return withTenant(appDb(), { userId }, (tx) =>
-    tx.select({ id: membershipApplications.id, clubId: membershipApplications.clubId, clubName: clubs.name, status: membershipApplications.status, createdAt: membershipApplications.createdAt })
-      .from(membershipApplications).innerJoin(clubs, eq(clubs.id, membershipApplications.clubId))
-      .where(and(eq(membershipApplications.userId, userId), eq(membershipApplications.status, "pending"))).orderBy(asc(membershipApplications.createdAt)));
+  const mine = await withTenant(appDb(), { userId }, (tx) =>
+    tx.select({ id: membershipApplications.id, clubId: membershipApplications.clubId, status: membershipApplications.status, createdAt: membershipApplications.createdAt })
+      .from(membershipApplications).where(and(eq(membershipApplications.userId, userId), eq(membershipApplications.status, "pending"))).orderBy(asc(membershipApplications.createdAt)));
+  if (mine.length === 0) return [];
+  const names = await serviceDb().select({ id: clubs.id, name: clubs.name }).from(clubs).where(inArray(clubs.id, mine.map((m) => m.clubId)));
+  const byId = new Map(names.map((n) => [n.id, n.name]));
+  return mine.map((m) => ({ ...m, clubName: byId.get(m.clubId) ?? "the club" }));
 }
 
 /** Whether this club has written anything on its page yet (for the setup checklist). */

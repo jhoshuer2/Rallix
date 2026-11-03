@@ -26,7 +26,7 @@ const text=p=>p.locator('body').innerText();
   await A.goto(B+'/profile');await A.getByRole('button',{name:/Create invite link|Create a new link/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor();
   const invite=(await text(A)).match(/\/join\/([A-Z0-9]{8})/)[1];
   await A.getByRole('link',{name:/Club page/}).click();await A.waitForURL(/club-page/);
-  await A.getByLabel('About').fill('A friendly club in Abuja.');await A.getByLabel('When we play').fill('Saturdays 4pm to 8pm. Closed on public holidays.');
+  await A.getByLabel('About',{exact:true}).fill('A friendly club in Abuja.');await A.getByLabel('When we play').fill('Saturdays 4pm to 8pm. Closed on public holidays.');
   await A.getByLabel('Dress code').fill('Sports shoes and sportswear.');await A.getByLabel('Equipment').fill('Bring your own bat or borrow one.');await A.getByLabel('Rules and guidelines').fill('Be kind. Pay dues by the 5th.');
   await A.getByRole('button',{name:'Save club page'}).click();await A.getByText('Saved.').waitFor();
   ok(sql(`select join_mode||','||published from club_pages where club_id='${club}'`)==='review,false','club page saved: reviews applications, not public yet');
