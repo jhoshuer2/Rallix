@@ -407,7 +407,7 @@ export function Checklist({ title, steps, linkAs: L = "a" }: { title: string; st
       <ListGroup bare label={title}>
         {steps.map((st, i) => (
           <ListRow key={st.key} media={<span className={cx("rx-stepdot", st.done && "is-done")} aria-hidden="true">{st.done ? <Icon name="check" size={18} /> : i + 1}</span>}
-            title={st.title} subtitle={st.done ? undefined : st.hint} href={st.href} linkAs={L} current={st.key === nextKey} ariaLabel={`${st.title}${st.done ? ", done" : ""}`} />
+            title={st.title} subtitle={st.key === nextKey ? st.hint : undefined} href={st.href} linkAs={L} current={st.key === nextKey} ariaLabel={`${st.title}${st.done ? ", done" : ""}`} />
         ))}
       </ListGroup>
     </Panel>

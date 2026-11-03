@@ -12,7 +12,7 @@ const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_servic
 let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAIL',m)};
 function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...log.matchAll(re)];return a.length?a[a.length-1][1]:null}
 const mails=to=>fs.readFileSync(LOG).toString().split('\n').filter(l=>l.includes('[mail:dev] to '+to+' |'));
-async function ctxFor(b,email,w=390){const c=await b.newContext({viewport:{width:w,height:900}});const p=await c.newPage();p.setDefaultTimeout(60000);p.errs=[];p.on('pageerror',e=>p.errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|Failed to load resource/.test(m.text()))p.errs.push(m.text())});
+async function ctxFor(b,email,w=390){const c=await b.newContext({viewport:{width:w,height:900}});const p=await c.newPage();p.setDefaultTimeout(60000);p.errs=[];p.on('pageerror',e=>p.errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|Failed to load resource/.test(m.text()))p.errs.push(p.url().replace(/^https?:\/\/[^/]+/,'')+' :: '+(/hydrat/i.test(m.text())?m.text().replace(/\n+/g,' | ').slice(-1400):m.text().slice(0,200)))});
  if(email){await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor();await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()))}
  return p}
 const small=async p=>p.evaluate(()=>[...document.querySelectorAll('button,a,[role=switch]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<44&&getComputedStyle(e).visibility!=='hidden'&&!e.classList.contains('rx-btn--small')&&!e.closest('dialog:not([open])')}).map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,28)));
@@ -60,6 +60,7 @@ const text=p=>p.locator('body').innerText();
   await A.goto(B+'/');ok(/wants to join|want to join/.test(await text(A)),'admin home lists the waiting application under Needs your attention');
   ok(await A.locator('.rx-nav__badge').first().isVisible(),'the Members tab shows a badge');
   await A.goto(B+'/members');t=await text(A);ok(/Nia Newbie/.test(t)&&/I played at university/.test(t),'admin sees the applicant and their message');
+  await A.waitForLoadState('networkidle');await A.waitForTimeout(800);
   await A.screenshot({path:SC+'/applications_admin.png',fullPage:true});
   const sm2=await small(A);ok(sm2.length===0,'applications targets are 44px or larger '+JSON.stringify(sm2));
   await A.getByRole('button',{name:'Approve Nia Newbie'}).click();await A.getByText(/Waiting to join/i).waitFor({state:'detached',timeout:20000}).catch(()=>{});
@@ -101,6 +102,6 @@ const text=p=>p.locator('body').innerText();
   // 9. Setup checklist ticks the club page step
   await A.goto(B+'/');ok(true,'admin home still loads');
 
-  const errs=[A,S,N,D,W,O,P].flatMap(p=>p.errs);ok(errs.length===0,'no page errors: '+JSON.stringify(errs).slice(0,300));
+  const errs=[A,S,N,D,W,O,P].flatMap(p=>p.errs);ok(errs.length===0,'no page errors: '+JSON.stringify(errs).slice(0,3000));
   await b.close();console.log(`\n${pass} passed, ${fail} failed`);process.exit(fail?1:0)
 })().catch(e=>{console.log('CRASH',e.message.split('\n')[0]);process.exit(1)});

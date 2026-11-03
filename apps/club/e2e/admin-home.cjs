@@ -4,8 +4,8 @@
  * Needs a freshly seeded DB and the club app running:  OUT=/tmp DEV_LOG=/tmp/club.log node apps/club/e2e/admin-home.cjs
  */
 const {chromium}=require('playwright');const fs=require('fs');const {execSync}=require('child_process');
-const SC=process.env.OUT||'/tmp', LOG=process.env.DEV_LOG, B='http://localhost:3000';
-const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
+const SC=process.env.OUT||'/tmp', LOG=process.env.DEV_LOG, B=process.env.BASE||'http://localhost:3000', DB=process.env.PGDB||'rallix_dev';
+const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d ${DB} -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
 let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAIL',m)};
 function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...log.matchAll(re)];return a.length?a[a.length-1][1]:null}
 async function signIn(p,email,club){await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()),{timeout:25000});const id=sql(`select id from clubs where name='${club}'`);await p.goto(B+'/switch/'+id)}
@@ -42,7 +42,7 @@ const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.ne
 await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill('empty-admin@example.com');await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code('empty-admin@example.com'));await p.getByRole('button',{name:'Sign in'}).click();
 await p.getByLabel('What is your club called?').waitFor({timeout:25000});await p.waitForLoadState('networkidle');await p.waitForTimeout(1500);await p.getByLabel('What is your club called?').fill('Empty Club');await p.getByLabel(/your name/i).fill('Empty Admin');await p.getByLabel('Where are you located').fill('Lagos');await p.getByRole('button',{name:'Create my club'}).click();
 await p.waitForURL(u=>!/onboarding/.test(u.toString()),{timeout:25000});await p.waitForLoadState('networkidle');
-let t=await checkPage(p,'empty_home','/',{maxWords:90});ok(/Set up your club/i.test(t)&&/0 of 6/.test(t),'empty home: a setup checklist tells the new admin what to do');ok(!/Outstanding|Revenue|Recent activity|Needs your attention/i.test(t),'empty home: no empty sections or zero figures');
+let t=await checkPage(p,'empty_home','/',{maxWords:90});ok(/Set up your club/i.test(t)&&/0 of 7/.test(t),'empty home: a setup checklist tells the new admin what to do');ok(!/Outstanding|Revenue|Recent activity|Needs your attention/i.test(t),'empty home: no empty sections or zero figures');
 t=await checkPage(p,'empty_members','/members',{maxWords:60});ok(/invite/i.test(t),'empty members: invite action is present');
 t=await checkPage(p,'empty_competition','/competition',{maxWords:60});ok(/Create a competition/i.test(t),'empty competition: one clear action');
 ok(errs.length===0,'empty club: no uncaught errors');
