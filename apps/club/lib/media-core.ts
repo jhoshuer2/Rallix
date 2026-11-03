@@ -1,14 +1,19 @@
 import { and, eq, gt, sql } from "drizzle-orm";
 import { clubs, competitions, playerProfiles, uploadLog } from "@rallix/db";
 import { MediaError, authorizeTarget, clubOfKey, objectKey, ownKeyFromUrl, processImage, type ImageStore, type PhotoKind, type Target } from "@rallix/media";
-import { inClub, type Ctx, type MyClub } from "./context";
+import { can, inClub, type Ctx, type MyClub } from "./context";
 import { serviceDb } from "./db";
 
 export type { Target };
 export type MediaResult = { ok: true; url: string | null } | { ok: false; error: string };
 
 type Signed = Ctx & { club: MyClub };
-const authorize = (ctx: Signed, t: Target) => authorizeTarget({ roles: ctx.club.roles, membershipId: ctx.club.membershipId }, t);
+/** Pictures follow the admin's responsibility: club and member pictures need Members, competition covers need Competitions. */
+const authorize = (ctx: Signed, t: Target) => {
+  const need = t.kind === "competition-cover" ? "competitions" : t.kind === "me" ? null : "members";
+  const roles = need && !can(ctx.club, need) ? ctx.club.roles.filter((r) => r !== "admin") : ctx.club.roles;
+  return authorizeTarget({ roles, membershipId: ctx.club.membershipId }, t);
+};
 
 async function recentUploads(userId: string): Promise<number> {
   const [r] = await serviceDb().select({ n: sql<number>`count(*)::int` }).from(uploadLog).where(and(eq(uploadLog.userId, userId), gt(uploadLog.createdAt, new Date(Date.now() - 86_400_000))));

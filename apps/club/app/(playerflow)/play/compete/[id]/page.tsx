@@ -5,7 +5,7 @@ import { registrationState, spotsLabel, spotsPercent } from "@rallix/stats";
 import { CompetitionJoin } from "../../../../../components/CompetitionJoin";
 import { RulesSheet } from "../../../../../components/RulesSheet";
 import { todayInClub } from "../../../../../lib/highlights";
-import { inClub, isAdmin, requireClub } from "../../../../../lib/context";
+import { can, inClub, requireClub } from "../../../../../lib/context";
 import { getCompetitionPreview, listMatches } from "../../../../../lib/queries";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,7 +42,7 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
   return (
     <PageShell back={<BackButton href="/play/compete" linkAs={Link} />} lead={<CompetitionBanner name={c.name} summary={c.summary} cover={c.coverUrl} status={statusPill} />}>
       {state !== "hidden" && (draft || registered) ? <CompetitionJoin id={id} state={state} canLeave={draft} level={c.level ? cap(c.level) : null} /> : null}
-      {isAdmin(ctx.club) ? <Link className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 12, boxSizing: "border-box" }} href={`/competition/${id}/groups`}>Manage competition</Link> : null}
+      {can(ctx.club, "competitions") ? <Link className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 12, boxSizing: "border-box" }} href={`/competition/${id}/groups`}>Manage competition</Link> : null}
 
       <ListGroup label="Competition details">
         <ListRow media={<IconBadge icon="calendar" />} title={when.title} subtitle={when.sub || undefined} />

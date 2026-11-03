@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { competitionEntries, competitions } from "@rallix/db";
 import { sql } from "drizzle-orm";
-import { inClub, isAdmin, requireClub } from "./context";
+import { inClub, can, requireClub } from "./context";
 import { seedAndGenerate } from "./competition-core";
 import { getCompetition, listMembers } from "./queries";
 
@@ -42,7 +42,7 @@ export async function leaveCompetition(id: string): Promise<Result> {
 /** Admin: the preview details and the sign-up settings. Only an admin's session passes row-level security for this update. */
 export async function saveCompetitionDetails(id: string, input: { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: number | null; closesOn: string | null }): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can edit competitions.");
+  if (!can(ctx.club, "competitions")) return fail("Only club admins can edit competitions.");
   if (!UUID.test(id)) return fail("We couldn’t find that competition.");
   const summary = input.summary.trim(), prize = input.prize.trim(), rules = input.rules.trim();
   if (summary.length > 140) return fail("Keep the summary under 140 characters.");
@@ -71,7 +71,7 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
 /** Admin: lock the sign-ups and generate the fixtures. Needs at least two entrants. */
 export async function startCompetition(id: string): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can start a competition.");
+  if (!can(ctx.club, "competitions")) return fail("Only club admins can start a competition.");
   if (!UUID.test(id)) return fail("We couldn’t find that competition.");
   const res = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
@@ -94,7 +94,7 @@ export async function startCompetition(id: string): Promise<Result> {
 /** Admin: add players to a competition that has not started. */
 export async function addEntrants(id: string, memberIds: string[]): Promise<Result<{ added: number }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can add players.");
+  if (!can(ctx.club, "competitions")) return fail("Only club admins can add players.");
   if (!UUID.test(id) || !Array.isArray(memberIds) || memberIds.some((m) => !UUID.test(m))) return fail("Something went wrong. Please try again.");
   const added = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
@@ -113,7 +113,7 @@ export async function addEntrants(id: string, memberIds: string[]): Promise<Resu
 
 export async function removeEntrant(id: string, memberId: string): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can remove players.");
+  if (!can(ctx.club, "competitions")) return fail("Only club admins can remove players.");
   if (!UUID.test(id) || !UUID.test(memberId)) return fail("Something went wrong. Please try again.");
   const ok = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);

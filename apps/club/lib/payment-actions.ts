@@ -6,7 +6,7 @@ import { generateReference, isPaymentError } from "@rallix/payments";
 import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { attemptsLastHour, ipAllowed, lookupPayLink, ownerEmail } from "./pay-link";
-import { inClub, isAdmin, requireClub } from "./context";
+import { inClub, can, requireClub } from "./context";
 import { serviceDb } from "./db";
 import { appUrl, provider } from "./payments";
 import { invoiceCols } from "./payment-queries";
@@ -64,7 +64,7 @@ export async function startDuePayment(dueId: string): Promise<Res<{ url: string 
 /** Admin records money received outside the app (cash or bank transfer). */
 export async function recordManualPayment(input: { dueId: string; method: "cash" | "transfer" }): Promise<Res> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can record payments.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can record payments.");
   if (!UUID.test(input.dueId) || !["cash", "transfer"].includes(input.method)) return fail("Invalid request.");
   const done = await inClub(ctx, async (tx) => {
     const [due] = await tx.select().from(dues).where(eq(dues.id, input.dueId));
@@ -83,7 +83,7 @@ export async function recordManualPayment(input: { dueId: string; method: "cash"
 
 export async function startInvoicePayment(invoiceId: string): Promise<Res<{ url: string }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can pay invoices.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can pay invoices.");
   if (!UUID.test(invoiceId)) return fail("Invalid request.");
   const [inv] = await inClub(ctx, (tx) => tx.select(invoiceCols).from(platformInvoices).where(and(eq(platformInvoices.id, invoiceId), eq(platformInvoices.clubId, ctx.club.clubId))));
   if (!inv) return fail("That invoice was not found.");
@@ -105,13 +105,13 @@ export async function startInvoicePayment(invoiceId: string): Promise<Res<{ url:
 
 export async function loadBanks(): Promise<Res<{ banks: Array<{ name: string; code: string }> }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can set up payouts.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can set up payouts.");
   try { return { ok: true, banks: await provider().listBanks() }; } catch (e) { return fail(friendly(e)); }
 }
 
 export async function resolvePayoutAccount(input: { bankCode: string; accountNumber: string }): Promise<Res<{ accountName: string }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can set up payouts.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can set up payouts.");
   if (!/^\d{10}$/.test(input.accountNumber)) return fail("Account numbers have 10 digits.");
   try {
     if (!(await provider().listBanks()).some((b) => b.code === input.bankCode)) return fail("Choose a bank from the list.");
@@ -122,7 +122,7 @@ export async function resolvePayoutAccount(input: { bankCode: string; accountNum
 /** Create the club's settlement subaccount. The account name is re-resolved here, never trusted from the browser. */
 export async function savePayoutAccount(input: { bankCode: string; accountNumber: string; confirmedName: string }): Promise<Res> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can set up payouts.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can set up payouts.");
   if (!/^\d{10}$/.test(input.accountNumber)) return fail("Account numbers have 10 digits.");
   try {
     const bank = (await provider().listBanks()).find((b) => b.code === input.bankCode);

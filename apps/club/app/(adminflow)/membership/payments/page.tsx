@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BackButton, PageShell } from "@rallix/ui";
-import { inClub, requireRole } from "../../../../lib/context";
+import { inClub, requirePermission } from "../../../../lib/context";
 import { listDues, naira, fmtDate } from "../../../../lib/queries";
 import { reminderCounts } from "../../../../lib/reminder-queries";
 import { Payments } from "./Payments";
 
 export default async function PaymentsPage() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("finance");
   const dues = await inClub(ctx, (tx) => listDues(tx, ctx.club.clubId));
   const reminded = await reminderCounts(ctx.club.clubId, dues.map((d) => d.id));
   const map = { due: "pending", overdue: "failed", paid: "paid", waived: "refunded" } as const;

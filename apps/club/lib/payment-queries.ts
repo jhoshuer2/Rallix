@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { clubSubscriptions, clubs, platformInvoices } from "@rallix/db";
-import { inClub, isAdmin, type Ctx, type MyClub } from "./context";
+import { inClub, can, type Ctx, type MyClub } from "./context";
 import { serviceDb } from "./db";
 
 type C = Ctx & { club: MyClub };
@@ -11,7 +11,7 @@ export const payoutsEnabled = async (ctx: C) =>
 
 /** Bank details are service-only. Call this only after the caller is known to be an admin of this club. */
 export async function payoutDetails(ctx: C) {
-  if (!isAdmin(ctx.club)) return null;
+  if (!can(ctx.club, "finance")) return null;
   const [r] = await serviceDb().select({ enabledAt: clubs.payoutsEnabledAt, bank: clubs.payoutBankName, name: clubs.payoutAccountName, last4: clubs.payoutAccountLast4 }).from(clubs).where(eq(clubs.id, ctx.club.clubId));
   return r?.enabledAt ? r : null;
 }

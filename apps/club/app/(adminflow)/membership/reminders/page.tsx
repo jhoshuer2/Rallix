@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BackButton, EmptyState, IconBadge, ListGroup, ListRow, PageShell, Pill } from "@rallix/ui";
 import { describeOffset } from "@rallix/payments";
-import { requireRole } from "../../../../lib/context";
+import { requirePermission } from "../../../../lib/context";
 import { reminderOverview, reminderSettingsFor } from "../../../../lib/reminder-queries";
 import { ReminderForm } from "./ReminderForm";
 
 export default async function Reminders() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("finance");
   const [settings, ov] = await Promise.all([reminderSettingsFor(ctx), reminderOverview(ctx)]);
   const when = (d: Date) => d.toLocaleString("en-NG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   return (

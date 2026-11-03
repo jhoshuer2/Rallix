@@ -3,13 +3,13 @@ import { PageShell, Panel, SectionTitle, StackedBar, TileLink } from "@rallix/ui
 import { membershipOverview } from "@rallix/stats";
 import { todayInClub } from "../../../lib/highlights";
 import { ClubHeader } from "../../../components/ClubHeader";
-import { inClub, requireRole } from "../../../lib/context";
+import { inClub, requirePermission } from "../../../lib/context";
 import { payoutDetails } from "../../../lib/payment-queries";
 import { listDues, naira, revenue } from "../../../lib/queries";
 import { Revenue } from "./Revenue";
 
 export default async function Membership() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("finance");
   const periods = ["Today", "Week", "Month", "Year"] as const;
   const data = await inClub(ctx, async (tx) => Object.fromEntries(await Promise.all(periods.map(async (p) => {
     const r = await revenue(tx, ctx.club.clubId, p);

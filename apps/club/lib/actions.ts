@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { competitionEntries, competitions, dues, games, globalRatings, invites, matches, memberships, plans, ratingEvents, ratings, users, withTenant } from "@rallix/db";
 import { applyElo, resolveMatch, roundRobin, snakeGroups, START_RATING, type GameScore } from "@rallix/stats";
 import { normalizePhone } from "@rallix/config/phone";
-import { CLUB_COOKIE, canScore, getCtx, inClub, isAdmin, requireClub } from "./context";
+import { CLUB_COOKIE, canScore, getCtx, inClub, can, requireClub } from "./context";
 import { appDb, serviceDb } from "./db";
 import { listMembers } from "./queries";
 import { savePhone } from "./contact";
@@ -70,7 +70,7 @@ function inviteCode(): string {
 /* ---------- Invites and plans (admin) ---------- */
 export async function createInvite(): Promise<Result<{ code: string }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can create invites.");
+  if (!can(ctx.club, "members")) return fail("Only club admins can create invites.");
   const code = inviteCode();
   await inClub(ctx, (tx) => tx.insert(invites).values({ clubId: ctx.club.clubId, code, createdBy: ctx.club.membershipId, expiresAt: new Date(Date.now() + 30 * 86400000) }));
   revalidatePath("/profile");
@@ -79,7 +79,7 @@ export async function createInvite(): Promise<Result<{ code: string }>> {
 
 export async function setPlanActive(planId: string, active: boolean): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can change plans.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can change plans.");
   await inClub(ctx, (tx) => tx.update(plans).set({ active }).where(eq(plans.id, planId)));
   revalidatePath("/membership/subscriptions");
   return { ok: true };
@@ -87,7 +87,7 @@ export async function setPlanActive(planId: string, active: boolean): Promise<Re
 
 export async function savePlan(input: { id?: string; name: string; naira: number; period: "monthly" | "yearly" }): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can change plans.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can change plans.");
   const kobo = Math.round(input.naira * 100);
   if (!Number.isFinite(kobo) || kobo < 0 || kobo > 1_000_000_00) return fail("Enter a valid price.");
   try {
@@ -107,7 +107,7 @@ export async function savePlan(input: { id?: string; name: string; naira: number
 /** Create dues for every active player on a plan for the current month. Safe to run twice. */
 export async function billMembers(planId: string): Promise<Result<{ created: number }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can bill members.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can bill members.");
   const now = new Date();
   const label = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const due = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -131,7 +131,7 @@ export async function createCompetition(input: {
   openRegistration?: boolean; maxPlayers?: number | null; closesOn?: string | null;
 }): Promise<Result<{ id: string; draft: boolean }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can create competitions.");
+  if (!can(ctx.club, "competitions")) return fail("Only club admins can create competitions.");
   const name = input.name.trim();
   if (name.length < 2) return fail("Give the competition a name.");
   if (input.endsOn < input.startsOn) return fail("The end date must be on or after the start date.");

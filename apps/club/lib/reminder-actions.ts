@@ -3,7 +3,7 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auditLog, emailLog, reminderSettings } from "@rallix/db";
 import { checkOffsets } from "@rallix/payments";
-import { inClub, isAdmin, requireClub } from "./context";
+import { inClub, can, requireClub } from "./context";
 import { serviceDb } from "./db";
 import { logEmail, mailer } from "./mail";
 import { buildReminderMessage, runDueReminders } from "./reminders-core";
@@ -14,7 +14,7 @@ const fail = (error: string): { ok: false; error: string } => ({ ok: false, erro
 /** Turn reminders on or off and choose the days. Admins of THIS club only (the database enforces it too). */
 export async function saveReminderSettings(input: { enabled: boolean; offsets: number[] }): Promise<Res> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can change reminder settings.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can change reminder settings.");
   const c = checkOffsets(input.offsets);
   if (!c.ok) return fail(c.error);
   await inClub(ctx, (tx) => tx.insert(reminderSettings).values({ clubId: ctx.club.clubId, enabled: !!input.enabled, offsets: c.offsets })
@@ -27,7 +27,7 @@ export async function saveReminderSettings(input: { enabled: boolean; offsets: n
 /** Send the admin a sample reminder, using the real template and their own address, so they can see exactly what members get. */
 export async function sendTestReminder(): Promise<Res> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can send a test.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can send a test.");
   const [recent] = await serviceDb().select({ n: sql<number>`count(*)::int` }).from(emailLog)
     .where(and(eq(emailLog.kind, "reminder"), eq(emailLog.relatedId, `test:${ctx.club.clubId}`), gt(emailLog.createdAt, new Date(Date.now() - 3600_000))));
   if ((recent?.n ?? 0) >= 5) return fail("You’ve sent several test emails already. Please wait a little.");
@@ -44,7 +44,7 @@ export async function sendTestReminder(): Promise<Res> {
 /** Run today's schedule for THIS club now (the same thing the daily job does). Nothing is ever sent twice. */
 export async function runRemindersNow(): Promise<Res<{ sent: number; failed: number; waiting: number }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can do this.");
+  if (!can(ctx.club, "finance")) return fail("Only club admins can do this.");
   const r = await runDueReminders({ clubId: ctx.club.clubId, maxEmails: 100 });
   if (!r.ok) return fail(r.error);
   revalidatePath("/membership/reminders");

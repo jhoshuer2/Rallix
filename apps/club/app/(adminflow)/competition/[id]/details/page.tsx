@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton, PageShell, Panel } from "@rallix/ui";
 import { PhotoUploader } from "../../../../../components/PhotoUploader";
-import { inClub, requireRole } from "../../../../../lib/context";
+import { inClub, requirePermission } from "../../../../../lib/context";
 import { getCompetition } from "../../../../../lib/queries";
 import { DetailsForm } from "./DetailsForm";
 
@@ -11,7 +11,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function Details({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!uuid.test(id)) notFound();
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("competitions");
   const c = await inClub(ctx, (tx) => getCompetition(tx, id));
   if (!c) notFound();
   return (

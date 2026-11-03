@@ -6,7 +6,7 @@ import { Entrants } from "../../../../../components/Entrants";
 import { RoundResults } from "../../../../../components/RoundResults";
 import { competitionEntries } from "@rallix/db";
 import { eq } from "drizzle-orm";
-import { canScore, inClub, isAdmin, requireRole } from "../../../../../lib/context";
+import { can, canScore, inClub, requireScoringAccess } from "../../../../../lib/context";
 import { getCompetition, listMatches, listMembers } from "../../../../../lib/queries";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -14,7 +14,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function Groups({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!uuid.test(id)) notFound();
-  const ctx = await requireRole("admin", "scorer");
+  const ctx = await requireScoringAccess();
   const data = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
     if (!c) return null;
@@ -27,7 +27,7 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
   if (!data) notFound();
   const mayScore = canScore(ctx.club);
   const draft = data.c.status === "draft";
-  const admin = isAdmin(ctx.club);
+  const admin = can(ctx.club, "competitions");
   const open = (m: (typeof data.ms)[number]) => mayScore && m.status !== "completed" && !!m.p1 && !!m.p2;
   return (
     <PageShell back={<BackButton href="/competition" linkAs={Link} />} title={data.c.name}>

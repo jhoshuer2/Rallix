@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BackButton, ListGroup, ListRow, IconBadge, PageShell, Panel } from "@rallix/ui";
-import { requireRole } from "../../../../lib/context";
+import { requirePermission } from "../../../../lib/context";
 import { payoutDetails } from "../../../../lib/payment-queries";
 import { provider } from "../../../../lib/payments";
 import { PayoutForm } from "./PayoutForm";
 
 export default async function Payouts() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("finance");
   const [details, banks] = await Promise.all([payoutDetails(ctx), provider().listBanks().catch(() => [])]);
   return (
     <PageShell back={<BackButton href="/membership" linkAs={Link} />} title="Payout account">

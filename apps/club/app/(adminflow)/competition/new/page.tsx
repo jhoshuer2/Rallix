@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { BackButton, IconBadge, ListGroup, ListRow, PageShell } from "@rallix/ui";
-import { requireRole } from "../../../../lib/context";
+import { requirePermission } from "../../../../lib/context";
 
 export default async function SelectLevel() {
-  await requireRole("admin");
+  await requirePermission("competitions");
   return (
     <PageShell back={<BackButton href="/competition" linkAs={Link} />} title="New competition">
       <h2 className="rx-panel__title" style={{ margin: "0 0 4px" }}>Select the level</h2>

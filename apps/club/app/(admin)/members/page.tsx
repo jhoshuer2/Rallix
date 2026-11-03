@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { EmptyState, PageShell, SectionTitle } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
-import { inClub, requireRole } from "../../../lib/context";
+import { inClub, requirePermission } from "../../../lib/context";
 import { listMembers } from "../../../lib/queries";
 import { listPendingApplications } from "../../../lib/applications";
 import { Applications } from "../../../components/Applications";
@@ -9,7 +9,7 @@ import { dayLabel } from "../../../lib/highlights";
 import { MembersGrid } from "./MembersGrid";
 
 export default async function Members() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("members");
   const members = await inClub(ctx, (tx) => listMembers(tx, ctx.club.clubId));
   const waiting = await inClub(ctx, (tx) => listPendingApplications(tx, ctx.club.clubId));
   return (

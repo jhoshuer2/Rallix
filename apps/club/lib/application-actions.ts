@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { clubPages, users, withTenant } from "@rallix/db";
-import { CLUB_COOKIE, getCtx, inClub, isAdmin, requireClub } from "./context";
+import { CLUB_COOKIE, getCtx, inClub, can, requireClub } from "./context";
 import { appDb } from "./db";
 import { savePhone } from "./contact";
 import { lookupClubByCode } from "./club-public";
@@ -60,7 +60,7 @@ export async function withdrawApplication(id: string): Promise<Result> {
 /** An admin approves or declines. Approval creates the member; the applicant is emailed the decision. */
 export async function decideApplication(id: string, approve: boolean, note?: string): Promise<Result<{ decision: "approved" | "declined" }>> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can review applications.");
+  if (!can(ctx.club, "members")) return fail("Only club admins can review applications.");
   if (!/^[0-9a-f-]{36}$/i.test(id)) return fail("Something went wrong. Please try again.");
   const r = await inClub(ctx, (tx) => tx.execute(sql`select app.decide_application(${id}, ${!!approve}, ${(note ?? "").trim().slice(0, 300)}) as r`));
   const code = (r.rows[0] as { r: string }).r;
@@ -75,7 +75,7 @@ const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slic
 /** Admins write what people see before they join. Length limits are also enforced by the database. */
 export async function saveClubPage(input: { about: string; schedule: string; dressCode: string; equipment: string; rules: string; contact: string; joinMode: "review" | "open"; published: boolean }): Promise<Result> {
   const ctx = await requireClub();
-  if (!isAdmin(ctx.club)) return fail("Only club admins can edit the club page.");
+  if (!can(ctx.club, "members")) return fail("Only club admins can edit the club page.");
   const v = { about: clip(input.about, 1000), schedule: clip(input.schedule, 2000), dressCode: clip(input.dressCode, 1000), equipment: clip(input.equipment, 1000), rules: clip(input.rules, 8000), contact: clip(input.contact, 500) };
   const joinMode = input.joinMode === "open" ? "open" : "review";
   const row = { clubId: ctx.club.clubId, about: v.about || null, schedule: v.schedule || null, dressCode: v.dressCode || null, equipment: v.equipment || null, rules: v.rules || null, contact: v.contact || null, joinMode, published: !!input.published, updatedAt: new Date() };

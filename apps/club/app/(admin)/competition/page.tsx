@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { EmptyState, MediaCard, PageShell, SectionTitle } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
-import { inClub, requireRole } from "../../../lib/context";
+import { inClub, requirePermission } from "../../../lib/context";
 import { listCompetitions } from "../../../lib/queries";
 
 const short = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "");
@@ -9,7 +9,7 @@ const tagOf = (c: { status: string; openRegistration: boolean }) => (c.status ==
 const range = (a: string | null, b: string | null) => (a && b ? `${short(a)} – ${short(b)}` : a ? `From ${short(a)}` : "Dates to be set");
 
 export default async function Competition() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("competitions");
   const comps = await inClub(ctx, (tx) => listCompetitions(tx, ctx.club.clubId));
   const latest = comps.find((c) => c.status === "active") ?? comps[0];
   const rest = comps.filter((c) => c.id !== latest?.id);

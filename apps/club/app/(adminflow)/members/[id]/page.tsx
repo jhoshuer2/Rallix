@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { BackButton, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, RankChart } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { PhotoUploader } from "../../../../components/PhotoUploader";
-import { inClub, requireRole } from "../../../../lib/context";
+import { inClub, requirePermission } from "../../../../lib/context";
 import { ageOf, listMembers, memberStats, ratingHistory } from "../../../../lib/queries";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,7 +11,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function Member({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!uuid.test(id)) notFound();
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("members");
   const data = await inClub(ctx, async (tx) => {
     const p = (await listMembers(tx, ctx.club.clubId)).find((m) => m.id === id);
     if (!p) return null;

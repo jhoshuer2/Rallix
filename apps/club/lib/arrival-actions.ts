@@ -3,7 +3,7 @@ import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { arrivals, clubs, memberships, playerProfiles, pushSubscriptions, users } from "@rallix/db";
 import { arrivalMessage, shouldAlert, withinVenue } from "@rallix/stats";
-import { getCtx, inClub, requireClub, requireRole } from "./context";
+import { can, getCtx, inClub, requireClub } from "./context";
 import { serviceDb } from "./db";
 import { getVenue, HERE_HOURS } from "./arrival-queries";
 import { sendToUsers } from "./push";
@@ -45,7 +45,8 @@ export async function saveArrivalSettings(input: { share: boolean; notify: boole
 
 /** Club admin sets the court location. The client reports the position of the admin standing at the court. */
 export async function saveVenue(input: { lat: number; lng: number; label: string; radiusM: number }): Promise<Result> {
-  const ctx = await requireRole("admin");
+  const ctx = await requireClub();
+  if (!can(ctx.club, "facilities")) return fail("Only the admin who looks after facilities can set the court.");
   const lat = num(input?.lat), lng = num(input?.lng), radius = num(input?.radiusM);
   if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) return fail("We couldn’t read your location. Try again outdoors.");
   if (radius === null || ![50, 100, 200].includes(radius)) return fail("Choose a radius from the list.");

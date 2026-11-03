@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton, PageShell } from "@rallix/ui";
 import { RoundResults } from "../../../../../components/RoundResults";
-import { inClub, requireRole } from "../../../../../lib/context";
+import { inClub, requireScoringAccess } from "../../../../../lib/context";
 import { getCompetition, listMatches } from "../../../../../lib/queries";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -10,7 +10,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function BracketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!uuid.test(id)) notFound();
-  const ctx = await requireRole("admin", "scorer");
+  const ctx = await requireScoringAccess();
   const data = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
     if (!c) return null;

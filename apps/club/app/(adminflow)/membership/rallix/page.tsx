@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { BackButton, EmptyState, IconBadge, ListActions, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Pill } from "@rallix/ui";
-import { requireRole } from "../../../../lib/context";
+import { requirePermission } from "../../../../lib/context";
 import { rallixBilling } from "../../../../lib/payment-queries";
 import { naira } from "../../../../lib/queries";
 import { PayInvoiceButton } from "./PayInvoiceButton";
 
 export default async function RallixBilling() {
-  const ctx = await requireRole("admin");
+  const ctx = await requirePermission("finance");
   const { subscription: s, invoices } = await rallixBilling(ctx);
   const fmt = (d: Date | null) => (d ? d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "—");
   return (
