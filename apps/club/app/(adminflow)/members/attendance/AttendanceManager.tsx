@@ -12,7 +12,7 @@ const hm = (iso: string) => new Date(iso).toLocaleTimeString("en-NG", { hour: "n
 const dayName = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const TONE = { good: "success", due: "warning", overdue: "warning" } as const;
 
-export function AttendanceManager({ today, here, people, days, regulars }: { today: string; here: Here[]; people: Person[]; days: DayCount[]; regulars: Array<MemberVisits & { name: string; photo: string | null }> }) {
+export function AttendanceManager({ today, here, people, days, regulars, expected, walkIns }: { today: string; here: Here[]; people: Person[]; days: DayCount[]; regulars: Array<MemberVisits & { name: string; photo: string | null }>; expected: Array<{ eventId: string; title: string; time: string; coming: number; arrived: number; notYet: string[] }>; walkIns: number }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<null | "pick" | "scan">(null);
   const [q, setQ] = useState("");
@@ -42,6 +42,16 @@ export function AttendanceManager({ today, here, people, days, regulars }: { tod
         <Button onClick={() => setSheet("scan")}>Scan a card</Button>
         <Button variant="ghost" onClick={() => setSheet("pick")}>Check in by name</Button>
       </div>
+
+      {expected.length ? (
+        <div className="rx-block">
+          <p className="rx-label" style={{ margin: "0 0 8px" }}>Expected today</p>
+          <ListGroup label="Expected today">
+            {expected.map((x) => <ListRow key={x.eventId} title={x.title} subtitle={`${x.time ? `${x.time} · ` : ""}${x.notYet.length ? `Still to come: ${x.notYet.slice(0, 4).join(", ")}${x.notYet.length > 4 ? ` and ${x.notYet.length - 4} more` : ""}` : "Everyone has arrived"}`} trailing={`${x.arrived} of ${x.coming} here`} />)}
+          </ListGroup>
+          {walkIns > 0 ? <p className="rx-muted" style={{ margin: "8px 0 0" }}>{walkIns} {walkIns === 1 ? "person" : "people"} here didn’t say they were coming.</p> : null}
+        </div>
+      ) : null}
 
       <div className="rx-block">
         <p className="rx-label" style={{ margin: "0 0 8px" }}>Here now · {here.length}</p>

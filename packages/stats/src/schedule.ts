@@ -3,9 +3,9 @@
 export type EventKind = "play" | "event" | "closed";
 export interface ScheduleEvent {
   id: string; kind: EventKind; title: string; note?: string | null;
-  startsOn: string; endsOn?: string | null; startTime?: string | null; endTime?: string | null; repeatsWeekly?: boolean; until?: string | null;
+  startsOn: string; endsOn?: string | null; startTime?: string | null; endTime?: string | null; doorsOpen?: string | null; repeatsWeekly?: boolean; until?: string | null;
 }
-export interface Occurrence { eventId: string; kind: EventKind; title: string; note: string | null; date: string; endDate: string | null; startTime: string | null; endTime: string | null }
+export interface Occurrence { eventId: string; kind: EventKind; title: string; note: string | null; date: string; endDate: string | null; startTime: string | null; endTime: string | null; doorsOpen: string | null }
 
 const MS = 86400000;
 const ts = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
@@ -20,7 +20,7 @@ export function closedOn(events: ScheduleEvent[], day: string): ScheduleEvent | 
 /** Everything that happens between `from` and `to` (inclusive), soonest first. Weekly sessions repeat on the weekday of their first date and are dropped on closed days. */
 export function occurrences(events: ScheduleEvent[], from: string, to: string): Occurrence[] {
   const out: Occurrence[] = [];
-  const mk = (e: ScheduleEvent, date: string): Occurrence => ({ eventId: e.id, kind: e.kind, title: e.title, note: e.note ?? null, date, endDate: e.endsOn && e.endsOn !== date ? e.endsOn : null, startTime: e.startTime ?? null, endTime: e.endTime ?? null });
+  const mk = (e: ScheduleEvent, date: string): Occurrence => ({ eventId: e.id, kind: e.kind, title: e.title, note: e.note ?? null, date, endDate: e.endsOn && e.endsOn !== date ? e.endsOn : null, startTime: e.startTime ?? null, endTime: e.endTime ?? null, doorsOpen: e.doorsOpen ?? null });
   for (const e of events) {
     if (e.repeatsWeekly && e.kind === "play") {
       const last = e.until && e.until < to ? e.until : to;
@@ -59,4 +59,13 @@ export function closureNotice(events: ScheduleEvent[], today: string): string | 
   const t = closedOn(events, today); if (t) return `Closed today: ${t.title}`;
   const m = closedOn(events, addDays(today, 1)); if (m) return `Closed tomorrow: ${m.title}`;
   return null;
+}
+
+/** "Doors open 17:45", or null. */
+export const doorsLabel = (o: { doorsOpen: string | null }) => (o.doorsOpen ? `Doors open ${o.doorsOpen}` : null);
+
+/** The time-filter chips on the calendar. Returns the last day to show (inclusive) counted from today. */
+export type CalendarRange = "today" | "week" | "month";
+export function rangeEnd(range: CalendarRange, today: string): string {
+  return range === "today" ? today : range === "week" ? addDays(today, 6) : addDays(today, 29);
 }

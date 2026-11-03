@@ -39,3 +39,18 @@ export function standing(dues: Array<{ status: string; dueDate: string }>, today
 }
 
 export const STANDING_LABEL: Record<Standing, string> = { good: "Paid up", due: "Fee due soon", overdue: "Fee overdue" };
+
+export interface RsvpRow { eventId: string; memberId: string }
+export interface ExpectedRow { eventId: string; coming: number; arrived: number; notYet: string[] }
+
+/** For today's sessions: how many said they are coming, how many of those are here, and who has not arrived yet. */
+export function expectedToday(rsvps: RsvpRow[], here: string[]): ExpectedRow[] {
+  const hereSet = new Set(here);
+  const by = new Map<string, Set<string>>();
+  for (const r of rsvps) { const s = by.get(r.eventId) ?? new Set<string>(); s.add(r.memberId); by.set(r.eventId, s); }
+  return [...by.entries()].map(([eventId, members]) => ({ eventId, coming: members.size, arrived: [...members].filter((m) => hereSet.has(m)).length, notYet: [...members].filter((m) => !hereSet.has(m)).sort() }))
+    .sort((a, b) => b.coming - a.coming || a.eventId.localeCompare(b.eventId));
+}
+
+/** People who are here but never said they were coming. */
+export const walkIns = (rsvps: RsvpRow[], here: string[]): number => { const said = new Set(rsvps.map((r) => r.memberId)); return here.filter((h) => !said.has(h)).length; };

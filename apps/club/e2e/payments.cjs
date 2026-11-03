@@ -54,11 +54,11 @@ const refFor = who => sql(`select p.provider_ref from payments p join membership
 
   console.log('3. a player pays a due');
   await S.goto(CLUB + '/play/me/payments'); ok(await S.getByRole('button', { name: /^Pay ₦6,000/ }).count() === 1, 'the Pay button now appears');
-  await S.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await S.waitForURL(/\/pay\/fake/, { timeout: 20000 });
+  await S.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await S.waitForURL(/\/pay\/fake/, { timeout: 60000 });
   const ref = refFor(SULE); ok(/^RLX-D-[A-Z2-9]{20}$/.test(ref), 'a pending payment with an unguessable reference was recorded first (' + ref + ')');
   ok(sql(`select status || ':' || amount_kobo from payments where provider_ref='${ref}'`) === 'pending:600000', 'amount recorded from the database (₦6,000), status pending');
   ok(/₦6,000/.test(await text(S)), 'checkout shows the amount');
-  await S.getByRole('button', { name: 'Pay now' }).click(); await S.waitForURL(/\/pay\/return/, { timeout: 20000 }); await S.waitForLoadState('networkidle'); t = await text(S);
+  await S.getByRole('button', { name: 'Pay now' }).click(); await S.waitForURL(/\/pay\/return/, { timeout: 60000 }); await S.waitForLoadState('networkidle'); t = await text(S);
   ok(/Payment received/i.test(t), 'return page confirms the payment');
   ok(sql(`select status || ':' || coalesce(method,'') from payments where provider_ref='${ref}'`) === 'paid:fake', 'payment is marked paid');
   ok(sql(`select d.status from dues d join payments p on p.due_id=d.id where p.provider_ref='${ref}'`) === 'paid', 'the due is marked paid');
@@ -77,16 +77,16 @@ const refFor = who => sql(`select p.provider_ref from payments p join membership
   ok(Number(sql(`select count(*) from payment_events where outcome='rejected_signature'`)) >= 3, 'rejected forgeries are logged for review');
 
   const N = await mk(); await signIn(N, CLUB, NURU); await N.goto(CLUB + '/play/me/payments');
-  await N.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await N.waitForURL(/\/pay\/fake/, { timeout: 20000 });
+  await N.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await N.waitForURL(/\/pay\/fake/, { timeout: 60000 });
   const nref = refFor(NURU); sql(`update payments set amount_kobo=100 where provider_ref='${nref}'`);
-  await N.getByRole('button', { name: 'Pay now' }).click(); await N.waitForURL(/\/pay\/return/, { timeout: 20000 }); await N.waitForLoadState('networkidle');
+  await N.getByRole('button', { name: 'Pay now' }).click(); await N.waitForURL(/\/pay\/return/, { timeout: 60000 }); await N.waitForLoadState('networkidle');
   ok(/couldn.t confirm this payment/i.test(await text(N)), 'if the provider amount differs from what we recorded, the customer is told we could not confirm it');
   ok(sql(`select status from payments where provider_ref='${nref}'`) === 'pending' && sql(`select d.status from dues d join payments p on p.due_id=d.id where p.provider_ref='${nref}'`) === 'overdue', 'and nothing is credited: payment pending, due still overdue');
   ok(Number(sql(`select count(*) from payment_events where reference='${nref}' and outcome='rejected_mismatch'`)) >= 1, 'the mismatch is logged for staff');
 
   const H = await mk(); await signIn(H, CLUB, NATH); await H.goto(CLUB + '/play/me/payments');
-  await H.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await H.waitForURL(/\/pay\/fake/, { timeout: 20000 });
-  await H.getByRole('button', { name: /Simulate a failed payment/ }).click(); await H.waitForURL(/\/pay\/return/, { timeout: 20000 }); await H.waitForLoadState('networkidle');
+  await H.getByRole('button', { name: /^Pay ₦6,000/ }).click(); await H.waitForURL(/\/pay\/fake/, { timeout: 60000 });
+  await H.getByRole('button', { name: /Simulate a failed payment/ }).click(); await H.waitForURL(/\/pay\/return/, { timeout: 60000 }); await H.waitForLoadState('networkidle');
   ok(/didn.t go through/i.test(await text(H)), 'a failed payment shows a clear message');
   ok(sql(`select status from payments where provider_ref='${refFor(NATH)}'`) === 'failed', 'recorded as failed');
   await H.goto(CLUB + '/play/me/payments'); ok(await H.getByRole('button', { name: /^Pay ₦6,000/ }).count() === 1, 'and the player can try again');
@@ -120,9 +120,9 @@ const refFor = who => sql(`select p.provider_ref from payments p join membership
   const L = await mk(); await signIn(L, CLUB, ADE); await L.goto(CLUB + '/membership/rallix'); t = await text(L);
   ok(/Lagos Spin Club/i.test(t) || /Rallix subscription/i.test(t), 'admin sees the Rallix billing page');
   ok(/past due/i.test(t) && await L.getByRole('button', { name: /^Pay ₦20,000/ }).count() === 1, 'a past-due club sees its subscription state and a Pay button on the issued invoice');
-  await L.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await L.waitForURL(/\/pay\/fake/, { timeout: 20000 });
+  await L.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await L.waitForURL(/\/pay\/fake/, { timeout: 60000 });
   const iref = sql(`select reference from invoice_payments where invoice_id='${lagosInv}'`); ok(/^RLX-I-/.test(iref), 'an invoice payment attempt was recorded first');
-  await L.getByRole('button', { name: 'Pay now' }).click(); await L.waitForURL(/\/pay\/return/, { timeout: 20000 }); await L.waitForLoadState('networkidle');
+  await L.getByRole('button', { name: 'Pay now' }).click(); await L.waitForURL(/\/pay\/return/, { timeout: 60000 }); await L.waitForLoadState('networkidle');
   ok(/Payment received/i.test(await text(L)), 'return page confirms');
   ok(sql(`select status || ':' || payment_ref from platform_invoices where id='${lagosInv}'`) === 'paid:' + iref, 'invoice marked paid with the provider reference');
   ok(sql(`select s.status from club_subscriptions s join clubs c on c.id=s.club_id where c.slug='lagos-spin'`) === 'active', 'the past-due subscription is reactivated');

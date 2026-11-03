@@ -11,9 +11,9 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const validDate = (d: string) => DATE.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
 
-export interface EventInput { kind: string; title: string; note?: string; startsOn: string; endsOn?: string; startTime?: string; endTime?: string; repeatsWeekly?: boolean; until?: string }
+export interface EventInput { kind: string; title: string; note?: string; startsOn: string; endsOn?: string; startTime?: string; endTime?: string; doorsOpen?: string; repeatsWeekly?: boolean; until?: string }
 
-type Clean = { kind: "play" | "event" | "closed"; title: string; note: string | null; startsOn: string; endsOn: string | null; startTime: string | null; endTime: string | null; repeatsWeekly: boolean; until: string | null };
+type Clean = { kind: "play" | "event" | "closed"; title: string; note: string | null; startsOn: string; endsOn: string | null; startTime: string | null; endTime: string | null; doorsOpen: string | null; repeatsWeekly: boolean; until: string | null };
 
 function clean(i: EventInput): { ok: true; v: Clean } | { ok: false; error: string } {
   const kind = i?.kind;
@@ -27,11 +27,15 @@ function clean(i: EventInput): { ok: true; v: Clean } | { ok: false; error: stri
   const startTime = i.startTime ? String(i.startTime) : null, endTime = i.endTime ? String(i.endTime) : null;
   if ((startTime && !TIME.test(startTime)) || (endTime && !TIME.test(endTime))) return fail("Times look like 18:00.");
   if (endTime && !startTime) return fail("Add a start time too.");
+  const doorsOpen = i.doorsOpen ? String(i.doorsOpen) : null;
+  if (doorsOpen && !TIME.test(doorsOpen)) return fail("Times look like 18:00.");
+  if (doorsOpen && !startTime) return fail("Add a start time before the doors-open time.");
+  if (doorsOpen && startTime && doorsOpen > startTime) return fail("Doors can’t open after the start.");
   if (startTime && endTime && endTime <= startTime) return fail("It has to end after it starts.");
   const repeatsWeekly = kind === "play" && !!i.repeatsWeekly;
   const until = repeatsWeekly && i.until ? String(i.until) : null;
   if (until && (!validDate(until) || until < i.startsOn)) return fail("“Until” can’t be before the first day.");
-  return { ok: true, v: { kind, title, note, startsOn: i.startsOn, endsOn: kind === "play" ? null : endsOn, startTime: kind === "closed" ? null : startTime, endTime: kind === "closed" ? null : endTime, repeatsWeekly, until } };
+  return { ok: true, v: { kind, title, note, startsOn: i.startsOn, endsOn: kind === "play" ? null : endsOn, startTime: kind === "closed" ? null : startTime, endTime: kind === "closed" ? null : endTime, doorsOpen: kind === "closed" ? null : doorsOpen, repeatsWeekly, until } };
 }
 
 export async function saveScheduleEvent(id: string | null, input: EventInput): Promise<Result> {

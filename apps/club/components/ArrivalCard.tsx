@@ -11,7 +11,7 @@ const time = (iso: string) => new Date(iso).toLocaleTimeString("en-NG", { hour: 
 const GUARD = "rallix:arrival-try";
 
 /** "At the court": who is here and one button. Shown only when the club has set its court location. */
-export function ArrivalCard({ venueLabel, here, iAmHere, share, auto }: { venueLabel: string | null; here: HereItem[]; iAmHere: boolean; share: boolean; auto: boolean }) {
+export function ArrivalCard({ venueLabel, here, iAmHere, share, auto, today }: { venueLabel: string | null; here: HereItem[]; iAmHere: boolean; share: boolean; auto: boolean; /** Today's session, when the club has one: "Tuesday night · Doors open 17:45". */ today?: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string>();
@@ -45,6 +45,7 @@ export function ArrivalCard({ venueLabel, here, iAmHere, share, auto }: { venueL
   return (
     <>
       <SectionTitle title="At the court" />
+      {today ? <p className="rx-muted" style={{ margin: "0 0 8px" }}>Today: {today}</p> : null}
       {here.length ? (
         <ListGroup label="Here now">
           {here.slice(0, 5).map((h) => <ListRow key={h.id} media={<Photo src={h.photo} name={h.name} alt="" />} title={h.name} subtitle={`Here since ${time(h.since)}`} />)}

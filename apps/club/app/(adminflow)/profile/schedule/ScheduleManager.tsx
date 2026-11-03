@@ -8,8 +8,8 @@ import { deleteScheduleEvent, saveScheduleEvent } from "../../../../lib/schedule
 const KINDS: Array<{ value: EventKind; label: string }> = [{ value: "play", label: "Playing time" }, { value: "event", label: "Event" }, { value: "closed", label: "Closed" }];
 const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 const nice = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-type Form = { id: string | null; kind: EventKind; title: string; note: string; startsOn: string; endsOn: string; startTime: string; endTime: string; repeatsWeekly: boolean; until: string };
-const blank = (today: string): Form => ({ id: null, kind: "play", title: "", note: "", startsOn: today, endsOn: "", startTime: "", endTime: "", repeatsWeekly: true, until: "" });
+type Form = { id: string | null; kind: EventKind; title: string; note: string; startsOn: string; endsOn: string; startTime: string; endTime: string; doorsOpen: string; repeatsWeekly: boolean; until: string };
+const blank = (today: string): Form => ({ id: null, kind: "play", title: "", note: "", startsOn: today, endsOn: "", startTime: "", endTime: "", doorsOpen: "", repeatsWeekly: true, until: "" });
 
 export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; today: string }) {
   const router = useRouter();
@@ -18,7 +18,7 @@ export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; to
   const [msg, setMsg] = useState<string>();
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => (x ? { ...x, [k]: v } : x));
   const close = () => { setF(null); setMsg(undefined); };
-  const open = (e: ScheduleEvent) => setF({ id: e.id, kind: e.kind, title: e.title, note: e.note ?? "", startsOn: e.startsOn, endsOn: e.endsOn ?? "", startTime: e.startTime ?? "", endTime: e.endTime ?? "", repeatsWeekly: !!e.repeatsWeekly, until: e.until ?? "" });
+  const open = (e: ScheduleEvent) => setF({ id: e.id, kind: e.kind, title: e.title, note: e.note ?? "", startsOn: e.startsOn, endsOn: e.endsOn ?? "", startTime: e.startTime ?? "", endTime: e.endTime ?? "", doorsOpen: e.doorsOpen ?? "", repeatsWeekly: !!e.repeatsWeekly, until: e.until ?? "" });
 
   async function save() {
     if (!f) return;
@@ -37,7 +37,7 @@ export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; to
     close(); router.refresh();
   }
   const when = (e: ScheduleEvent) => {
-    const t = timeLabel({ startTime: e.startTime ?? null, endTime: e.endTime ?? null });
+    const t = `${e.doorsOpen ? `doors ${e.doorsOpen} · ` : ""}${timeLabel({ startTime: e.startTime ?? null, endTime: e.endTime ?? null })}`;
     if (e.repeatsWeekly) return `Every ${WEEKDAYS[new Date(`${e.startsOn}T12:00:00Z`).getUTCDay()]!.slice(0, -1)} · ${t}${e.until ? ` · until ${nice(e.until)}` : ""}`;
     return `${nice(e.startsOn)}${e.endsOn && e.endsOn !== e.startsOn ? ` – ${nice(e.endsOn)}` : ""}${e.kind === "closed" ? "" : ` · ${t}`}`;
   };
@@ -79,6 +79,7 @@ export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; to
                 <TextField label="Ends" type="time" value={f.endTime} onChange={(e) => set("endTime", e.target.value)} />
               </div>
             ) : null}
+            {f.kind !== "closed" && f.startTime ? <TextField label="Doors open (optional)" type="time" max={f.startTime} value={f.doorsOpen} onChange={(e) => set("doorsOpen", e.target.value)} /> : null}
             {f.kind === "play" ? <Switch label="Repeats every week" checked={f.repeatsWeekly} onChange={(v) => set("repeatsWeekly", v)} /> : null}
             {f.kind === "play" && f.repeatsWeekly ? <TextField label="Until (optional)" type="date" min={f.startsOn} value={f.until} onChange={(e) => set("until", e.target.value)} /> : null}
             <TextField label="Note (optional)" maxLength={280} value={f.note} onChange={(e) => set("note", e.target.value)} />

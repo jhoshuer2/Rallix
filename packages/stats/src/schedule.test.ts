@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closedOn, closureNotice, groupByDay, occurrences, timeLabel, dayLabel, type ScheduleEvent } from "./index";
+import { closedOn, closureNotice, doorsLabel, groupByDay, occurrences, rangeEnd, timeLabel, dayLabel, type ScheduleEvent } from "./index";
 
 const tue: ScheduleEvent = { id: "p", kind: "play", title: "Tuesday night", startsOn: "2030-01-01", repeatsWeekly: true, startTime: "18:00", endTime: "20:00" };
 const closed: ScheduleEvent = { id: "c", kind: "closed", title: "New Year break", startsOn: "2030-01-08", endsOn: "2030-01-10" };
@@ -52,5 +52,22 @@ describe("helpers", () => {
     expect(dayLabel("2030-01-01", "2030-01-01")).toBe("Today");
     expect(dayLabel("2030-01-02", "2030-01-01")).toBe("Tomorrow");
     expect(dayLabel("2030-01-05", "2030-01-01")).toMatch(/Saturday/);
+  });
+});
+
+describe("doors open and the calendar range", () => {
+  it("carries doors open through to each occurrence and labels it", () => {
+    const e: ScheduleEvent = { id: "p", kind: "play", title: "Tuesday night", startsOn: "2030-01-01", repeatsWeekly: true, startTime: "18:00", doorsOpen: "17:45" };
+    const o = occurrences([e], "2030-01-01", "2030-01-10");
+    expect(o.every((x) => x.doorsOpen === "17:45")).toBe(true);
+    expect(doorsLabel(o[0]!)).toBe("Doors open 17:45");
+    expect(doorsLabel({ doorsOpen: null })).toBeNull();
+    expect(occurrences([{ ...e, doorsOpen: undefined }], "2030-01-01", "2030-01-02")[0]!.doorsOpen).toBeNull();
+  });
+  it("gives the last day of each calendar range", () => {
+    expect(rangeEnd("today", "2030-01-10")).toBe("2030-01-10");
+    expect(rangeEnd("week", "2030-01-10")).toBe("2030-01-16");
+    expect(rangeEnd("month", "2030-01-10")).toBe("2030-02-08");
+    expect(rangeEnd("week", "2030-02-27")).toBe("2030-03-05");
   });
 });

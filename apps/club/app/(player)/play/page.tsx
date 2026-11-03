@@ -8,7 +8,7 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { closureNotice, celebrationTiles, celebrations, playerStart, spotsLabel, spotsLeftLabel } from "@rallix/stats";
+import { closureNotice, doorsLabel, occurrences, timeLabel, celebrationTiles, celebrations, playerStart, spotsLabel, spotsLeftLabel } from "@rallix/stats";
 import { listScheduleEvents } from "../../../lib/schedule-queries";
 import { listMyChallenges, needsMe } from "../../../lib/friendly-queries";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
@@ -32,6 +32,8 @@ export default async function PlayerHome() {
     schedule: await listScheduleEvents(tx, ctx.club.clubId),
   }));
   const closed = closureNotice(d.schedule, todayInClub());
+  const session = occurrences(d.schedule, todayInClub(), todayInClub()).find((o) => o.kind === "play");
+  const sessionLine = session ? `${session.title} · ${doorsLabel(session) ?? timeLabel(session)}` : null;
   const asks = needsMe(d.friendlies, me);
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
@@ -68,7 +70,7 @@ export default async function PlayerHome() {
           {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} foot={c.status === "draft" ? <SpotsFaces left={spotsLeftLabel(c.entries, c.maxPlayers)} faces={c.faces} /> : undefined} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
         </Carousel>
       </>) },
-    { key: "court", show: !!d.venue, node: <ArrivalCard venueLabel={d.venue?.label ?? null} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> },
+    { key: "court", show: !!d.venue, node: <ArrivalCard today={sessionLine} venueLabel={d.venue?.label ?? null} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> },
     { key: "performance", show: r.played > 0, node: (
       <>
         <SectionTitle title="My performance" href="/play/stats" linkAs={Link} label="See my stats" />
