@@ -77,7 +77,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
         {tried && !openReg && ids.length < 2 ? <p className="rx-error" role="alert">Pick at least two players</p> : null}
         {error ? <p className="rx-error" role="alert">{error}</p> : null}
         <div style={{ height: 24 }} />
-        <button type="submit" disabled={busy} className="rx-btn rx-btn--block">{busy ? "Creating…" : openReg ? "Open sign-up" : `Shuffle ${format === "group_stage" ? "group" : "one-on-one"}`}</button>
+        <button type="submit" disabled={busy} className="rx-btn rx-btn--block">{busy ? "Creating…" : openReg ? "Open sign-up" : format === "knockout" ? "Create bracket" : `Shuffle ${format === "group_stage" ? "group" : "one-on-one"}`}</button>
       </form>
     </PageShell>
   );

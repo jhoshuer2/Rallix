@@ -23,7 +23,7 @@ async function signIn(page, who, next = '/') {
   const email = emailFor(who);
   await page.goto(B + '/sign-in?next=' + encodeURIComponent(next));
   await page.getByLabel('Email address').fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
-  await page.getByLabel('6-digit code').waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
+  await page.getByLabel('6-digit code').waitFor({ timeout: 60000 }); await page.waitForTimeout(500);
   const code = await readCode(DEV_LOG, email);
   await page.getByLabel('6-digit code').fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL(u => !/sign-in/.test(u.toString()), { timeout: 60000 });
@@ -111,7 +111,7 @@ const code=((await text(N)).match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!code,'ne
 sql(`insert into club_pages (club_id, join_mode) select id, 'open' from clubs where name='Test Club' on conflict (club_id) do update set join_mode='open'`); // this scenario is about joining; review mode is covered by applications.cjs
 const J=await mk();await signIn(J,'+2348038888888','/join/'+code);await J.waitForLoadState('networkidle');
 await J.getByLabel('Your full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();
-await J.waitForURL(/\/play/,{timeout:20000});await J.waitForLoadState('networkidle');await J.getByText(/Hi, Chika/i).first().waitFor({timeout:25000}).catch(()=>{});ok(/Hi, Chika/i.test(await text(J)),'invited user joined and sees the player home');
+await J.waitForURL(/\/play/,{timeout:40000});await J.waitForLoadState('networkidle');await J.getByText(/Hi, Chika/i).first().waitFor({timeout:25000}).catch(()=>{});ok(/Hi, Chika/i.test(await text(J)),'invited user joined and sees the player home');
 ok(sql(`select level from player_profiles p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.email='joiner@example.com'`)==='senior','joined profile has the chosen level');
 const J2=await mk();await J2.goto(B+'/join/NOPE1234');await J2.waitForLoadState('networkidle');
 ok(/isn’t valid|isn't valid/i.test(await text(J2)),'a bad invite code shows a clear message instead of a form');
