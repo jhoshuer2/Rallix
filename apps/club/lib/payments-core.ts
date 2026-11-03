@@ -86,7 +86,7 @@ async function finalizeInvoice(reference: string): Promise<Finalised> {
 
     // A club suspended for NON-PAYMENT comes back on its own once nothing else is overdue. Any other suspension waits for a human.
     const [club] = await tx.select({ status: clubs.status, reason: clubs.suspensionReason }).from(clubs).where(eq(clubs.id, locked.clubId)).for("update");
-    if (club) {
+    if (club && club.status !== "pending") { // a club still waiting for approval is never reactivated by a payment
       const others = await tx.select({ dueAt: platformInvoices.dueAt }).from(platformInvoices).where(and(eq(platformInvoices.clubId, locked.clubId), eq(platformInvoices.status, "issued")));
       if (shouldReactivate({ clubStatus: club.status, suspensionReason: club.reason, otherUnpaidInvoices: others, now: new Date() })) {
         await tx.update(clubs).set({ status: "active", suspensionReason: null }).where(eq(clubs.id, locked.clubId));
