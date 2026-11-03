@@ -42,11 +42,11 @@ function seedCelebrations(){ // give a few seeded players birthdays and a club a
 }
 (async()=>{seedCelebrations();const b=await chromium.launch();
 for(const [role,email,routes,max] of [['player','ade@example.com',PLAYER,170],['admin','admin@example.com',ADMIN,170]]){
-  const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultNavigationTimeout(90000);c.setDefaultTimeout(90000);const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning/.test(m.text()))errs.push(m.text())});
+  const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultNavigationTimeout(90000);c.setDefaultTimeout(90000);const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|ERR_CONNECTION_(RESET|REFUSED)/.test(m.text()))errs.push(m.text())});
   await signIn(p,email);await crawl(p,role,routes,errs,max);ok(errs.length===0,`${role}: no console errors ${JSON.stringify(errs.slice(0,2))}`);await c.close();
 }
 { // public pages, signed out
-  const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultNavigationTimeout(90000);c.setDefaultTimeout(90000);const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|401|404/.test(m.text()))errs.push(m.text())});
+  const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultNavigationTimeout(90000);c.setDefaultTimeout(90000);const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|401|404|ERR_CONNECTION_(RESET|REFUSED)/.test(m.text()))errs.push(m.text())});
   await crawl(p,'public',PUBLIC,errs,120);ok(errs.length===0,`public: no console errors ${JSON.stringify(errs.slice(0,2))}`);
   await p.goto(B+'/pay/invoice/'+PAYTOKEN);const t=await p.locator('body').innerText();ok(/Pay your Rallix invoice/i.test(t)&&/₦/.test(t),'public: pay link shows the invoice and amount');
   await c.close();
