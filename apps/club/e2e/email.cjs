@@ -22,6 +22,7 @@ async function requestCode(page, base, email) {
 }
 async function signIn(page, base, email) {
   await requestCode(page, base, email); await page.getByLabel('6-digit code').fill(codeFor(base, email)); await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(u => !/\/sign-in/.test(u.toString()), { timeout: 60000 }).catch(() => {});
   await page.waitForLoadState('networkidle'); await sleep(700);
 }
 (async () => {

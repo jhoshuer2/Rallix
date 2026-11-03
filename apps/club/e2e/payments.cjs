@@ -26,6 +26,8 @@ async function signIn(page, base, who) {
   await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
   const code = await readCode(LOGS[base], email);
   await page.getByLabel(/6-digit code/).fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
+  // Leave the sign-in page before doing anything else: navigating again mid-redirect aborts the first navigation on a slow server.
+  await page.waitForURL(u => !/\/sign-in/.test(u.toString()), { timeout: 60000 }).catch(() => {});
   await page.waitForLoadState('networkidle'); await page.waitForTimeout(700);
 }
 const refFor = who => sql(`select p.provider_ref from payments p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.phone_number='${who}' and p.provider='fake' order by p.created_at desc limit 1`);

@@ -25,6 +25,8 @@ async function signIn(page, base, who) {
   await page.getByLabel(/6-digit code/).waitFor({ timeout: 60000 }); await page.waitForTimeout(500);
   const code = await readCode(LOGS[base], email);
   await page.getByLabel(/6-digit code/).fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
+  // Leave the sign-in page before doing anything else: navigating again mid-redirect aborts the first navigation on a slow server.
+  await page.waitForURL(u => !/\/sign-in/.test(u.toString()), { timeout: 60000 }).catch(() => {});
   await page.waitForLoadState('networkidle'); await page.waitForTimeout(700);
 }
 const clubId = slug => sql(`select id from clubs where slug='${slug}'`);

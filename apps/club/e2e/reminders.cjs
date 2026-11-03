@@ -21,7 +21,7 @@ const codeFor = (base, email) => mailsTo(base, email).map(m => (m.body.match(/si
 async function signIn(page, base, email) {
   await page.goto(base + '/sign-in'); await page.getByLabel(/Email address|Work email/).fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
   await page.getByLabel('6-digit code').waitFor({ timeout: 25000 }); await sleep(600);
-  await page.getByLabel('6-digit code').fill(codeFor(base, email)); await page.getByRole('button', { name: 'Sign in' }).click(); await page.waitForLoadState('networkidle'); await sleep(700);
+  await page.getByLabel('6-digit code').fill(codeFor(base, email)); await page.getByRole('button', { name: 'Sign in' }).click(); await page.waitForURL(u => !/\/sign-in/.test(u.toString()), { timeout: 60000 }).catch(() => {}); await page.waitForLoadState('networkidle'); await sleep(700);
 }
 const job = async (today, extra = '') => { const r = await fetch(`${CLUB}/api/jobs/dues-reminders?today=${today}${extra}`, { method: 'POST', headers: { Authorization: `Bearer ${SECRET}` } }); return { status: r.status, ...(await r.json()) }; };
 const PARIS = () => sql(`select id from clubs where slug='paris-arena'`);
