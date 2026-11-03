@@ -13,7 +13,8 @@
     "send-test": "tsx scripts/send-test.ts"
   },
   "dependencies": {
-    "nodemailer": "^6.9.16"
+    "nodemailer": "^6.9.16",
+    "@rallix/config": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

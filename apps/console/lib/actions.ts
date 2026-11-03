@@ -6,7 +6,7 @@ import { db } from "./db";
 import { requireAdmin } from "./guard";
 import { audienceCount } from "./queries";
 import { uuid } from "./format";
-import { newPayToken, payLinkUrl } from "./pay-link";
+import { clubAppUrl, newPayToken, payLinkUrl } from "./pay-link";
 import { createDeliveries, deliverNotification, sendInvoiceEmails } from "./email-core";
 import { PLACEHOLDERS } from "./placeholders";
 import { placeholdersIn } from "@rallix/mailer";
@@ -296,7 +296,7 @@ export async function runRemindersJob(): Promise<Res<{ sent: number; failed: num
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 16) return fail("CRON_SECRET is not set for the console, so it can't call the job.");
   try {
-    const res = await fetch(`${process.env.CLUB_APP_URL ?? "http://localhost:3000"}/api/jobs/dues-reminders`, { method: "POST", headers: { Authorization: `Bearer ${secret}` }, cache: "no-store", signal: AbortSignal.timeout(110_000) });
+    const res = await fetch(`${clubAppUrl()}/api/jobs/dues-reminders`, { method: "POST", headers: { Authorization: `Bearer ${secret}` }, cache: "no-store", signal: AbortSignal.timeout(110_000) });
     const body = (await res.json().catch(() => null)) as { ok?: boolean; sent?: number; failed?: number; error?: string } | null;
     if (!res.ok || !body?.ok) return fail(body?.error ?? `The job returned ${res.status}.`);
     await audit(staff.id, "reminders.run_manual", "reminders", null, { sent: body.sent, failed: body.failed });

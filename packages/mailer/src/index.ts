@@ -1,3 +1,4 @@
+import { normalizeMailFrom } from "@rallix/config/env";
 import { ConsoleMailer } from "./console";
 import { SmtpMailer } from "./smtp";
 import { MailError, type Mailer } from "./types";
@@ -24,6 +25,6 @@ export function createMailer(env: Record<string, string | undefined>): Mailer {
     if (production) throw new MailError("MAIL_PROVIDER=console is not allowed in production", "config");
     return new ConsoleMailer((env.MAIL_FAIL_ADDRESSES ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
   }
-  if (choice === "smtp") return new SmtpMailer({ url: env.SMTP_URL ?? "", from: env.MAIL_FROM ?? "", replyTo: env.MAIL_REPLY_TO });
+  if (choice === "smtp") return new SmtpMailer({ url: env.SMTP_URL ?? "", from: normalizeMailFrom(env.MAIL_FROM), replyTo: env.MAIL_REPLY_TO });
   throw new MailError(`Unknown MAIL_PROVIDER "${choice}"`, "config");
 }

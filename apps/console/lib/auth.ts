@@ -1,3 +1,4 @@
+import { normalizeBaseUrl } from "@rallix/config/env";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -16,7 +17,7 @@ const g = globalThis as unknown as { __consoleAuth?: ReturnType<typeof create> }
 function create() {
   return betterAuth({
     secret: process.env.BETTER_AUTH_SECRET,
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: normalizeBaseUrl(process.env.BETTER_AUTH_URL),
     database: drizzleAdapter(db(), { provider: "pg", schema: { users, sessions, accounts, verifications } }),
     user: { modelName: "users" },
     session: { modelName: "sessions", expiresIn: 60 * 60 * 12 }, // staff sessions are short

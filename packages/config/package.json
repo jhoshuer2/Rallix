@@ -3,7 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { "./phone": "./src/phone.ts" },
-  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
-  "devDependencies": { "typescript": "^5.8.0", "vitest": "^3.2.0" }
+  "exports": {
+    "./phone": "./src/phone.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
 }

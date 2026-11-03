@@ -176,6 +176,9 @@ importers:
 
   packages/mailer:
     dependencies:
+      '@rallix/config':
+        specifier: workspace:*
+        version: link:../config
       nodemailer:
         specifier: ^6.9.16
         version: 6.10.1
