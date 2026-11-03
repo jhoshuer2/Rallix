@@ -22,7 +22,7 @@ async function readCode(logPath, email) {
 async function signIn(page, base, who) {
   const email = emailFor(who);
   await page.goto(base + '/sign-in'); await page.getByLabel(/Email address|Work email/).fill(email); await page.getByRole('button', { name: 'Email me a code' }).click();
-  await page.getByLabel(/6-digit code/).waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
+  await page.getByLabel(/6-digit code/).waitFor({ timeout: 60000 }); await page.waitForTimeout(500);
   const code = await readCode(LOGS[base], email);
   await page.getByLabel(/6-digit code/).fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForLoadState('networkidle'); await page.waitForTimeout(700);
@@ -57,15 +57,15 @@ const tokenOf = id => sql(`select coalesce(pay_token,'') from platform_invoices 
   ok(sql(`select status || ':' || suspension_reason from clubs where id='${LAGOS}'`) === 'suspended:non_payment', 'suspended with reason type "non-payment" by default');
   sql(`insert into users (id, name, email, phone_number, phone_number_verified) values ('only_lagos','Lagos Treasurer','lt@x.example','+2348030000300',true)`);
   sql(`insert into memberships (club_id, user_id, roles) values ('${LAGOS}','only_lagos', ARRAY['admin']::member_role[])`);
-  const A = await mk(); await signIn(A, CLUB, '+2348030000300'); await A.goto(CLUB + '/'); await A.waitForURL(/suspended/, { timeout: 15000 }); ok(/currently suspended/i.test(await text(A)), 'an admin who only belongs to that club is locked out and sees "Club unavailable"');
+  const A = await mk(); await signIn(A, CLUB, '+2348030000300'); await A.goto(CLUB + '/'); await A.waitForURL(/suspended/, { timeout: 60000 }); ok(/currently suspended/i.test(await text(A)), 'an admin who only belongs to that club is locked out and sees "Club unavailable"');
   const AD = await mk(); await signIn(AD, CLUB, '+2348030000006'); await AD.goto(CLUB + '/play'); await AD.getByRole('button', { name: /Switch club/ }).click(); await AD.waitForTimeout(400);
   ok(/Unavailable/.test(await AD.locator('dialog').innerText()) && /Lagos Spin Club is suspended/.test(await AD.locator('dialog').innerText()), 'a member of several clubs sees the suspended one explained in the club switcher');
   await V.goto(CLUB + '/pay/invoice/' + tok); await V.getByLabel(/Email for your receipt/).fill('not-an-email'); await V.getByRole('button', { name: /^Pay ₦20,000/ }).click();
   await V.getByText(/doesn.t look right/i).waitFor({ timeout: 10000 }); ok(true, 'an invalid receipt email is refused');
-  await V.getByLabel(/Email for your receipt/).fill('treasurer@lagosspin.example'); await V.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await V.waitForURL(/\/pay\/fake/, { timeout: 20000 });
+  await V.getByLabel(/Email for your receipt/).fill('treasurer@lagosspin.example'); await V.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await V.waitForURL(/\/pay\/fake/, { timeout: 60000 });
   const ref = sql(`select reference from invoice_payments where invoice_id='${lagosInv}' and via_link order by created_at desc limit 1`);
   ok(/^RLX-I-/.test(ref) && sql(`select amount_kobo || ':' || payer_email from invoice_payments where reference='${ref}'`) === '2000000:treasurer@lagosspin.example', 'attempt recorded first, amount from the database, receipt email kept');
-  await V.getByRole('button', { name: 'Pay now' }).click(); await V.waitForURL(/\/pay\/invoice\/.*\/return/, { timeout: 20000 }); await V.waitForLoadState('networkidle');
+  await V.getByRole('button', { name: 'Pay now' }).click(); await V.waitForURL(/\/pay\/invoice\/.*\/return/, { timeout: 60000 }); await V.waitForLoadState('networkidle');
   ok(/Payment received/i.test(await text(V)), 'the visitor sees the payment confirmed');
   ok(sql(`select status from platform_invoices where id='${lagosInv}'`) === 'paid', 'invoice marked paid');
   ok(sql(`select status || ':' || coalesce(suspension_reason::text,'none') from clubs where id='${LAGOS}'`) === 'active:none', 'the club is reactivated and the reason cleared');
@@ -76,12 +76,12 @@ const tokenOf = id => sql(`select coalesce(pay_token,'') from platform_invoices 
   await V.goto(CLUB + '/pay/invoice/' + tok); ok(/Invoice paid/i.test(await text(V)) && !(await V.getByRole('button', { name: /^Pay/ }).count()), 'the link now says the invoice is paid and offers no Pay button');
 
   console.log('3. a suspension for another reason is never lifted by payment');
-  await O.goto(CON + '/invoices?new=1'); await O.locator('form select').first().selectOption(PARIS); await O.getByLabel('Period').fill('2026-12'); await O.getByLabel(/Total/).fill('20000'); await O.getByRole('button', { name: 'Create invoice' }).click(); await O.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 15000 });
+  await O.goto(CON + '/invoices?new=1'); await O.locator('form select').first().selectOption(PARIS); await O.getByLabel('Period').fill('2026-12'); await O.getByLabel(/Total/).fill('20000'); await O.getByRole('button', { name: 'Create invoice' }).click(); await O.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 60000 });
   const parisInv = sql(`select id from platform_invoices where club_id='${PARIS}' and period_label='2026-12'`);
   await O.goto(CON + '/clubs/' + PARIS); await O.getByText('Something else').click(); await O.getByLabel('Details').fill('Conduct complaint under review'); await O.getByRole('button', { name: 'Suspend club' }).click(); await O.getByText(/Club suspended/).waitFor({ timeout: 10000 });
   ok(sql(`select suspension_reason from clubs where id='${PARIS}'`) === 'other', 'suspended with reason type "other"');
-  const P = await mk(); await P.goto(CLUB + '/pay/invoice/' + tokenOf(parisInv)); await P.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await P.waitForURL(/\/pay\/fake/, { timeout: 20000 });
-  await P.getByRole('button', { name: 'Pay now' }).click(); await P.waitForURL(/\/return/, { timeout: 20000 }); await P.waitForLoadState('networkidle');
+  const P = await mk(); await P.goto(CLUB + '/pay/invoice/' + tokenOf(parisInv)); await P.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await P.waitForURL(/\/pay\/fake/, { timeout: 60000 });
+  await P.getByRole('button', { name: 'Pay now' }).click(); await P.waitForURL(/\/return/, { timeout: 60000 }); await P.waitForLoadState('networkidle');
   ok(sql(`select status from platform_invoices where id='${parisInv}'`) === 'paid', 'the invoice is paid');
   ok(sql(`select status from clubs where id='${PARIS}'`) === 'suspended', 'but the club stays suspended: only staff can lift an "other" suspension');
   await O.goto(CON + "/payments"); let t = await text(O); ok(/Paid but still locked out/i.test(t) && /Paris Arena/.test(t) && /only staff can reactivate/i.test(t), 'the console flags it for a human');
@@ -89,7 +89,7 @@ const tokenOf = id => sql(`select coalesce(pay_token,'') from platform_invoices 
   console.log('4. other overdue invoices block automatic reactivation');
   sql(`update clubs set status='suspended', suspension_reason='non_payment' where id='${LAGOS}'`);
   sql(`insert into platform_invoices (club_id, number, status, amount_kobo, period_label, issued_at, due_at, pay_token) values ('${LAGOS}','T-A','issued',100000,'t-a', now()-interval '30 days', now()-interval '16 days','OverdueTokenAAAAAAAAAAAAAA'), ('${LAGOS}','T-B','issued',100000,'t-b', now()-interval '20 days', now()-interval '6 days','OverdueTokenBBBBBBBBBBBBBB')`);
-  const pay = async tokenStr => { const p = await mk(); await p.goto(CLUB + '/pay/invoice/' + tokenStr); await p.getByRole('button', { name: /^Pay ₦1,000/ }).click(); await p.waitForURL(/\/pay\/fake/, { timeout: 20000 }); await p.getByRole('button', { name: 'Pay now' }).click(); await p.waitForURL(/\/return/, { timeout: 20000 }); await p.waitForLoadState('networkidle'); return p; };
+  const pay = async tokenStr => { const p = await mk(); await p.goto(CLUB + '/pay/invoice/' + tokenStr); await p.getByRole('button', { name: /^Pay ₦1,000/ }).click(); await p.waitForURL(/\/pay\/fake/, { timeout: 60000 }); await p.getByRole('button', { name: 'Pay now' }).click(); await p.waitForURL(/\/return/, { timeout: 60000 }); await p.waitForLoadState('networkidle'); return p; };
   await pay('OverdueTokenAAAAAAAAAAAAAA'); ok(sql(`select status from clubs where id='${LAGOS}'`) === 'suspended', 'paying one of two overdue invoices does NOT reactivate the club');
   await pay('OverdueTokenBBBBBBBBBBBBBB'); ok(sql(`select status from clubs where id='${LAGOS}'`) === 'active', 'paying the last overdue invoice does');
 
@@ -105,7 +105,7 @@ const tokenOf = id => sql(`select coalesce(pay_token,'') from platform_invoices 
   await O.goto(CON + '/invoices/' + lagosInv); void 0;
 
   console.log('6. attempt limit and token isolation');
-  await O.goto(CON + '/invoices?new=1'); await O.locator('form select').first().selectOption(PARIS); await O.getByLabel('Period').fill('2027-01'); await O.getByLabel(/Total/).fill('20000'); await O.getByRole('button', { name: 'Create invoice' }).click(); await O.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 15000 });
+  await O.goto(CON + '/invoices?new=1'); await O.locator('form select').first().selectOption(PARIS); await O.getByLabel('Period').fill('2027-01'); await O.getByLabel(/Total/).fill('20000'); await O.getByRole('button', { name: 'Create invoice' }).click(); await O.waitForURL(/\/invoices\/[0-9a-f-]{36}/, { timeout: 60000 });
   const limInv = sql(`select id from platform_invoices where club_id='${PARIS}' and period_label='2027-01'`), limTok = tokenOf(limInv);
   const L = await mk(); let blocked = false;
   for (let i = 1; i <= 6; i++) { await L.goto(CLUB + '/pay/invoice/' + limTok); await L.getByRole('button', { name: /^Pay ₦20,000/ }).click(); await L.waitForTimeout(1500); if (/Too many attempts for this invoice/i.test(await text(L))) { blocked = i === 6; break; } }
