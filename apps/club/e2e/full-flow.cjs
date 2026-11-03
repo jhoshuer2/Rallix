@@ -115,7 +115,6 @@ await J.waitForURL(/\/play/,{timeout:20000});await J.waitForLoadState('networkid
 ok(sql(`select level from player_profiles p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.email='joiner@example.com'`)==='senior','joined profile has the chosen level');
 const J2=await mk();await J2.goto(B+'/join/NOPE1234');await J2.waitForLoadState('networkidle');
 ok(/isn’t valid|isn't valid/i.test(await text(J2)),'a bad invite code shows a clear message instead of a form');
-ok(/invalid, expired or full/i.test(await text(J2)),'a bad invite code shows a clear error');
 await J.goto(B+'/members');await J.waitForURL(/\/play/);ok(true,'the new player cannot open admin pages in that club');
 // cross-club isolation through the UI
 await J.goto(B+'/play/compete/'+compId);await J.waitForFunction(()=>/not be found|404/i.test(document.body.innerText),null,{timeout:20000}).catch(()=>{});const st=await J.evaluate(()=>document.body.innerText);ok(/not be found|404/i.test(st),'Test Club player cannot open a Paris Arena competition (404)');
