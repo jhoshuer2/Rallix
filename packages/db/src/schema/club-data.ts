@@ -357,3 +357,43 @@ export const clubEvents = pgTable("club_events", {
   check("club_events_repeat", sql`NOT ${t.repeatsWeekly} OR (${t.kind} = 'play' AND ${t.endsOn} IS NULL)`),
   check("club_events_until", sql`${t.until} IS NULL OR (${t.repeatsWeekly} AND ${t.until} >= ${t.startsOn})`),
 ]);
+
+/** What the club owns: tables, bats, balls, nets. Looked after by the Facilities admin. */
+export const facilityItems = pgTable("facility_items", {
+  id: id(),
+  clubId: clubId(),
+  kind: text("kind").notNull(), // table | bat | ball | net | other
+  name: text("name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  minQuantity: integer("min_quantity"),
+  status: text("status").notNull().default("ok"), // ok | needs_attention | out
+  note: text("note"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("facility_items_id_club_uq").on(t.id, t.clubId),
+  index("facility_items_club_idx").on(t.clubId, t.kind),
+  check("facility_items_kind", sql`${t.kind} IN ('table','bat','ball','net','other')`),
+  check("facility_items_name", sql`char_length(${t.name}) BETWEEN 1 AND 80`),
+  check("facility_items_quantity", sql`${t.quantity} BETWEEN 0 AND 100000 AND (${t.minQuantity} IS NULL OR ${t.minQuantity} BETWEEN 0 AND 100000)`),
+  check("facility_items_status", sql`${t.status} IN ('ok','needs_attention','out')`),
+  check("facility_items_note", sql`${t.note} IS NULL OR char_length(${t.note}) <= 280`),
+]);
+
+/** Append-only history of upkeep and stock changes. */
+export const facilityLog = pgTable("facility_log", {
+  id: id(),
+  clubId: clubId(),
+  itemId: uuid("item_id").notNull(),
+  kind: text("kind").notNull(), // maintenance | stock | note
+  note: text("note"),
+  delta: integer("delta"),
+  createdBy: uuid("created_by"),
+  createdAt: createdAt(),
+}, (t) => [
+  foreignKey({ columns: [t.itemId, t.clubId], foreignColumns: [facilityItems.id, facilityItems.clubId], name: "facility_log_item_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.createdBy, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "facility_log_by_fk" }),
+  index("facility_log_item_idx").on(t.itemId, t.createdAt),
+  check("facility_log_kind", sql`${t.kind} IN ('maintenance','stock','note')`),
+  check("facility_log_note", sql`${t.note} IS NULL OR char_length(${t.note}) <= 280`),
+]);

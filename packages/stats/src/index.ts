@@ -9,3 +9,4 @@ export * from "./registration";
 export * from "./setup";
 export * from "./friendly";
 export * from "./schedule";
+export * from "./facilities";

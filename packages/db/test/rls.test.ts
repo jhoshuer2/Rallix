@@ -977,3 +977,68 @@ describe("club schedule", () => {
     expect(await denied(add({ userId: "adminB", clubId: ids.A }))).toBe("42501");
   });
 });
+
+describe("facilities", () => {
+  let k = 0;
+  async function admin(perms: string[]) {
+    const u = `fac${++k}`;
+    await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`);
+    const r = await svc.execute(sql`insert into memberships (club_id, user_id, roles, permissions) values (${ids.A}, ${u}, ARRAY['admin']::member_role[], ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)}) returning id`);
+    return { ctx: { userId: u, clubId: ids.A }, id: (r.rows[0] as { id: string }).id };
+  }
+  const OWNER = () => ({ userId: "adminA", clubId: ids.A });
+  const player = () => ({ userId: "playerA1", clubId: ids.A });
+  const mk = (ctx: { userId: string; clubId: string }, name: string, qty = 5) =>
+    withTenant(app, ctx, (tx) => tx.execute(sql`insert into facility_items (club_id, kind, name, quantity) values (${ctx.clubId}, 'ball', ${name}, ${qty}) returning id`));
+  const adjust = async (ctx: { userId: string; clubId: string }, item: string, d: number, note: string | null = null) =>
+    String((await rows(app, ctx, sql`select app.adjust_stock(${item}::uuid, ${d}, ${note}) as r`))[0]!.r);
+
+  it("only the Facilities admin (or the owner) sees or changes facilities; players, other admins and other clubs see nothing", async () => {
+    const fac = await admin(["facilities"]), fin = await admin(["finance"]);
+    const item = (await mk(fac.ctx, "Training balls")).rows[0] as { id: string };
+    expect((await mk(OWNER(), "Table 1", 1)).rows).toHaveLength(1);
+    expect(await denied(mk(fin.ctx, "Nope"))).toBe("42501");
+    expect(await denied(mk(player(), "Nope"))).toBe("42501");
+    expect(await rows(app, fin.ctx, sql`select id from facility_items`)).toHaveLength(0);
+    expect(await rows(app, player(), sql`select id from facility_items`)).toHaveLength(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from facility_items`)).toHaveLength(0);
+    expect((await rows(app, fac.ctx, sql`select id from facility_items`)).length).toBeGreaterThanOrEqual(2);
+    expect(await rows(app, fin.ctx, sql`update facility_items set name = 'x' where id = ${item.id} returning id`)).toHaveLength(0);
+    expect(await rows(app, fac.ctx, sql`update facility_items set status = 'out' where id = ${item.id} returning id`)).toHaveLength(1);
+  });
+  it("stock changes go through one function: logged, never negative, and refused for anyone else", async () => {
+    const fac = await admin(["facilities"]), fin = await admin(["finance"]);
+    const item = ((await mk(fac.ctx, "Spare bats", 3)).rows[0] as { id: string }).id;
+    expect(await adjust(fac.ctx, item, -2, "Lent to juniors")).toBe("ok");
+    expect(await adjust(fac.ctx, item, -2)).toBe("negative");
+    expect(await adjust(fac.ctx, item, 0)).toBe("invalid");
+    expect(await adjust(fac.ctx, item, 200000)).toBe("invalid");
+    expect(await adjust(fin.ctx, item, 1)).toBe("denied");
+    expect(await adjust(player(), item, 1)).toBe("denied");
+    expect(await adjust({ userId: "adminB", clubId: ids.B }, item, 1)).toBe("denied");
+    expect(Number((await svc.execute(sql`select quantity from facility_items where id = ${item}`)).rows[0]!.quantity)).toBe(1);
+    const log = (await rows(app, fac.ctx, sql`select kind, delta, note, created_by from facility_log where item_id = ${item}`))[0]!;
+    expect([log.kind, log.delta, log.note, log.created_by]).toEqual(["stock", -2, "Lent to juniors", fac.id]);
+  });
+  it("the log is append-only and records only your own identity; direct quantity edits are still allowed but unlogged", async () => {
+    const fac = await admin(["facilities"]), other = await admin(["facilities"]);
+    const item = ((await mk(fac.ctx, "Net", 2)).rows[0] as { id: string }).id;
+    const add = (ctx: { userId: string; clubId: string }, by: string | null) =>
+      withTenant(app, ctx, (tx) => tx.execute(sql`insert into facility_log (club_id, item_id, kind, note, created_by) values (${ids.A}, ${item}, 'maintenance', 'Replaced net', ${by}) returning id`));
+    expect((await add(fac.ctx, fac.id)).rows).toHaveLength(1);
+    expect(await denied(add(fac.ctx, other.id))).toBe("42501"); // cannot write a line in someone else's name
+    expect(await denied(add({ userId: "playerA1", clubId: ids.A }, null))).toBe("42501");
+    expect(await denied(withTenant(app, fac.ctx, (tx) => tx.execute(sql`update facility_log set note = 'x' where item_id = ${item}`)))).toBe("42501");
+    expect(await denied(withTenant(app, fac.ctx, (tx) => tx.execute(sql`delete from facility_log where item_id = ${item}`)))).toBe("42501");
+    expect(await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select id from facility_log`)).toHaveLength(0);
+  });
+  it("bad values are refused by the database, and a log line cannot point at another club's item", async () => {
+    const o = OWNER();
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_items (club_id, kind, name) values (${ids.A}, 'car', 'x')`)))).toBe("23514");
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_items (club_id, kind, name, quantity) values (${ids.A}, 'ball', 'x', -1)`)))).toBe("23514");
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_items (club_id, kind, name, status) values (${ids.A}, 'ball', 'x', 'broken')`)))).toBe("23514");
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_items (club_id, kind, name) values (${ids.A}, 'ball', '')`)))).toBe("23514");
+    const itemB = ((await svc.execute(sql`insert into facility_items (club_id, kind, name) values (${ids.B}, 'ball', 'B balls') returning id`)).rows[0] as { id: string }).id;
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_log (club_id, item_id, kind) values (${ids.A}, ${itemB}, 'note')`)))).toBe("23503");
+  });
+});
