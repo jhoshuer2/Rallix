@@ -9,8 +9,8 @@
  */
 const {chromium}=require('playwright');const fs=require('fs');const {execSync}=require('child_process');
 const SC=process.env.E2E_OUT||'/tmp';const DEV_LOG=process.env.DEV_LOG;if(!DEV_LOG){console.error('Set DEV_LOG to the dev server log file');process.exit(2)}
-const B='http://localhost:3000';
-const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
+const B=process.env.BASE||'http://localhost:3000';
+const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d ${process.env.PGDB||'rallix_dev'} -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
 let pass=0,fail=0;const ok=(c,m)=>{if(c){pass++;console.log('  ok  ',m)}else{fail++;console.log('  FAIL',m)}};
 const EMAILS = { '+2348030000100': 'admin@example.com', '+2348030000200': 'owner@rallix.app', '+2348030000300': 'lt@x.example', '+2348039999999': 'newowner@example.com', '+2348038888888': 'joiner@example.com', '+2348037777777': 'badcode@example.com', '+2348030000000': 'jide@example.com', '+2348030000001': 'pastor@example.com', '+2348030000002': 'sule@example.com', '+2348030000003': 'nurudeen@example.com', '+2348030000004': 'dorathy@example.com', '+2348030000005': 'nathaniel@example.com', '+2348030000006': 'ade@example.com' };
 const emailFor = p => EMAILS[p] || p;
@@ -108,11 +108,13 @@ await N.goto(B+'/members');{const rt=await text(N);ok(/Ngozi Test/i.test(rt)&&!/
 await N.goto(B+'/competition');ok(!/Senior Cup|Group Stage/i.test(await text(N)),'new club sees none of Paris Arena’s competitions');
 await N.goto(B+'/profile/invite');await N.getByRole('button',{name:/Create invite link/}).click();await N.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});
 const code=((await text(N)).match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!code,'new club admin created invite '+code);
+sql(`insert into club_pages (club_id, join_mode) select id, 'open' from clubs where name='Test Club' on conflict (club_id) do update set join_mode='open'`); // this scenario is about joining; review mode is covered by applications.cjs
 const J=await mk();await signIn(J,'+2348038888888','/join/'+code);await J.waitForLoadState('networkidle');
-await J.getByLabel('Full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();
+await J.getByLabel('Your full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();
 await J.waitForURL(/\/play/,{timeout:20000});await J.waitForLoadState('networkidle');await J.getByText(/Hi, Chika/i).first().waitFor({timeout:25000}).catch(()=>{});ok(/Hi, Chika/i.test(await text(J)),'invited user joined and sees the player home');
 ok(sql(`select level from player_profiles p join memberships m on m.id=p.membership_id join users u on u.id=m.user_id where u.email='joiner@example.com'`)==='senior','joined profile has the chosen level');
-const J2=await mk();await signIn(J2,'+2348037777777','/join/NOPE1234');await J2.getByLabel('Full name').fill('Bad Code');await J2.getByRole('radio',{name:'Junior'}).click();await J2.getByRole('button',{name:'Join club'}).click();await J2.waitForTimeout(1500);
+const J2=await mk();await J2.goto(B+'/join/NOPE1234');await J2.waitForLoadState('networkidle');
+ok(/isn’t valid|isn't valid/i.test(await text(J2)),'a bad invite code shows a clear message instead of a form');
 ok(/invalid, expired or full/i.test(await text(J2)),'a bad invite code shows a clear error');
 await J.goto(B+'/members');await J.waitForURL(/\/play/);ok(true,'the new player cannot open admin pages in that club');
 // cross-club isolation through the UI

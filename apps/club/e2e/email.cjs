@@ -8,7 +8,7 @@ const fs = require('fs'); const { execSync } = require('child_process');
 const CLUB = 'http://localhost:3000', CON = 'http://localhost:3001';
 const LOGS = { [CLUB]: process.env.CLUB_LOG, [CON]: process.env.CONSOLE_LOG };
 if (!LOGS[CLUB] || !LOGS[CON]) { console.error('Set CLUB_LOG and CONSOLE_LOG'); process.exit(2); }
-const sql = q => execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g, '\\"')}"`).toString().trim();
+const sql = q => execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d ${process.env.PGDB||'rallix_dev'} -Atc "${q.replace(/"/g, '\\"')}"`).toString().trim();
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ok  ', m); } else { fail++; console.log('  FAIL', m); } };
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

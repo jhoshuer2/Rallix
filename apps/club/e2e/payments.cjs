@@ -7,7 +7,7 @@ const fs = require('fs'); const crypto = require('crypto'); const { execSync } =
 const CLUB = 'http://localhost:3000', CON = 'http://localhost:3001';
 const LOGS = { [CLUB]: process.env.CLUB_LOG, [CON]: process.env.CONSOLE_LOG };
 if (!LOGS[CLUB] || !LOGS[CON]) { console.error('Set CLUB_LOG and CONSOLE_LOG'); process.exit(2); }
-const sql = q => execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d rallix_dev -Atc "${q.replace(/"/g, '\\"')}"`).toString().trim();
+const sql = q => execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d ${process.env.PGDB||'rallix_dev'} -Atc "${q.replace(/"/g, '\\"')}"`).toString().trim();
 const sign = body => crypto.createHmac('sha512', 'fake_webhook_secret').update(body).digest('hex');
 const hook = async (body, sig) => { const r = await fetch(CLUB + '/api/webhooks/paystack', { method: 'POST', headers: { 'content-type': 'application/json', 'x-paystack-signature': sig ?? sign(body) }, body }); return { status: r.status, json: await r.json().catch(() => null) }; };
 const evt = (reference, amount = 600000) => JSON.stringify({ event: 'charge.success', data: { id: 1, reference, status: 'success', amount, currency: 'NGN' } });
