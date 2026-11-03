@@ -46,7 +46,7 @@ await A.goto(B+'/membership/payments');t=await text(A);ok(/Paid|Pending|Failed/i
 await A.goto(B+'/membership/subscriptions');t=await text(A);ok(/₦6,000/.test(t),'subscription plans show ₦6,000 from the database');
 await A.screenshot({path:SC+'/e_admin_plans.png'});
 await A.goto(B+'/membership');await A.getByRole('radio',{name:'Year'}).click();t=await text(A);ok(/₦/.test(t),'revenue card renders period totals');
-await A.goto(B+'/profile');await A.getByRole('button',{name:/Create (invite link|a new link)/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});t=await text(A);
+await A.goto(B+'/profile/invite');await A.getByRole('button',{name:/Create (invite link|a new link)/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});t=await text(A);
 const inv=(t.match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!inv,'admin created an invite link ('+inv+')');
 // ===== B. create competition + score =====
 console.log('B. create a competition, then score a match');
@@ -106,7 +106,7 @@ ok(/Test Club/i.test(await text(N)),'new club created, user is its admin');
 ok(sql(`select slug from clubs where name='Test Club'`)==='test-club','club slug generated');
 await N.goto(B+'/members');{const rt=await text(N);ok(/Ngozi Test/i.test(rt)&&!/Jide|Pastor|Sule|Nurudeen|Dorathy|Nathaniel/i.test(rt),'new club roster is just its founder, none of Paris Arena’s players');}
 await N.goto(B+'/competition');ok(!/Senior Cup|Group Stage/i.test(await text(N)),'new club sees none of Paris Arena’s competitions');
-await N.goto(B+'/profile');await N.getByRole('button',{name:/Create invite link/}).click();await N.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});
+await N.goto(B+'/profile/invite');await N.getByRole('button',{name:/Create invite link/}).click();await N.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor({timeout:15000}).catch(()=>{});
 const code=((await text(N)).match(/\/join\/([A-Z0-9]{8})/)||[])[1];ok(!!code,'new club admin created invite '+code);
 const J=await mk();await signIn(J,'+2348038888888','/join/'+code);await J.waitForLoadState('networkidle');
 await J.getByLabel('Full name').fill('Chika Joiner');await J.getByRole('radio',{name:'Senior'}).click();await J.getByRole('button',{name:'Join club'}).click();

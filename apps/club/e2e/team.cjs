@@ -47,7 +47,7 @@ const adePerms=()=>sql(`select m.roles::text||'|'||array_to_string(m.permissions
   await A.goto(B+'/membership/subscriptions');ok((await at(A))==='/membership/subscriptions','fee plans are open to them');
   await A.goto(B+'/membership/payments');ok((await at(A))==='/membership/payments','payments are open to them');
   await A.goto(B+'/profile');t=await text(A);
-  ok(/Admin team/.test(t)&&!/Invite players|Court location|Club pictures/.test(t)&&!/Club page/.test(t.replace(/Admin team/g,'')),'the Club tab shows only what they may do (no invite, court, pictures or club page)');
+  ok(/Admin team/.test(t)&&!/Invite players|Court and check-in|Club pictures/.test(t)&&!/Club page/.test(t.replace(/Admin team/g,'')),'the Club menu shows only what they may do (no invite, court, pictures or club page)');
   await A.goto(B+'/profile/team');ok(!(await A.getByRole('button',{name:'Add an admin'}).count()),'they can see the team but not change it');
   ok(/Owner/.test(await text(A)),'and the team lists the owner');
 

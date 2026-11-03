@@ -73,7 +73,7 @@ export async function createInvite(): Promise<Result<{ code: string }>> {
   if (!can(ctx.club, "members")) return fail("Only club admins can create invites.");
   const code = inviteCode();
   await inClub(ctx, (tx) => tx.insert(invites).values({ clubId: ctx.club.clubId, code, createdBy: ctx.club.membershipId, expiresAt: new Date(Date.now() + 30 * 86400000) }));
-  revalidatePath("/profile");
+  revalidatePath("/profile/invite");
   return { ok: true, code };
 }
 

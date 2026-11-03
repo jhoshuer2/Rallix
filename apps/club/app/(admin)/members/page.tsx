@@ -13,7 +13,7 @@ export default async function Members() {
   const members = await inClub(ctx, (tx) => listMembers(tx, ctx.club.clubId));
   const waiting = await inClub(ctx, (tx) => listPendingApplications(tx, ctx.club.clubId));
   return (
-    <PageShell flat header={<ClubHeader />} title={`Members · ${members.length}`} action={members.length ? <Link className="rx-btn rx-btn--small" href="/profile" aria-label="Invite players">+ Invite</Link> : undefined}>
+    <PageShell flat header={<ClubHeader />} title={`Members · ${members.length}`} action={members.length ? <Link className="rx-btn rx-btn--small" href="/profile/invite" aria-label="Invite players">+ Invite</Link> : undefined}>
       {waiting.length ? (
         <>
           <SectionTitle title={`Waiting to join (${waiting.length})`} />
@@ -22,7 +22,7 @@ export default async function Members() {
         </>
       ) : null}
       {members.length === 0 ? (
-        <EmptyState title="No players yet" hint="Share your invite link and they will appear here." action={<Link className="rx-btn" href="/profile">Get invite link</Link>} />
+        <EmptyState title="No players yet" hint="Share your invite link and they will appear here." action={<Link className="rx-btn" href="/profile/invite">Get invite link</Link>} />
       ) : <MembersGrid members={members.map((m) => ({ id: m.id, name: m.name, rank: m.rank, rating: m.rating, photo: m.photo ?? null }))} />}
     </PageShell>
   );

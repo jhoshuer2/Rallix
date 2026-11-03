@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@rallix/ui";
-import { createInvite } from "../../../lib/actions";
+import { createInvite } from "../lib/actions";
 
 export function InviteLink({ clubName, initialCode }: { clubName: string; initialCode: string | null }) {
   const [code, setCode] = useState(initialCode);

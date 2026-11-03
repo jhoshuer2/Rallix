@@ -26,7 +26,7 @@ async function ctx(b,email){const c=await b.newContext({viewport:{width:440,heig
 
 // Admin sets the court
 const A=await ctx(b,'admin@example.com');
-await A.p.goto(B+'/profile');await A.p.getByRole('button',{name:/Use my current location/}).click();
+await A.p.goto(B+'/profile/court');await A.p.getByRole('button',{name:/Use my current location/}).click();
 await A.p.getByText('Court location saved.').waitFor({timeout:15000}).catch(()=>{});
 const v=sql(`select venue_lat||','||venue_lng||','||venue_radius_m from clubs where name='Paris Arena'`);
 ok(/^9\.07\d*,7\.39\d*,100$/.test(v),'admin saved the court location with the default 100 m radius: '+v);

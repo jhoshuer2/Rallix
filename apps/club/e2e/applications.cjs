@@ -23,9 +23,9 @@ const text=p=>p.locator('body').innerText();
   const club=sql(`select id from clubs where name='Paris Arena'`), slug=sql(`select slug from clubs where name='Paris Arena'`);
   const A=await ctxFor(b,'admin@example.com');await A.goto(B+'/switch/'+club);
   // 1. Admin writes the club page and creates an invite
-  await A.goto(B+'/profile');await A.getByRole('button',{name:/Create invite link|Create a new link/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor();
+  await A.goto(B+'/profile/invite');await A.getByRole('button',{name:/Create invite link|Create a new link/}).click();await A.getByText(/\/join\/[A-Z0-9]{8}/).first().waitFor();
   const invite=(await text(A)).match(/\/join\/([A-Z0-9]{8})/)[1];
-  await A.getByRole('link',{name:/Club page/}).click();await A.waitForURL(/club-page/);
+  await A.goto(B+'/profile/club-page');
   await A.getByLabel('About',{exact:true}).fill('A friendly club in Abuja.');await A.getByLabel('When we play').fill('Saturdays 4pm to 8pm. Closed on public holidays.');
   await A.getByLabel('Dress code').fill('Sports shoes and sportswear.');await A.getByLabel('Equipment').fill('Bring your own bat or borrow one.');await A.getByLabel('Rules and guidelines').fill('Be kind. Pay dues by the 5th.');
   await A.getByRole('button',{name:'Save club page'}).click();await A.getByText('Saved.').waitFor();

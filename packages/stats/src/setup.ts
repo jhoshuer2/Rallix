@@ -15,12 +15,12 @@ export type SetupStep = { key: "picture" | "clubpage" | "court" | "plans" | "pay
 /** The ordered steps, what each is for, and where to do it. A club picture counts as done with a logo OR a cover. */
 export function setupSteps(f: SetupFacts): SetupStep[] {
   return [
-    { key: "picture", title: "Add your club picture", hint: "A logo or cover people recognise.", href: "/profile", done: f.hasLogo || f.hasCover },
+    { key: "picture", title: "Add your club picture", hint: "A logo or cover people recognise.", href: "/profile/pictures", done: f.hasLogo || f.hasCover },
     { key: "clubpage", title: "Write your club page", hint: "Rules, schedule and dress code people read before they join.", href: "/profile/club-page", done: f.hasClubPage },
-    { key: "invite", title: "Invite your players", hint: "Share the invite link in your group chat.", href: "/profile", done: f.hasInvited },
+    { key: "invite", title: "Invite your players", hint: "Share the invite link in your group chat.", href: "/profile/invite", done: f.hasInvited },
     { key: "plans", title: "Set your fees", hint: "Monthly or yearly dues, if your club charges any.", href: "/membership/subscriptions", done: f.hasPlans },
     { key: "payouts", title: "Choose where fees are paid", hint: "Your bank account for online payments.", href: "/membership/payouts", done: f.hasPayouts },
-    { key: "court", title: "Mark your court", hint: "So players can check in when they arrive.", href: "/profile", done: f.hasCourt },
+    { key: "court", title: "Mark your court", hint: "So players can check in when they arrive.", href: "/profile/court", done: f.hasCourt },
     { key: "competition", title: "Start your first competition", hint: "Or skip it and just let people play.", href: "/competition/new", done: f.hasCompetition },
   ];
 }
