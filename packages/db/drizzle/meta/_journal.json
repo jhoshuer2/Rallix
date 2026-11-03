@@ -232,6 +232,13 @@
       "when": 1793681186562,
       "tag": "0032_waitlist",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793681187562,
+      "tag": "0033_doors_open_rsvps",
+      "breakpoints": true
     }
   ]
 }

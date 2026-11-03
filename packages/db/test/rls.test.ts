@@ -1288,3 +1288,64 @@ describe("competition waitlist", () => {
     expect(await queue()).toEqual(["wl1"]);
   });
 });
+
+describe("doors open and I'm coming", () => {
+  const OWNER = () => ({ userId: "adminA", clubId: ids.A });
+  const p1 = () => ({ userId: "playerA1", clubId: ids.A });
+  const p2 = () => ({ userId: "playerA2", clubId: ids.A });
+  const fn = async (ctx: { userId: string; clubId: string }, q: ReturnType<typeof sql>) => String((await rows(app, ctx, q))[0]!.r);
+  const day = async (offset: number) => String((await svc.execute(sql`select to_char((now() at time zone 'Africa/Lagos')::date + ${offset}::int, 'YYYY-MM-DD') as d`)).rows[0]!.d);
+  let weekly = "", oneOff = "", closed = "";
+
+  it("doors open must be a time no later than the start, and needs a start", async () => {
+    const add = (cols: string, vals: string) => withTenant(app, OWNER(), (tx) => tx.execute(sql.raw(`insert into club_events (club_id, kind, title, starts_on, ${cols}) values ('${ids.A}', 'play', 'T', '2030-01-01', ${vals}) returning id`)));
+    expect((await add("start_time, doors_open", "'18:00', '17:45'")).rows).toHaveLength(1);
+    expect((await add("start_time, doors_open", "'18:00', '18:00'")).rows).toHaveLength(1);
+    expect(await denied(add("start_time, doors_open", "'18:00', '18:30'"))).toBe("23514");
+    expect(await denied(add("doors_open", "'17:45'"))).toBe("23514");
+    expect(await denied(add("start_time, doors_open", "'18:00', '25:00'"))).toBe("23514");
+  });
+  it("setup: a weekly session from last week, a one-off event in 3 days, and a closure in 5 days", async () => {
+    await svc.execute(sql`delete from club_events`);
+    const start = await day(-7);
+    weekly = ((await svc.execute(sql`insert into club_events (club_id, kind, title, starts_on, start_time, repeats_weekly) values (${ids.A}, 'play', 'Weekly', ${start}, '18:00', true) returning id`)).rows[0] as { id: string }).id;
+    oneOff = ((await svc.execute(sql`insert into club_events (club_id, kind, title, starts_on) values (${ids.A}, 'event', 'Social', ${await day(3)}) returning id`)).rows[0] as { id: string }).id;
+    closed = ((await svc.execute(sql`insert into club_events (club_id, kind, title, starts_on) values (${ids.A}, 'closed', 'Holiday', ${await day(5)}) returning id`)).rows[0] as { id: string }).id;
+  });
+  it("a member can say they are coming to a real day, and say they are not, and it is idempotent", async () => {
+    const d = await day(0);
+    expect(await fn(p1(), sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`)).toBe("going");
+    expect(await fn(p1(), sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`)).toBe("going");
+    expect(Number((await svc.execute(sql`select count(*) as n from event_rsvps where event_id = ${oneOff}`)).rows[0]!.n)).toBe(1);
+    expect(await fn(p1(), sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, false) as r`)).toBe("not_going");
+    expect(Number((await svc.execute(sql`select count(*) as n from event_rsvps where event_id = ${oneOff}`)).rows[0]!.n)).toBe(0);
+    // a weekly session: only its weekday counts
+    const start = await day(-7);
+    expect(await fn(p1(), sql`select app.rsvp(${weekly}::uuid, ${await day(7)}::date, true) as r`)).toBe("going"); // same weekday as the first date
+    expect(await fn(p1(), sql`select app.rsvp(${weekly}::uuid, ${await day(8)}::date, true) as r`)).toBe("invalid"); // the wrong weekday
+    void d; void start;
+  });
+  it("past days, far-off days, closures, closed entries, other clubs and non-members are refused", async () => {
+    expect(await fn(p1(), sql`select app.rsvp(${oneOff}::uuid, ${await day(-1)}::date, true) as r`)).toBe("past");
+    expect(await fn(p1(), sql`select app.rsvp(${weekly}::uuid, ${await day(63)}::date, true) as r`)).toBe("past");
+    expect(await fn(p1(), sql`select app.rsvp(${closed}::uuid, ${await day(5)}::date, true) as r`)).toBe("invalid"); // you cannot come to a closure
+    await svc.execute(sql`insert into club_events (club_id, kind, title, starts_on, repeats_weekly, start_time) values (${ids.A}, 'closed', 'Weekday', ${await day(7)}, false, null)`);
+    expect(await fn(p1(), sql`select app.rsvp(${weekly}::uuid, ${await day(7)}::date, true) as r`)).toBe("closed"); // a closure covers that day
+    expect(await fn({ userId: "adminB", clubId: ids.B }, sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`)).toBe("invalid");
+    expect(await fn({ userId: "stranger", clubId: ids.A }, sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`)).toBe("invalid");
+    expect(await fn(p1(), sql`select app.rsvp('00000000-0000-0000-0000-000000000000'::uuid, ${await day(3)}::date, true) as r`)).toBe("invalid");
+  });
+  it("RSVPs are private: you see your own, the Members admin sees everyone's, nobody writes directly", async () => {
+    await fn(p1(), sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`);
+    await fn(p2(), sql`select app.rsvp(${oneOff}::uuid, ${await day(3)}::date, true) as r`);
+    expect(await rows(app, p1(), sql`select id from event_rsvps`)).toHaveLength(2); // the weekly session from before, and this event
+    expect(await rows(app, p2(), sql`select id from event_rsvps`)).toHaveLength(1);
+    expect((await rows(app, p1(), sql`select distinct membership_id from event_rsvps`)).map((r) => r.membership_id)).toEqual([ids.mP1]);
+    expect((await rows(app, OWNER(), sql`select id from event_rsvps`)).length).toBeGreaterThanOrEqual(2);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from event_rsvps`)).toHaveLength(0);
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`insert into event_rsvps (club_id, event_id, on_date, membership_id) values (${ids.A}, ${oneOff}, ${"2030-01-01"}, ${ids.mP1})`)))).toBe("42501");
+    expect(await denied(withTenant(app, p1(), (tx) => tx.execute(sql`delete from event_rsvps`)))).toBe("42501");
+    await svc.execute(sql`delete from club_events where id = ${oneOff}`);
+    expect(await rows(app, OWNER(), sql`select id from event_rsvps where event_id = ${oneOff}`)).toHaveLength(0); // gone with the event
+  });
+});

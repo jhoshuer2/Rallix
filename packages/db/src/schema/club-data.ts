@@ -351,13 +351,16 @@ export const clubEvents = pgTable("club_events", {
   startsOn: date("starts_on").notNull(),
   endsOn: date("ends_on"),
   startTime: text("start_time"), // "HH:MM" local to the club, null = all day
+  doorsOpen: text("doors_open"), // "HH:MM", optional, not after the start
   endTime: text("end_time"),
   repeatsWeekly: boolean("repeats_weekly").notNull().default(false),
   until: date("until"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  unique("club_events_id_club_uq").on(t.id, t.clubId),
   index("club_events_club_idx").on(t.clubId, t.startsOn),
+  check("club_events_doors", sql`${t.doorsOpen} IS NULL OR (${t.doorsOpen} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${t.startTime} IS NOT NULL AND ${t.doorsOpen} <= ${t.startTime})`),
   check("club_events_kind", sql`${t.kind} IN ('play','event','closed')`),
   check("club_events_title", sql`char_length(${t.title}) BETWEEN 1 AND 80`),
   check("club_events_note", sql`${t.note} IS NULL OR char_length(${t.note}) <= 280`),
@@ -448,4 +451,19 @@ export const competitionWaitlist = pgTable("competition_waitlist", {
   foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "waitlist_competition_fk" }).onDelete("cascade"),
   foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "waitlist_membership_fk" }).onDelete("cascade"),
   index("competition_waitlist_idx").on(t.competitionId, t.createdAt),
+]);
+
+/** "I'm coming": a member says they will be at a session or event on a given day. Private: players see their own, admins see who is coming today. */
+export const eventRsvps = pgTable("event_rsvps", {
+  id: id(),
+  clubId: clubId(),
+  eventId: uuid("event_id").notNull(),
+  onDate: date("on_date").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("event_rsvps_uq").on(t.eventId, t.onDate, t.membershipId),
+  foreignKey({ columns: [t.eventId, t.clubId], foreignColumns: [clubEvents.id, clubEvents.clubId], name: "rsvps_event_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "rsvps_membership_fk" }).onDelete("cascade"),
+  index("event_rsvps_day_idx").on(t.clubId, t.onDate),
 ]);
