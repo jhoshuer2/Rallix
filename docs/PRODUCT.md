@@ -49,5 +49,5 @@ Runs the multi-club product: clubs and their health, subscriptions and invoices,
 
 ## Status
 Built: clubs, invites, players, dues and payments, competitions with open sign-up and preview, scoring, ratings, check-in with alerts, reminders, pictures, console.
-Round 1 (in progress): calm type scale, hide-until-data, simpler homes, setup checklist, clearer navigation.
-Next: club page and apply-to-join, admin team responsibilities; then friendlies, club schedule and holidays, facilities, admin attendance, more competition formats, console club approval.
+Rounds 1 to 3 done: calm type scale and hide-until-data homes, club page with apply-to-join, admin team responsibilities, friendly challenges (rated only when both players agree).
+Next: club schedule and holidays, facilities, admin attendance, more competition formats, console club approval.

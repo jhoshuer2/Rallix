@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { EmptyState, ListGroup, ListRow, Photo, Pill, Segmented } from "@rallix/ui";
 
@@ -14,7 +15,8 @@ export function Ranks({ clubName, club, global, meId, meUserId }: { clubName: st
         <ListGroup label={scope === "club" ? "Club leaderboard" : "Global leaderboard"}>
           {rows.map((p) => {
             const you = scope === "club" ? p.id === meId : p.id === meUserId;
-            return <ListRow key={p.id} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} subtitle={`Rating ${p.points}`} current={you} trailing={<>{you ? <Pill tone="success">You</Pill> : null} <span>#{p.rank}</span></>} />;
+            return <ListRow key={p.id} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} subtitle={`Rating ${p.points}`} current={you} href={scope === "club" && !you ? `/play/friendlies/new?to=${p.id}` : undefined} linkAs={Link} ariaLabel={scope === "club" && !you ? `${p.name}, rank ${p.rank}. Challenge to a friendly` : undefined}
+              trailing={<>{you ? <Pill tone="success">You</Pill> : null} <span>#{p.rank}</span></>} />;
           })}
         </ListGroup>
       )}

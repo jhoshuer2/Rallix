@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { EmptyState, FormChips, ListGroup, ListRow, MetricCard, MetricGrid, PageShell, Panel, Photo, RankChart, StatBar } from "@rallix/ui";
-import { streakLabel } from "@rallix/stats";
+import { friendlyRecord, streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../../components/ClubHeader";
 import { inClub, requireClub } from "../../../../lib/context";
+import { listMyChallenges } from "../../../../lib/friendly-queries";
 import { listMembers, memberStats, ratingHistory } from "../../../../lib/queries";
 
 export default async function Stats() {
   const ctx = await requireClub();
   const me = ctx.club.membershipId;
-  const d = await inClub(ctx, async (tx) => ({ stats: await memberStats(tx, ctx.club.clubId, me), members: await listMembers(tx, ctx.club.clubId), history: await ratingHistory(tx, me) }));
+  const d = await inClub(ctx, async (tx) => ({ stats: await memberStats(tx, ctx.club.clubId, me), members: await listMembers(tx, ctx.club.clubId), history: await ratingHistory(tx, me), friendlies: await listMyChallenges(tx, ctx.club.clubId, me, 200) }));
+  const fr = friendlyRecord(d.friendlies, me);
   const { record: r, h2h } = d.stats;
   const names = new Map(d.members.map((m) => [m.id, m]));
   const mine = names.get(me);
@@ -35,6 +37,7 @@ export default async function Stats() {
             series={[{ label: "Rating", color: "#b54829", points: d.history.map((h) => h.after) }]} />
         </Panel>
       ) : null}
+      {fr.played ? <ListGroup label="Friendlies"><ListRow title="Friendlies" subtitle={`${fr.played} played · ${fr.won} won · ${fr.lost} lost`} href="/play/friendlies" linkAs={Link} /></ListGroup> : null}
       {h2h.length ? (
         <>
           <h2 className="rx-panel__title" style={{ margin: "32px 0 0" }}>Head to head</h2>

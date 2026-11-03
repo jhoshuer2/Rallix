@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, MediaCard, MetricCard, MetricGrid, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
@@ -9,6 +9,7 @@ import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
 import { celebrationTiles, celebrations, playerStart, spotsLabel } from "@rallix/stats";
+import { listMyChallenges, needsMe } from "../../../lib/friendly-queries";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
@@ -26,7 +27,9 @@ export default async function PlayerHome() {
     venue: await getVenue(tx, ctx.club.clubId),
     here: await listHere(tx, ctx.club.clubId),
     arrival: await getArrivalSettings(tx, me),
+    friendlies: await listMyChallenges(tx, ctx.club.clubId, me),
   }));
+  const asks = needsMe(d.friendlies, me);
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
   const celebs = celebrations(d.members.filter((x) => x.id !== me).map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
@@ -96,8 +99,15 @@ export default async function PlayerHome() {
           <PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />
         </div>
       ) : null}
+      {asks.length ? (
+        <div className="rx-block">
+          <ListGroup label="Friendlies waiting for you">
+            {asks.slice(0, 3).map((c) => { const o = c.challengerId === me ? c.opponent : c.challenger; return <ListRow key={c.id} media={<Photo src={o.photo} name={o.name} alt="" />} title={c.status === "proposed" ? `${first(o.name)} challenged you` : `Confirm your score with ${first(o.name)}`} subtitle="Friendly match" href={`/play/friendlies/${c.id}`} linkAs={Link} />; })}
+          </ListGroup>
+        </div>
+      ) : null}
       {shown.map((b) => <div className="rx-block" key={b.key}>{b.node}</div>)}
-      {!hero && shown.length === 0 && !due ? <EmptyState title="Nothing on yet" hint="When your club schedules matches or opens a competition, it shows up here." /> : null}
+      {!hero && shown.length === 0 && !due && !asks.length ? <EmptyState title="Nothing on yet" hint="When your club schedules matches or opens a competition, it shows up here." /> : null}
     </PageShell>
   );
 }

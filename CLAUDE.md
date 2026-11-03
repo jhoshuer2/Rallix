@@ -98,6 +98,13 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Barlow Condensed 600/700 (he
 - Do not use `instanceof` on store classes across bundles; compare `store.name`.
 - Tests: `pnpm --filter @rallix/media test`, RLS tests in `packages/db`, crop maths in `packages/ui`, and `apps/club/e2e/uploads.cjs`.
 
+## Friendly challenges (`lib/friendly-*.ts`, `(playerflow)/play/friendlies`)
+- A friendly is a one-on-one between two members of a club, outside any competition (`challenges` table; `matches` still requires a competition). Flow: `proposed` -> `accepted` -> `awaiting` (one player entered the score) -> `confirmed`; or `declined` / `cancelled`. The player who did NOT enter the score confirms it or disputes it (which clears the score).
+- Nobody writes `challenges` directly and only the two players can read a row (not even the club admin). Every change is a SECURITY DEFINER function run as the user: `app.propose_challenge`, `respond_challenge`, `cancel_challenge`, `record_challenge_result`, `confirm_challenge_result` (+ helper `app.my_membership`). One open challenge per pair, at most 5 unanswered per player.
+- Rating: each player ticks "Count it for the ranking"; it moves Elo only when BOTH agreed (`isRated`). `applyFriendlyRating` (service role, after the app-role checks) claims `rated_at IS NULL` once, and moves only the club and global ratings, never competition ratings. The Stats rating chart still comes from competition `rating_events`.
+- Pure rules (score validity, next step, record, Elo helper) are in `packages/stats/src/friendly.ts` and must agree with the SQL. UI: Ranks rows open the challenge form, `/play/friendlies` lists Needs you / Coming up / Played, Home shows a short "waiting for you" list only when something needs the player.
+- Cross-club challenges wait for the global leaderboard phase. Test: `apps/club/e2e/friendlies.cjs`.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.
