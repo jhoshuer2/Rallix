@@ -52,6 +52,9 @@ export const memberships = pgTable("memberships", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   roles: memberRole("roles").array().notNull().default(sql`ARRAY['player']::member_role[]`),
   status: memberStatus("status").notNull().default("active"),
+  /* What an admin looks after: members, competitions, finance, facilities. The club owner (clubs.owner_id) always has all of them.
+     Changed only through app.set_admin / app.remove_admin, which only the owner can call. */
+  permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: createdAt(),
 }, (t) => [
@@ -59,6 +62,7 @@ export const memberships = pgTable("memberships", {
   unique("memberships_id_club_uq").on(t.id, t.clubId),
   index("memberships_user_idx").on(t.userId),
   check("memberships_roles_nonempty", sql`cardinality(${t.roles}) > 0`),
+  check("memberships_permissions_known", sql`${t.permissions} <@ ARRAY['members','competitions','finance','facilities']::text[]`),
 ]);
 
 export const invites = pgTable("invites", {

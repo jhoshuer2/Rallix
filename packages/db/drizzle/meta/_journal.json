@@ -162,6 +162,20 @@
       "when": 1793678811695,
       "tag": "0022_applications_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793681177562,
+      "tag": "0023_admin_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793681178562,
+      "tag": "0024_admin_permissions_rls",
+      "breakpoints": true
     }
   ]
 }

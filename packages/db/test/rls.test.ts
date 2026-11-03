@@ -108,7 +108,7 @@ describe("roles", () => {
 
   it("players cannot create competitions, plans or change roles", async () => {
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.A}, 'Mine', 'knockout')`)))).toBe("42501");
-    expect((await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update memberships set roles = ARRAY['admin']::member_role[] where id = ${ids.mP1}`))).rowCount).toBe(0);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update memberships set roles = ARRAY['admin']::member_role[] where id = ${ids.mP1}`)))).toBe("42501"); // roles are only changed through app.set_admin, never directly
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into memberships (club_id, user_id) values (${ids.A}, 'stranger')`)))).toBe("42501");
     expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`insert into clubs (slug, name, owner_id) values ('direct', 'Direct', 'adminA')`)))).toBe("42501");
   });
@@ -759,5 +759,82 @@ describe("club pages and applications", () => {
     expect(await wd(other)).toBe("closed");
     expect(await wd(u)).toBe("withdrawn");
     expect(await wd(u)).toBe("closed");
+  });
+});
+
+describe("admin team and responsibilities", () => {
+  const OWNER = () => ({ userId: "adminA", clubId: ids.A });
+  let n = 0;
+  async function mkAdmin(perms: string[], club = ids.A) {
+    const u = `team${++n}`;
+    await svc.execute(sql`insert into users (id, name, email) values (${u}, ${`Team ${n}`}, ${`team${n}@x.com`})`);
+    const r = await svc.execute(sql`insert into memberships (club_id, user_id, roles, permissions) values (${club}, ${u}, ARRAY['admin','player']::member_role[], ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)}) returning id`);
+    return { u, id: (r.rows[0] as { id: string }).id, ctx: { userId: u, clubId: club } };
+  }
+  const can = async (ctx: { userId: string; clubId: string }, perm: string) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.has_permission(${ctx.clubId}, ${perm}) as r`))).rows[0] as { r: boolean }).r;
+  const setAdmin = async (ctx: { userId: string; clubId?: string }, member: string, perms: string[]) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.set_admin(${member}, ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)}) as r`))).rows[0] as { r: string }).r;
+  const removeAdmin = async (ctx: { userId: string; clubId?: string }, member: string) => ((await withTenant(app, ctx, (tx) => tx.execute(sql`select app.remove_admin(${member}) as r`))).rows[0] as { r: string }).r;
+
+  it("the owner has every responsibility; an admin has only the ones they were given; a player has none", async () => {
+    const fin = await mkAdmin(["finance"]);
+    for (const p of ["members", "competitions", "finance", "facilities"]) expect(await can(OWNER(), p)).toBe(true);
+    expect(await can(fin.ctx, "finance")).toBe(true);
+    for (const p of ["members", "competitions", "facilities"]) expect(await can(fin.ctx, p)).toBe(false);
+    expect(await can({ userId: "playerA1", clubId: ids.A }, "finance")).toBe(false);
+    expect(await can({ userId: "adminB", clubId: ids.A }, "finance")).toBe(false); // another club's owner has nothing here
+  });
+  it("a finance admin can manage fees but not competitions, invites or the club page", async () => {
+    const fin = await mkAdmin(["finance"]);
+    expect((await withTenant(app, fin.ctx, (tx) => tx.execute(sql`insert into plans (club_id, name, price_kobo, period) values (${ids.A}, 'Quarterly', 1000, 'monthly') returning id`))).rows).toHaveLength(1);
+    expect(await denied(withTenant(app, fin.ctx, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.A}, 'No', 'knockout')`)))).toBe("42501");
+    expect(await denied(withTenant(app, fin.ctx, (tx) => tx.execute(sql`insert into invites (club_id, code) values (${ids.A}, 'FINADM01')`)))).toBe("42501");
+    expect(await denied(withTenant(app, fin.ctx, (tx) => tx.execute(sql`insert into club_pages (club_id, about) values (${ids.A}, 'x') on conflict (club_id) do update set about = 'x'`)))).toBe("42501");
+  });
+  it("a competitions admin can create and score but cannot touch fees", async () => {
+    const comp = await mkAdmin(["competitions"]);
+    expect((await withTenant(app, comp.ctx, (tx) => tx.execute(sql`insert into competitions (club_id, name, format) values (${ids.A}, 'Open', 'knockout') returning id`))).rows).toHaveLength(1);
+    expect(await denied(withTenant(app, comp.ctx, (tx) => tx.execute(sql`insert into plans (club_id, name, price_kobo, period) values (${ids.A}, 'Nope', 1, 'monthly')`)))).toBe("42501");
+    expect(await rows(app, comp.ctx, sql`select id from dues where club_id = ${ids.A}`)).toHaveLength(0); // cannot read other people's dues
+  });
+  it("a members admin can invite and review applications but cannot score", async () => {
+    const mem = await mkAdmin(["members"]);
+    expect((await withTenant(app, mem.ctx, (tx) => tx.execute(sql`insert into invites (club_id, code) values (${ids.A}, ${`MEM${n}ADM1`}) returning id`))).rows).toHaveLength(1);
+    expect((await withTenant(app, mem.ctx, (tx) => tx.execute(sql`update matches set status = 'live' where id = ${ids.matchA} returning id`))).rows).toHaveLength(0);
+  });
+  it("scorers can still record results without any admin responsibility", async () => {
+    expect((await withTenant(app, { userId: "scorerA", clubId: ids.A }, (tx) => tx.execute(sql`update matches set status = 'live' where id = ${ids.matchA} returning id`))).rows).toHaveLength(1);
+  });
+  it("an admin cannot hand themselves or anyone else more power", async () => {
+    const a = await mkAdmin(["members"]), b = await mkAdmin([]);
+    expect(await setAdmin(a.ctx, a.id, ["members", "finance"])).toBe("closed");
+    expect(await setAdmin(a.ctx, b.id, ["finance"])).toBe("closed");
+    expect(await denied(withTenant(app, a.ctx, (tx) => tx.execute(sql`update memberships set permissions = ARRAY['finance']::text[] where id = ${a.id}`)))).toBe("42501");
+    expect(await removeAdmin(a.ctx, b.id)).toBe("closed");
+  });
+  it("only the club owner makes, changes and removes admins", async () => {
+    const mem = ((await svc.execute(sql`insert into users (id, name, email) values ('cand1', 'Candidate', 'cand1@x.com')`)), (await svc.execute(sql`insert into memberships (club_id, user_id) values (${ids.A}, 'cand1') returning id`)).rows[0] as { id: string });
+    expect(await setAdmin({ userId: "playerA1", clubId: ids.A }, mem.id, ["finance"])).toBe("closed"); // a player cannot
+    expect(await setAdmin({ userId: "adminB", clubId: ids.B }, mem.id, ["finance"])).toBe("closed"); // another club's owner cannot
+    expect(await setAdmin(OWNER(), mem.id, ["finance", "members"])).toBe("ok");
+    const r = (await svc.execute(sql`select roles::text, permissions from memberships where id = ${mem.id}`)).rows[0] as { roles: string; permissions: string[] };
+    expect(r.roles).toContain("admin"); expect(r.roles).toContain("player"); expect([...r.permissions].sort()).toEqual(["finance", "members"]);
+    expect(await setAdmin(OWNER(), mem.id, ["finance", "powers"])).toBe("invalid");
+    expect(await setAdmin(OWNER(), mem.id, ["competitions"])).toBe("ok"); // replace the set
+    expect(((await svc.execute(sql`select permissions from memberships where id = ${mem.id}`)).rows[0] as { permissions: string[] }).permissions).toEqual(["competitions"]);
+    expect(await removeAdmin(OWNER(), mem.id)).toBe("ok");
+    const after = (await svc.execute(sql`select roles::text, permissions from memberships where id = ${mem.id}`)).rows[0] as { roles: string; permissions: string[] };
+    expect(after.roles).not.toContain("admin"); expect(after.permissions).toEqual([]);
+  });
+  it("the owner cannot be demoted or edited, and unknown permissions are refused by the table too", async () => {
+    expect(await setAdmin(OWNER(), ids.mAdminA, ["finance"])).toBe("owner");
+    expect(await removeAdmin(OWNER(), ids.mAdminA)).toBe("owner");
+    expect(await denied(svc.execute(sql`update memberships set permissions = ARRAY['everything']::text[] where id = ${ids.mP1}`))).toBe("23514");
+  });
+  it("a suspended club's admins lose every responsibility", async () => {
+    const x = await mkAdmin(["finance"]);
+    await svc.execute(sql`update clubs set status = 'suspended', suspension_reason = 'other' where id = ${ids.A}`);
+    expect(await can(x.ctx, "finance")).toBe(false);
+    await svc.execute(sql`update clubs set status = 'active', suspension_reason = null where id = ${ids.A}`);
+    expect(await can(x.ctx, "finance")).toBe(true);
   });
 });

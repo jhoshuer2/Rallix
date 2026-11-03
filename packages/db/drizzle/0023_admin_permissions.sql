@@ -1,0 +1,2 @@
+ALTER TABLE "memberships" ADD COLUMN "permissions" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "memberships" ADD CONSTRAINT "memberships_permissions_known" CHECK ("memberships"."permissions" <@ ARRAY['members','competitions','finance','facilities']::text[]);
