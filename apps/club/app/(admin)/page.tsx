@@ -1,3 +1,4 @@
+import { attentionCount, listFacilityItems } from "../../lib/facility-queries";
 import Link from "next/link";
 import { invites } from "@rallix/db";
 import { and, eq, gt, isNull, or } from "drizzle-orm";
@@ -27,6 +28,7 @@ export default async function Home() {
     venue: await getVenue(tx, clubId),
     clubPage: await hasClubPageContent(tx, clubId),
     applications: await pendingApplicationCount(tx, clubId),
+    facilities: await listFacilityItems(tx, clubId),
     invite: (await tx.select({ id: invites.id }).from(invites).where(and(eq(invites.clubId, clubId), isNull(invites.revokedAt), or(isNull(invites.expiresAt), gt(invites.expiresAt, new Date())))).limit(1))[0],
   }));
   const payouts = await payoutsEnabled(ctx);
@@ -37,6 +39,8 @@ export default async function Home() {
   const readyToStart = d.comps.filter((c) => c.status === "draft" && (d.entries[c.id] ?? 0) >= 2);
   const running = d.comps.filter((c) => c.status === "active" || c.status === "draft").slice(0, 8);
   const hasMoney = d.month.total > 0 || d.dues.length > 0;
+  const needsFix = attentionCount(d.facilities);
+  const canFac = can(ctx.club, "facilities");
   const canM = can(ctx.club, "members"), canC = can(ctx.club, "competitions"), canF = can(ctx.club, "finance");
 
   const setup = setupProgress({ hasLogo: !!ctx.club.logoUrl, hasCover: !!ctx.club.coverUrl, hasCourt: !!d.venue, hasPlans: d.plans.length > 0, hasPayouts: payouts, hasInvited: !!d.invite || others > 0, hasCompetition: d.comps.length > 0, hasClubPage: d.clubPage });
@@ -49,12 +53,13 @@ export default async function Home() {
 
   // Blocks in priority order; each renders only when it has something to say. At most four below the hero.
   const blocks: Array<{ key: string; show: boolean; node: React.ReactNode }> = [
-    { key: "attention", show: (canM && d.applications > 0) || (canF && unpaid > 0) || (canC && (toScore > 0 || readyToStart.length > 0)), node: (
+    { key: "attention", show: (canFac && needsFix > 0) || (canM && d.applications > 0) || (canF && unpaid > 0) || (canC && (toScore > 0 || readyToStart.length > 0)), node: (
       <>
         <SectionTitle title="Needs your attention" />
         <ListGroup label="Needs your attention">
           {canM && d.applications > 0 ? <ListRow media={<IconBadge icon="user-add" />} title={`${d.applications} ${d.applications === 1 ? "person wants" : "people want"} to join`} subtitle="Review the applications" href="/members" linkAs={Link} /> : null}
           {canF && unpaid > 0 ? <ListRow media={<IconBadge icon="money" />} title={`${unpaid} unpaid ${unpaid === 1 ? "fee" : "fees"}`} subtitle={`${naira(outstanding)} outstanding`} href="/membership/payments" linkAs={Link} /> : null}
+          {canFac && needsFix > 0 ? <ListRow media={<IconBadge icon="settings" />} title={`${needsFix} ${needsFix === 1 ? "item needs" : "items need"} attention`} subtitle="Tables, bats and balls" href="/profile/facilities" linkAs={Link} /> : null}
           {canC && toScore > 0 ? <ListRow media={<IconBadge icon="trophy" />} title={`${toScore} ${toScore === 1 ? "match" : "matches"} to score`} subtitle="Record the results" href="/competition" linkAs={Link} /> : null}
           {canC ? readyToStart.map((c) => <ListRow key={c.id} media={<IconBadge icon="play" />} title={`${c.name} is ready to start`} subtitle={`${d.entries[c.id] ?? 0} players signed up`} href={`/competition/${c.id}/groups`} linkAs={Link} />) : null}
         </ListGroup>

@@ -15,6 +15,7 @@ export default async function Club() {
         {can(c, "members") ? <ListRow media={<IconBadge icon="user-add" />} title="Invite players" subtitle="Share your club link" href="/profile/invite" linkAs={Link} /> : null}
         {can(c, "members") ? <ListRow media={<IconBadge icon="image" />} title="Club pictures" subtitle="Logo and cover" href="/profile/pictures" linkAs={Link} /> : null}
         {can(c, "facilities") ? <ListRow media={<IconBadge icon="pin" />} title="Court and check-in" subtitle="Where players check in" href="/profile/court" linkAs={Link} /> : null}
+        {can(c, "facilities") ? <ListRow media={<IconBadge icon="grid" />} title="Facilities" subtitle="Tables, bats, balls and upkeep" href="/profile/facilities" linkAs={Link} /> : null}
         {can(c, "facilities") ? <ListRow media={<IconBadge icon="calendar" />} title="Schedule" subtitle="Playing times, events and closures" href="/profile/schedule" linkAs={Link} /> : null}
         <ListRow media={<IconBadge icon="members" />} title="Admin team" subtitle={c.isOwner ? "Choose what each admin looks after" : "Who runs the club"} href="/profile/team" linkAs={Link} />
       </ListGroup>
