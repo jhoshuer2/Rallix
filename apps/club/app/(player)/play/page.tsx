@@ -8,7 +8,7 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { celebrations, spotsLabel } from "@rallix/stats";
+import { celebrationTiles, celebrations, spotsLabel } from "@rallix/stats";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
@@ -102,8 +102,8 @@ export default async function PlayerHome() {
 
       {celebs.length || lastWinner ? (
         <>
-          <SectionTitle title="Club updates" />
-          {celebs.length ? <Celebrations items={celebs} /> : null}
+          <SectionTitle title="Club updates" href="/play/updates" linkAs={Link} label="See all club updates" />
+          {celebs.length ? <Celebrations tiles={celebrationTiles(celebs)} allHref="/play/updates" linkAs={Link} /> : null}
           {lastWinner ? (
             <ListGroup label="Featured player">
               <ListRow media={<Photo src={lastWinner.photo} name={lastWinner.name} alt="" />} eyebrow="Featured player" title={lastWinner.name} subtitle={`Won the latest result · rating ${lastWinner.rating}`} trailing={<Pill tone="success">Winner</Pill>} />

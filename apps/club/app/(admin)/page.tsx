@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ActionButton, Carousel, ClubBanner, EmptyState, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Panel, Photo, SectionTitle, StackedBar } from "@rallix/ui";
-import { mergeActivity, membershipOverview, type Activity } from "@rallix/stats";
+import { groupRegistrations, mergeActivity, membershipOverview, type Activity } from "@rallix/stats";
 import { ClubHeader } from "../../components/ClubHeader";
 import { inClub, requireRole } from "../../lib/context";
 import { byRecent, dayLabel, isDone, todayInClub } from "../../lib/highlights";
@@ -23,7 +23,7 @@ export default async function Home() {
   const outstanding = d.dues.filter((x) => x.status === "due" || x.status === "overdue").reduce((a, x) => a + x.amountKobo, 0);
   const comps = d.comps.filter((c) => c.status === "active" || c.status === "draft").slice(0, 8);
   const feed = mergeActivity([
-    d.members.slice().sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime()).slice(0, 5).map<Activity>((m) => ({ id: `j${m.id}`, kind: "member", at: m.joinedAt, title: `${m.name} joined`, detail: "New registration", href: `/members/${m.id}` })),
+    groupRegistrations(d.members.filter((m) => m.joinedAt.getTime() > Date.now() - 30 * 86400000).map((m) => ({ id: m.id, name: m.name, at: m.joinedAt })), { hrefOne: (id) => `/members/${id}`, hrefGroup: "/members" }).slice(0, 5),
     d.pays.map<Activity>((p) => ({ id: `p${p.id}`, kind: "payment", at: p.paidAt ?? new Date(0), title: `${p.name} paid ${naira(p.amountKobo)}`, detail: "Payment", href: "/membership/payments" })),
     d.matches.filter(isDone).sort(byRecent).slice(0, 5).map<Activity>((m) => ({ id: `m${m.id}`, kind: "result", at: m.confirmedAt ?? new Date(0), title: `${m.p1!.name} ${m.gamesP1}-${m.gamesP2} ${m.p2!.name}`, detail: m.competitionName, href: `/competition/${m.competitionId}/groups` })),
   ], 8);

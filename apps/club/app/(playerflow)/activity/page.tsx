@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo } from "@rallix/ui";
-import { mergeActivity, type Activity } from "@rallix/stats";
+import { groupRegistrations, mergeActivity, type Activity } from "@rallix/stats";
 import { inClub, requireClub } from "../../../lib/context";
 import { byRecent, dayLabel, isDone } from "../../../lib/highlights";
 import { listMatches, listMembers, naira, recentPayments } from "../../../lib/queries";
@@ -18,7 +18,7 @@ export default async function ActivityPage() {
   }));
   const feed = mergeActivity([
     d.matches.filter(isDone).sort(byRecent).slice(0, 15).map<Activity>((m) => ({ id: `m${m.id}`, kind: "result", at: m.confirmedAt ?? new Date(0), title: `${m.p1!.name} ${m.gamesP1}-${m.gamesP2} ${m.p2!.name}`, detail: m.competitionName, href: admin ? `/competition/${m.competitionId}/groups` : `/play/compete/${m.competitionId}` })),
-    d.members.slice().sort((a, b) => b.joinedAt.getTime() - a.joinedAt.getTime()).slice(0, 10).map<Activity>((x) => ({ id: `j${x.id}`, kind: "member", at: x.joinedAt, title: `${x.name} joined the club`, href: admin ? `/members/${x.id}` : undefined })),
+    groupRegistrations(d.members.filter((m) => m.joinedAt.getTime() > Date.now() - 60 * 86400000).map((m) => ({ id: m.id, name: m.name, at: m.joinedAt })), { hrefOne: admin ? (id) => `/members/${id}` : undefined, hrefGroup: admin ? "/members" : undefined }).slice(0, 10),
     d.pays.map<Activity>((p) => ({ id: `p${p.id}`, kind: "payment", at: p.paidAt ?? new Date(0), title: `${p.name} paid ${naira(p.amountKobo)}` })),
   ], 25);
   

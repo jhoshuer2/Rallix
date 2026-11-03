@@ -245,18 +245,44 @@ export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone
 /* ---------- Celebrations: birthdays and anniversaries, LinkedIn-style ---------- */
 export type CelebrationItem = { id: string; name: string; photo?: string | null; label: string; kind: "birthday" | "anniversary" | "new" };
 const celebIcon: Record<CelebrationItem["kind"], IconName> = { birthday: "cake", anniversary: "medal", new: "user-add" };
-/** A row of people with a speech-bubble label above each photo ("Birthday yesterday"). Names only, never ages. */
-export function Celebrations({ items, label = "Celebrations" }: { items: CelebrationItem[]; label?: string }) {
-  if (items.length === 0) return null;
+export type CelebrationTile =
+  | ({ type: "person" } & CelebrationItem)
+  | { type: "group"; id: string; label: string; count: number; faces: Array<{ name: string; photo?: string | null }> }
+  | { type: "more"; id: string; label: string; count: number };
+
+/**
+ * A row of people with a speech-bubble label above each photo ("Birthday yesterday"). Names only, never ages.
+ * Big clubs: many new members arrive as ONE group tile and overflow as a "+N more" tile; both open `allHref`, the full list.
+ */
+export function Celebrations({ tiles, label = "Celebrations", allHref, linkAs: L = "a" }: { tiles: CelebrationTile[]; label?: string; allHref?: string; linkAs?: ElementType }) {
+  if (tiles.length === 0) return null;
   return (
     <div className="rx-celebs" role="list" aria-label={label} tabIndex={0}>
-      {items.map((c) => (
-        <div className="rx-celeb" role="listitem" key={c.id}>
-          <span className="rx-celeb__bubble"><span className={cx("rx-celeb__icon", `is-${c.kind}`)} aria-hidden="true"><Icon name={celebIcon[c.kind]} size={16} /></span>{c.label}</span>
-          <Photo src={c.photo} name={c.name} alt="" className="rx-celeb__photo" />
-          <span className="rx-celeb__name">{c.name}</span>
-        </div>
-      ))}
+      {tiles.map((t) => {
+        if (t.type === "person") {
+          return (
+            <div className="rx-celeb" role="listitem" key={t.id}>
+              <span className="rx-celeb__bubble"><span className={cx("rx-celeb__icon", `is-${t.kind}`)} aria-hidden="true"><Icon name={celebIcon[t.kind]} size={16} /></span>{t.label}</span>
+              <Photo src={t.photo} name={t.name} alt="" className="rx-celeb__photo" />
+              <span className="rx-celeb__name">{t.name}</span>
+            </div>
+          );
+        }
+        const inner = (
+          <>
+            <span className="rx-celeb__bubble"><span className="rx-celeb__icon is-new" aria-hidden="true"><Icon name={t.type === "group" ? "user-add" : "members"} size={16} /></span>{t.label}</span>
+            {t.type === "group"
+              ? <span className="rx-celeb__faces" aria-hidden="true">{t.faces.map((f) => <Photo key={f.name} src={f.photo} name={f.name} alt="" />)}</span>
+              : <span className="rx-celeb__morecircle" aria-hidden="true">+{t.count}</span>}
+            <span className="rx-celeb__name">See all</span>
+          </>
+        );
+        return (
+          <div className="rx-celeb" role="listitem" key={t.id}>
+            {allHref ? <L href={allHref} className="rx-celeb__link" aria-label={`${t.label}. See all`}>{inner}</L> : inner}
+          </div>
+        );
+      })}
     </div>
   );
 }

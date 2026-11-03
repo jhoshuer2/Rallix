@@ -577,8 +577,8 @@ a.rx-lrow:active { background: rgba(15, 32, 56, .04); }
 .rx-celebs { display: flex; gap: var(--rx-space-4); overflow-x: auto; scrollbar-width: none; margin-inline: calc(var(--rx-space-4) * -1); padding: 14px var(--rx-space-4) 4px; scroll-snap-type: x proximity; scroll-padding-inline: var(--rx-space-4); }
 .rx-celebs::-webkit-scrollbar { display: none; }
 .rx-celebs:focus-visible { outline: 3px solid var(--rx-blue); outline-offset: 2px; }
-.rx-celeb { flex: none; width: 112px; display: grid; justify-items: center; gap: 8px; scroll-snap-align: start; }
-.rx-celeb__bubble { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; width: 100%; padding: 8px 8px 6px; background: #fff; border: 1px solid var(--rx-line); border-radius: 14px; font-size: 13px; font-weight: 600; line-height: 1.2; text-align: center; color: var(--rx-ink); }
+.rx-celeb { flex: none; width: 112px; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 8px; scroll-snap-align: start; }
+.rx-celeb__bubble { box-sizing: border-box; overflow-wrap: anywhere; position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; width: 100%; padding: 8px 8px 6px; background: #fff; border: 1px solid var(--rx-line); border-radius: 14px; font-size: 13px; font-weight: 600; line-height: 1.2; text-align: center; color: var(--rx-ink); }
 .rx-celeb__bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; background: #fff; border-right: 1px solid var(--rx-line); border-bottom: 1px solid var(--rx-line); transform: translateX(-50%) rotate(45deg); }
 .rx-celeb__icon { position: absolute; top: -12px; left: -6px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #fff; border: 1px solid var(--rx-line); color: var(--rx-blue); }
 .rx-celeb__icon.is-anniversary { color: #8a5200; } .rx-celeb__icon.is-new { color: #0b6b1d; }
@@ -743,3 +743,10 @@ button.rx-lrow { width: 100%; border-top: 0; border-left: 0; border-right: 0; fo
 .rx-input input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .rx-fieldpair { row-gap: 0; }
 fieldset { min-width: 0; }
+
+/* Group and "+N more" tiles in the Club updates strip */
+.rx-celeb__link { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 8px; width: 100%; color: inherit; text-decoration: none; }
+.rx-celeb__faces { display: flex; justify-content: center; margin-top: 4px; min-height: 80px; align-items: center; }
+.rx-celeb__faces > * { width: 52px; margin-left: -14px; border: 2px solid var(--rx-canvas); border-radius: 50%; }
+.rx-celeb__faces > *:first-child { margin-left: 0; }
+.rx-celeb__morecircle { width: 80px; height: 80px; margin-top: 4px; display: grid; place-items: center; border-radius: 50%; background: var(--rx-blue); color: #fff; font-family: var(--rx-font-display); font-weight: 700; font-size: 28px; }

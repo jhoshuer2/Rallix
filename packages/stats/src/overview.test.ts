@@ -30,3 +30,30 @@ describe("mergeActivity", () => {
     expect(m.map((x) => x.id)).toEqual(["2", "3"]);
   });
 });
+
+import { groupRegistrations } from "./overview";
+describe("groupRegistrations", () => {
+  const at = (day: number, hour = 10) => new Date(Date.UTC(2026, 10, day, hour));
+  const reg = (id: string, d: Date) => ({ id, name: `P${id}`, at: d });
+  it("lists a quiet day person by person", () => {
+    const out = groupRegistrations([reg("1", at(2)), reg("2", at(2, 12))]);
+    expect(out.map((a) => a.title)).toEqual(["P2 joined", "P1 joined"]);
+  });
+  it("turns a busy day into one row, and 100 sign-ups do not crowd out other days", () => {
+    const rush = Array.from({ length: 100 }, (_, i) => reg(String(i), at(2, 8 + (i % 10))));
+    const out = groupRegistrations([...rush, reg("x", at(1))]);
+    expect(out).toHaveLength(2);
+    expect(out[0]!.title).toBe("100 players joined");
+    expect(out[1]!.title).toBe("Px joined");
+  });
+  it("groups by the club's local day, not UTC", () => {
+    const lateNight = [reg("a", new Date("2026-11-02T23:30:00Z")), reg("b", new Date("2026-11-02T23:45:00Z")), reg("c", new Date("2026-11-03T00:10:00Z"))];
+    const out = groupRegistrations(lateNight); // all three are 3 Nov in Lagos (UTC+1)
+    expect(out).toHaveLength(1);
+    expect(out[0]!.title).toBe("3 players joined");
+  });
+  it("applies the links", () => {
+    const out = groupRegistrations([reg("1", at(2))], { hrefOne: (id) => `/members/${id}` });
+    expect(out[0]!.href).toBe("/members/1");
+  });
+});

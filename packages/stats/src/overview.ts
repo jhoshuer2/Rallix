@@ -40,3 +40,25 @@ export function mergeActivity(feeds: Activity[][], limit = 8): Activity[] {
   return feeds.flat().sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id))
     .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true))).slice(0, limit);
 }
+
+
+export type Registration = { id: string; name: string; at: Date };
+
+const dayKey = (d: Date, tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+
+/**
+ * Registrations for the activity feed, newest first. A day with fewer than `minGroup` joins lists each person; a busy day
+ * becomes ONE item ("23 players joined"), so a rush of sign-ups never fills the feed and hides payments and results.
+ */
+export function groupRegistrations(regs: Registration[], opts: { tz?: string; minGroup?: number; hrefOne?: (id: string) => string | undefined; hrefGroup?: string } = {}): Activity[] {
+  const tz = opts.tz ?? "Africa/Lagos", minGroup = opts.minGroup ?? 3;
+  const byDay = new Map<string, Registration[]>();
+  for (const r of regs) { const k = dayKey(r.at, tz); (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(r); }
+  const out: Activity[] = [];
+  for (const [day, list] of byDay) {
+    const sorted = [...list].sort((a, b) => b.at.getTime() - a.at.getTime());
+    if (sorted.length >= minGroup) out.push({ id: `jg-${day}`, kind: "member", at: sorted[0]!.at, title: `${sorted.length} players joined`, detail: "New registrations", href: opts.hrefGroup });
+    else for (const r of sorted) out.push({ id: `j${r.id}`, kind: "member", at: r.at, title: `${r.name} joined`, detail: "New registration", href: opts.hrefOne?.(r.id) });
+  }
+  return out.sort((a, b) => b.at.getTime() - a.at.getTime());
+}

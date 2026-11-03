@@ -116,3 +116,43 @@ describe("celebrations ordering", () => {
     expect(out.map((c) => c.kind)).toEqual(["birthday", "anniversary", "new"]);
   });
 });
+
+import { celebrationTiles, type Celebration } from "./celebrations";
+describe("celebrationTiles", () => {
+  const c = (id: string, kind: Celebration["kind"], off = 0): Celebration => ({ id: `${kind[0]}-${id}`, memberId: id, name: `Name ${id}`, photo: null, kind, label: kind, offsetDays: off });
+  it("shows a few new members one by one", () => {
+    const t = celebrationTiles([c("1", "new"), c("2", "new"), c("3", "new")]);
+    expect(t.map((x) => x.type)).toEqual(["person", "person", "person"]);
+  });
+  it("collapses many new members into one tile with three faces", () => {
+    const t = celebrationTiles(Array.from({ length: 100 }, (_, i) => c(String(i), "new")));
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ type: "group", count: 100, label: "100 new players" });
+    expect((t[0] as { faces: unknown[] }).faces).toHaveLength(3);
+  });
+  it("keeps birthdays visible and in order ahead of a joiner flood", () => {
+    const items = [c("b1", "birthday"), c("b2", "birthday", 1), ...Array.from({ length: 50 }, (_, i) => c(`n${i}`, "new"))];
+    const t = celebrationTiles(items);
+    expect(t.map((x) => x.type)).toEqual(["person", "person", "group"]);
+    expect((t[0] as { kind: string }).kind).toBe("birthday");
+  });
+  it("caps the strip and counts everyone it hides", () => {
+    const t = celebrationTiles(Array.from({ length: 12 }, (_, i) => c(String(i), "birthday")), { max: 8 });
+    expect(t).toHaveLength(8);
+    expect(t[7]).toMatchObject({ type: "more", count: 5, label: "+5 more" });
+  });
+  it("returns nothing when there is nothing", () => expect(celebrationTiles([])).toEqual([]));
+  it("keeps the group tile visible when many birthdays compete for room", () => {
+    const items = [...Array.from({ length: 9 }, (_, i) => c(`b${i}`, "birthday")), ...Array.from({ length: 20 }, (_, i) => c(`n${i}`, "new"))];
+    const t = celebrationTiles(items, { max: 8 });
+    expect(t).toHaveLength(8);
+    expect(t.slice(0, 6).every((x) => x.type === "person")).toBe(true);
+    expect(t[6]).toMatchObject({ type: "group", count: 20 });
+    expect(t[7]).toMatchObject({ type: "more", count: 3 });
+  });
+  it("shows the group and no more tile when the birthdays fit beside it", () => {
+    const items = [...Array.from({ length: 6 }, (_, i) => c(`b${i}`, "birthday")), ...Array.from({ length: 9 }, (_, i) => c(`n${i}`, "new"))];
+    const t = celebrationTiles(items, { max: 8 });
+    expect(t.map((x) => x.type)).toEqual(["person", "person", "person", "person", "person", "person", "group"]);
+  });
+});
