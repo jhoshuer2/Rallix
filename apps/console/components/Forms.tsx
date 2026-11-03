@@ -84,10 +84,11 @@ export function NewSubscriptionForm({ clubs, plans = [] }: { clubs: Array<{ id: 
 /** Switch club approval on or off. New clubs wait for staff when it is on. */
 export function ClubApprovalForm({ on }: { on: boolean }) {
   const { run, pending, note } = useRun();
+  const [checked, setChecked] = useState(on);
   return (
     <div className="cs-card" style={{ marginBottom: 20 }}>
       <label style={{ display: "flex", gap: 10, alignItems: "center", minHeight: 44 }}>
-        <input type="checkbox" checked={on} disabled={pending} onChange={(e) => run(() => A.setClubApproval(e.target.checked), e.target.checked ? "New clubs now wait for approval." : "New clubs go live straight away.")} />
+        <input type="checkbox" checked={checked} disabled={pending} onChange={(e) => { const v = e.target.checked; setChecked(v); run(() => A.setClubApproval(v), v ? "New clubs now wait for approval." : "New clubs go live straight away."); }} />
         <span><strong>New clubs need approval</strong><br /><span className="cs-hint">When on, a club created from now on can’t be used until you approve it here. Existing clubs are not affected.</span></span>
       </label>{note}
     </div>

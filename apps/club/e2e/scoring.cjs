@@ -61,8 +61,8 @@ ok(/Winner: /.test(await text()),'11–13 (two clear points after deuce) ends th
 ok(await p.getByRole('button',{name:'Save result'}).isVisible()&&await p.getByRole('button',{name:/End game/}).count()===0,'the match is finished: Save result, and no End game');
 await p.getByRole('button',{name:'Save result'}).click();await p.waitForURL(/\/groups/,{timeout:40000});
 ok(sql(`select count(*) from games where match_id='${match}'`)==='3','three games were saved');
-ok(sql(`select game_no||':'||p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=2`)==='2:2-3:t','game 2 is saved as 2–3 and marked stopped');
-ok(sql(`select p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=3`)==='11-13:f','game 3 is saved as a normal deuce game, 11–13: '+sql(`select p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=3`));
+ok(sql(`select game_no||':'||p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=2`)==='2:2-3:true','game 2 is saved as 2–3 and marked stopped');
+ok(sql(`select p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=3`)==='11-13:false','game 3 is saved as a normal deuce game, 11–13: '+sql(`select p1_points||'-'||p2_points||':'||stopped from games where match_id='${match}' and game_no=3`));
 ok(sql(`select status||'|'||(winner_id='${mid('jide')}')||'|'||games_p1||'-'||games_p2 from matches where id='${match}'`)==='completed|true|1-2','the match is completed: Jide wins 2–1');
 ok(errs.length===0,'no console errors '+errs.join('|'));
 console.log(`\n${pass} passed, ${fail} failed`);await b.close();process.exit(fail?1:0)})().catch(e=>{console.error('CRASH',e.message);process.exit(2)});

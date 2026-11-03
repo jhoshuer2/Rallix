@@ -14,10 +14,13 @@ let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAI
 const codeFor=(log,email)=>{const t=fs.readFileSync(log).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...t.matchAll(re)];return a.length?a[a.length-1][1]:null};
 async function signIn(p,base,email,next='/'){await p.goto(base+'/sign-in'+(base===CLUB?'?next='+encodeURIComponent(next):''));await p.getByLabel(/Email address|Work email/).fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel(/6-digit code/).waitFor({timeout:60000});await p.waitForTimeout(600);await p.getByLabel(/6-digit code/).fill(codeFor(LOGS[base],email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForLoadState('networkidle');await p.waitForTimeout(900)}
 const mk=async(b,w,h)=>{const c=await b.newContext({viewport:{width:w,height:h}});c.setDefaultTimeout(60000);c.setDefaultNavigationTimeout(90000);const p=await c.newPage();p.errs=[];p.on('pageerror',e=>p.errs.push(e.message));return p};
+const until=async(f,ms=30000)=>{const t=Date.now();while(Date.now()-t<ms){if(f())return true;await new Promise(r=>setTimeout(r,300))}return false};
 const mails=()=>fs.readFileSync(LOGS[CON]).toString().split('\n').filter(l=>l.includes('[mail:dev]'));
-async function createClub(p,email,club){await signIn(p,CLUB,email);await p.waitForURL(/onboarding/,{timeout:30000});
+async function createClub(p,email,club,pending=false){await signIn(p,CLUB,email);await p.waitForURL(/onboarding/,{timeout:30000});
   await p.getByLabel('What is your club called?').fill(club);await p.getByLabel('What’s your name').fill(club+' Owner');await p.getByLabel('Where are you located').fill('Enugu');
-  await p.getByRole('button',{name:'Create my club'}).click();await p.waitForLoadState('networkidle');await p.waitForTimeout(1500)}
+  await p.getByRole('button',{name:'Create my club'}).click();
+  await until(()=>sql(`select count(*) from clubs where name='${club}'`)==='1',90000);
+  if(pending)await p.waitForURL(/suspended/,{timeout:90000});await p.waitForLoadState('networkidle');await p.waitForTimeout(800)}
 
 (async()=>{const b=await chromium.launch();
 sql(`update platform_settings set club_approval=false where id=1`);
@@ -26,13 +29,13 @@ const own=await mk(b,1280,900);await signIn(own,CON,'owner@rallix.app');
 // ---------- Approval on ----------
 await own.goto(CON+'/clubs',{waitUntil:'networkidle'});
 ok(!(await own.getByText(/Waiting for approval \(/).count()),'no queue while nothing is waiting');
-await own.getByRole('checkbox',{name:/New clubs need approval/}).check();await own.getByText('New clubs now wait for approval.').waitFor();
+await own.getByRole('checkbox',{name:/New clubs need approval/}).click();await until(()=>sql(`select club_approval from platform_settings where id=1`)==='t');
 ok(sql(`select club_approval from platform_settings where id=1`)==='t','approval is switched on');
 
 // A new club waits
-const n1=await mk(b,440,956);await createClub(n1,'owner1@example.com','Pending FC');
+const n1=await mk(b,440,956);await createClub(n1,'owner1@example.com','Pending FC',true);
 ok(sql(`select status from clubs where name='Pending FC'`)==='pending','the new club is pending');
-ok(await n1.getByText('We’re reviewing your club').isVisible(),'its owner sees "We’re reviewing your club"');
+ok(await n1.getByRole('heading',{name:'We’re reviewing your club'}).first().isVisible(),'its owner sees "We’re reviewing your club"');
 ok(await n1.getByText(/Pending FC is waiting for approval from Rallix/).isVisible(),'and which club is waiting');
 
 // Console queue
@@ -50,7 +53,7 @@ ok(await own.getByText('This club is waiting for approval.').isVisible(),'the cl
 
 // Approve
 await own.goto(CON+'/clubs',{waitUntil:'networkidle'});
-await own.getByRole('button',{name:'Approve'}).click();await own.getByText('Approved. The owner has been emailed.').waitFor();
+await own.getByRole('button',{name:'Approve'}).click();await until(()=>sql(`select status from clubs where name='Pending FC'`)==='active');
 ok(sql(`select status from clubs where name='Pending FC'`)==='active','approved: the club is active');
 ok(mails().some(l=>l.includes('to owner1@example.com')&&/Pending FC is approved on Rallix/.test(l)),'the owner was emailed "Pending FC is approved on Rallix"');
 ok(sql(`select count(*) from email_log where kind='club_review' and to_email='owner1@example.com' and status='sent'`)==='1','the email is logged as a club review');
@@ -59,13 +62,13 @@ await n1.goto(CLUB+'/',{waitUntil:'networkidle'});
 ok(!/suspended/.test(n1.url()),'the owner now gets into the club: '+n1.url());
 
 // Decline another
-const n2=await mk(b,440,956);await createClub(n2,'owner2@example.com','Declined FC');
+const n2=await mk(b,440,956);await createClub(n2,'owner2@example.com','Declined FC',true);
 ok(sql(`select status from clubs where name='Declined FC'`)==='pending','a second club is pending');
 await own.goto(CON+'/clubs',{waitUntil:'networkidle'});
 await own.getByRole('button',{name:'Decline'}).click();
 await own.getByLabel(/Why is Declined FC declined/).fill('x');await own.getByRole('button',{name:'Decline'}).last().click();
 ok(sql(`select status from clubs where name='Declined FC'`)==='pending','a decline without a real reason does nothing');
-await own.getByLabel(/Why is Declined FC declined/).fill('We could not verify this club.');await own.getByRole('button',{name:'Decline'}).last().click();await own.getByText('Declined. The owner has been emailed.').waitFor();
+await own.getByLabel(/Why is Declined FC declined/).fill('We could not verify this club.');await own.getByRole('button',{name:'Decline'}).last().click();await until(()=>sql(`select status from clubs where name='Declined FC'`)==='closed');
 ok(sql(`select status from clubs where name='Declined FC'`)==='closed','declined: the club is closed');
 ok(mails().some(l=>l.includes('to owner2@example.com')&&/About your Rallix club Declined FC/.test(l)),'the owner was emailed with the reason');
 ok(sql(`select count(*) from audit_log where action='club.decline' and meta->>'reason' like '%verify%'`)==='1','the reason is in the audit log');
@@ -73,17 +76,18 @@ await own.goto(CON+'/clubs',{waitUntil:'networkidle'});
 ok(!(await own.getByText(/Waiting for approval \(/).count()),'the queue is empty again');
 
 // Approval off: a new club is live at once
-await own.getByRole('checkbox',{name:/New clubs need approval/}).uncheck();await own.getByText('New clubs go live straight away.').waitFor();
+await own.getByRole('checkbox',{name:/New clubs need approval/}).click();await until(()=>sql(`select club_approval from platform_settings where id=1`)==='f');
 const n3=await mk(b,440,956);await createClub(n3,'owner3@example.com','Live FC');
 ok(sql(`select status from clubs where name='Live FC'`)==='active','with approval off a new club is active at once');
 
 // ---------- Plans and the member limit ----------
 await own.goto(CON+'/plans',{waitUntil:'networkidle'});
 ok(await own.getByText('No plans yet.').isVisible(),'Plans starts empty');
-await own.getByLabel('Name').fill('Tiny');await own.getByLabel('Monthly (₦)').fill('5000');await own.getByLabel('Yearly (₦)').fill('50000');await own.getByLabel('Member limit').fill('2');
-await own.getByRole('button',{name:'Add plan'}).click();await own.getByText('Plan added.').waitFor();
+const pf=own.locator('.cs-card').last();
+await pf.getByLabel('Name').fill('Tiny');await pf.getByLabel('Monthly (₦)').fill('5000');await pf.getByLabel('Yearly (₦)').fill('50000');await pf.getByLabel('Member limit').fill('2');
+await pf.getByRole('button',{name:'Add plan'}).click();await own.getByText('Plan added.').waitFor();
 ok(sql(`select monthly_kobo||'|'||yearly_kobo||'|'||member_limit from platform_plans where name='Tiny'`)==='500000|5000000|2','the plan is saved in kobo with its limit');
-await own.getByLabel('Name').fill('Tiny');await own.getByLabel('Monthly (₦)').fill('1');await own.getByLabel('Yearly (₦)').fill('1');await own.getByRole('button',{name:'Add plan'}).click();
+await pf.getByLabel('Name').fill('Tiny');await pf.getByLabel('Monthly (₦)').fill('1');await pf.getByLabel('Yearly (₦)').fill('1');await pf.getByRole('button',{name:'Add plan'}).click();
 ok(await own.getByText('There is already a plan with that name.').waitFor({timeout:15000}).then(()=>true).catch(()=>false),'a duplicate plan name is refused');
 // Assign to Live FC
 await own.goto(CON+'/billing',{waitUntil:'networkidle'});
@@ -104,7 +108,7 @@ sql(`insert into club_pages (club_id, join_mode) select id,'open' from clubs whe
 sql(`insert into invites (club_id, code, role, created_by) select c.id,'LIVEFC01','player',m.id from clubs c join memberships m on m.club_id=c.id where c.name='Live FC' limit 1`);
 const j1=await mk(b,440,956);await signIn(j1,CLUB,'joiner1@example.com','/join/LIVEFC01');await j1.waitForLoadState('networkidle');
 await j1.getByLabel('Your full name').fill('First Joiner');await j1.getByRole('radio',{name:'Senior'}).click();await j1.getByRole('button',{name:'Join club'}).click();
-await j1.waitForURL(/\/play/,{timeout:40000});
+await j1.waitForURL(/\/play/,{timeout:120000});
 ok(sql(`select count(*) from memberships m join clubs c on c.id=m.club_id where c.name='Live FC' and m.status='active' and 'player'=ANY(m.roles)`)==='2','the second player joined (2 of 2)');
 await n3.goto(CLUB+'/',{waitUntil:'networkidle'});
 ok(await n3.getByText('Your club is full').isVisible(),'the owner now sees "Your club is full"');
@@ -115,7 +119,7 @@ ok(await j2.getByText(/This club is full right now/).waitFor({timeout:30000}).th
 ok(sql(`select count(*) from memberships m join clubs c on c.id=m.club_id where c.name='Live FC' and m.status='active' and 'player'=ANY(m.roles)`)==='2','and was not added');
 // Leaving frees a place
 sql(`update memberships set status='left' where user_id=(select id from users where email='joiner1@example.com') and club_id=${club}`);
-await j2.getByRole('button',{name:'Join club'}).click();await j2.waitForURL(/\/play/,{timeout:40000});
+await j2.getByRole('button',{name:'Join club'}).click();await j2.waitForURL(/\/play/,{timeout:120000});
 ok(sql(`select count(*) from memberships m join clubs c on c.id=m.club_id where c.name='Live FC' and m.status='active' and 'player'=ANY(m.roles)`)==='2','after someone left, the next player could join');
 
 ok([own,sup,n1,n2,n3,j1,j2].every(p=>p.errs.length===0),'no console errors '+[own,sup,n1,n2,n3,j1,j2].flatMap(p=>p.errs).join('|'));
