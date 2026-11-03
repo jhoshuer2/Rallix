@@ -17,6 +17,10 @@ async function checkPage(p,name,path,{maxWords=140}={}){
   ok(await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),`${name}: no sideways page scroll`);
   const small=await p.evaluate(()=>[...document.querySelectorAll('a,button,input')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&(r.height<44)&&!e.closest('.rx-carousel')&&!e.classList.contains('rx-btn--small')&&getComputedStyle(e).visibility!=='hidden'}).map(e=>(e.getAttribute('aria-label')||e.textContent||e.placeholder||'').trim().slice(0,24)+' '+Math.round(e.getBoundingClientRect().height)));
   ok(small.length===0,`${name}: targets at least 44px high ${JSON.stringify(small)}`);
+  const heads=await p.evaluate(()=>[...document.querySelectorAll('h1,h2,h3,.rx-sectiontitle__h')].filter(e=>e.getBoundingClientRect().width>0).map(e=>({t:e.textContent.trim().slice(0,28),fs:parseFloat(getComputedStyle(e).fontSize),tt:getComputedStyle(e).textTransform,sec:e.classList.contains('rx-sectiontitle__h')})));
+  ok(heads.every(h=>h.fs<=40),`${name}: no heading above 40px ${JSON.stringify(heads.filter(h=>h.fs>40))}`);
+  ok(heads.filter(h=>h.sec).every(h=>h.fs<=20&&h.tt==='none'),`${name}: section titles are quiet (20px or less, sentence case)`);
+  ok((await p.locator('.rx-block').count())<=4,`${name}: at most four blocks below the hero`);
   await p.screenshot({path:`${SC}/admin_${name}.png`,fullPage:true});
   return t;
 }
@@ -25,7 +29,7 @@ for(const mode of ['no-preference','reduce']){
  console.log('motion:',mode);
  const c=await b.newContext({viewport:{width:440,height:956},reducedMotion:mode});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning/.test(m.text()))errs.push(m.text())});
  await signIn(p,'admin@example.com','Paris Arena');
- let t=await checkPage(p,'home','/',{maxWords:200});ok(/Paris Arena/i.test(t),'home: club name shown');ok(/₦/.test(t),'home: revenue figure shown');
+ let t=await checkPage(p,'home','/',{maxWords:150});ok(/Paris Arena/i.test(t),'home: club name shown');ok(/₦/.test(t),'home: revenue figure shown');
  t=await checkPage(p,'members','/members');ok(/Members/i.test(t),'members: title');
  await p.getByLabel('Search members').fill('zzzz');ok(/No one matches/.test(await p.locator('body').innerText()),'members: search with no match says so');
  await p.getByLabel('Search members').fill('ade');await p.waitForTimeout(200);ok(await p.locator('.rx-mcard').count()>=1,'members: search finds Ade');
@@ -38,7 +42,7 @@ const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.ne
 await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill('empty-admin@example.com');await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:25000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code('empty-admin@example.com'));await p.getByRole('button',{name:'Sign in'}).click();
 await p.getByLabel('What is your club called?').waitFor({timeout:25000});await p.waitForLoadState('networkidle');await p.waitForTimeout(1500);await p.getByLabel('What is your club called?').fill('Empty Club');await p.getByLabel(/your name/i).fill('Empty Admin');await p.getByLabel('Where are you located').fill('Lagos');await p.getByRole('button',{name:'Create my club'}).click();
 await p.waitForURL(u=>!/onboarding/.test(u.toString()),{timeout:25000});await p.waitForLoadState('networkidle');
-let t=await checkPage(p,'empty_home','/',{maxWords:100});ok(/No competitions yet/i.test(t),'empty home: invites the admin to start a competition');
+let t=await checkPage(p,'empty_home','/',{maxWords:90});ok(/Set up your club/i.test(t)&&/0 of 6/.test(t),'empty home: a setup checklist tells the new admin what to do');ok(!/Outstanding|Revenue|Recent activity|Needs your attention/i.test(t),'empty home: no empty sections or zero figures');
 t=await checkPage(p,'empty_members','/members',{maxWords:60});ok(/invite/i.test(t),'empty members: invite action is present');
 t=await checkPage(p,'empty_competition','/competition',{maxWords:60});ok(/Create a competition/i.test(t),'empty competition: one clear action');
 ok(errs.length===0,'empty club: no uncaught errors');

@@ -39,7 +39,7 @@ function seedCelebrations(){ // give a few seeded players birthdays and a club a
   sql(`update memberships set joined_at='${day(1).replace(/^\d{4}/,String(new Date().getFullYear()-2))}' where user_id=(select id from users where email='nathaniel@example.com') and club_id=(select id from clubs where name='Paris Arena')`);
 }
 (async()=>{seedCelebrations();const b=await chromium.launch();
-for(const [role,email,routes,max] of [['player','ade@example.com',PLAYER,230],['admin','admin@example.com',ADMIN,230]]){
+for(const [role,email,routes,max] of [['player','ade@example.com',PLAYER,170],['admin','admin@example.com',ADMIN,170]]){
   const c=await b.newContext({viewport:{width:440,height:956}});const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning/.test(m.text()))errs.push(m.text())});
   await signIn(p,email);await crawl(p,role,routes,errs,max);ok(errs.length===0,`${role}: no console errors ${JSON.stringify(errs.slice(0,2))}`);await c.close();
 }
