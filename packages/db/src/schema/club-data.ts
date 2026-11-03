@@ -189,6 +189,8 @@ export const games = pgTable("games", {
   gameNo: smallint("game_no").notNull(),
   p1Points: smallint("p1_points").notNull().default(0),
   p2Points: smallint("p2_points").notNull().default(0),
+  /* The umpire ended this game early; whoever led won it. */
+  stopped: boolean("stopped").notNull().default(false),
 }, (t) => [
   unique("games_id_club_uq").on(t.id, t.clubId),
   unique("games_match_no_uq").on(t.matchId, t.gameNo),

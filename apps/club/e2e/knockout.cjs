@@ -18,7 +18,7 @@ async function create(p,level,name,{raffle=false}={}){
   await p.getByRole('radio',{name:/Knockout/}).click();
   if(raffle)await p.getByRole('switch',{name:'Draw by raffle'}).click();
   await p.getByRole('button',{name:'Create bracket'}).click();
-  await p.waitForURL(/\/shuffle/,{timeout:40000});await p.waitForURL(/\/groups/,{timeout:40000});
+  await p.waitForURL(/\/groups/,{timeout:60000});
   return p.url().match(/competition\/([0-9a-f-]{36})/)[1]}
 async function scoreFirst(p,id){await p.goto(B+`/competition/${id}/groups`,{waitUntil:'networkidle'});
   await p.locator('a[aria-label^="Score"]').first().click();await p.waitForURL(/\/score\?match=/);

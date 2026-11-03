@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyElo, computeRecord, expectedScore, headToHead, isValidGame, resolveMatch, roundRobin, shuffle, snakeGroups, streakLabel, type PlayedMatch } from "./index";
+import { applyElo, computeRecord, expectedScore, headToHead, gamePointFor, isDeuce, isValidGame, isValidStoppedGame, resolveMatch, roundRobin, shuffle, snakeGroups, streakLabel, type PlayedMatch } from "./index";
 
 const d = (n: number) => new Date(2026, 9, n);
 const m = (id: string, p1: string, p2: string, winner: string, day: number, games: Array<[number, number]>): PlayedMatch =>
@@ -154,5 +154,35 @@ describe("celebrationTiles", () => {
     const items = [...Array.from({ length: 6 }, (_, i) => c(`b${i}`, "birthday")), ...Array.from({ length: 9 }, (_, i) => c(`n${i}`, "new"))];
     const t = celebrationTiles(items, { max: 8 });
     expect(t.map((x) => x.type)).toEqual(["person", "person", "person", "person", "person", "person", "group"]);
+  });
+});
+
+describe("stopped games, game point and deuce", () => {
+  it("lets the umpire stop a game where someone leads, but never a tie", () => {
+    expect(isValidStoppedGame({ p1: 7, p2: 5, stopped: true })).toBe(true);
+    expect(isValidStoppedGame({ p1: 0, p2: 3, stopped: true })).toBe(true);
+    expect(isValidStoppedGame({ p1: 5, p2: 5, stopped: true })).toBe(false);
+    expect(isValidStoppedGame({ p1: -1, p2: 5, stopped: true })).toBe(false);
+    expect(isValidStoppedGame({ p1: 2.5, p2: 1, stopped: true })).toBe(false);
+    expect(isValidStoppedGame({ p1: 100, p2: 1, stopped: true })).toBe(false);
+  });
+  it("counts a stopped game in the match, and an ordinary invalid game still fails", () => {
+    const full = [{ p1: 11, p2: 3 }, { p1: 3, p2: 2, stopped: true }, { p1: 11, p2: 9 }];
+    expect(resolveMatch(full, 5)).toMatchObject({ valid: true, winnerSide: 1, gamesP1: 3, gamesP2: 0 });
+    expect(resolveMatch([{ p1: 11, p2: 3 }, { p1: 7, p2: 5 }, { p1: 11, p2: 9 }], 5)).toMatchObject({ valid: false }); // 7-5 was not stopped
+    expect(resolveMatch([{ p1: 5, p2: 5, stopped: true }], 3)).toMatchObject({ valid: false });
+    expect(resolveMatch([{ p1: 11, p2: 0 }, { p1: 4, p2: 6, stopped: true }, { p1: 8, p2: 11 }], 3)).toMatchObject({ valid: true, winnerSide: 2, gamesP1: 1, gamesP2: 2 });
+  });
+  it("knows game point and deuce, with no upper limit in a deuce", () => {
+    expect(gamePointFor(10, 8)).toBe(0);
+    expect(gamePointFor(9, 10)).toBe(1);
+    expect(gamePointFor(10, 10)).toBeNull();
+    expect(gamePointFor(11, 10)).toBe(0); // one point from winning by two
+    expect(gamePointFor(12, 10)).toBeNull(); // that is a finished game
+    expect(gamePointFor(9, 5)).toBeNull();
+    expect(isDeuce(10, 10)).toBe(true);
+    expect(isDeuce(10, 9)).toBe(false);
+    expect(isValidGame({ p1: 24, p2: 22 })).toBe(true);
+    expect(isValidGame({ p1: 24, p2: 23 })).toBe(false);
   });
 });

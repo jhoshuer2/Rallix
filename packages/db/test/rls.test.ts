@@ -1432,3 +1432,15 @@ describe("club approval, plans and the member limit", () => {
     expect(String((await rows(app, { userId: owner, clubId: club }, sql`select app.club_room(${club}) as r`))[0]!.r)).toBe("8");
   });
 });
+
+describe("stopped games", () => {
+  it("a scorer can record a stopped game; it defaults to a normal one", async () => {
+    const m = ((await svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id) values (${ids.A}, ${ids.compA}, 'Stopped test', ${ids.mP1}, ${ids.mP2}) returning id`)).rows[0] as { id: string }).id;
+    const o = { userId: "adminA", clubId: ids.A };
+    await withTenant(app, o, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no, p1_points, p2_points) values (${ids.A}, ${m}, 1, 11, 7)`));
+    await withTenant(app, o, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no, p1_points, p2_points, stopped) values (${ids.A}, ${m}, 2, 6, 4, true)`));
+    const r = await rows(app, o, sql`select game_no, stopped from games where match_id = ${m} order by game_no`);
+    expect(r.map((x) => x.stopped)).toEqual([false, true]);
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no, stopped) values (${ids.A}, ${m}, 3, true)`)))).toBe("42501"); // a player cannot score
+  });
+});

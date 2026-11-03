@@ -182,7 +182,7 @@ export async function saveResult(input: { matchId: string; games: GameScore[] })
       const upd = await tx.update(matches).set({ status: "completed", winnerId, gamesP1: r.gamesP1, gamesP2: r.gamesP2, scorerId: ctx.club.membershipId, confirmedAt: new Date() })
         .where(and(eq(matches.id, m.id), sql`${matches.status} NOT IN ('completed','walkover')`)).returning({ id: matches.id });
       if (!upd.length) return { error: "This match has already been recorded." };
-      await tx.insert(games).values(input.games.map((g, i) => ({ clubId: ctx.club.clubId, matchId: m.id, gameNo: i + 1, p1Points: g.p1, p2Points: g.p2 })));
+      await tx.insert(games).values(input.games.map((g, i) => ({ clubId: ctx.club.clubId, matchId: m.id, gameNo: i + 1, p1Points: g.p1, p2Points: g.p2, stopped: g.stopped === true })));
       // Knockout: the winner moves into the next match; deciding the final completes the competition. Same transaction as the result.
       if (m.feedsMatchId) {
         await tx.update(matches).set(m.feedsSlot === 1 ? { player1Id: winnerId } : { player2Id: winnerId }).where(and(eq(matches.id, m.feedsMatchId), eq(matches.competitionId, m.competitionId)));

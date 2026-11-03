@@ -1,4 +1,5 @@
-export type GameScore = { p1: number; p2: number };
+/** `stopped`: the umpire ended this game early; whoever led won it, whatever the score. */
+export type GameScore = { p1: number; p2: number; stopped?: boolean };
 export type PlayedMatch = {
   id: string;
   player1Id: string;

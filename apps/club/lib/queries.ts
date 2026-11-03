@@ -29,7 +29,7 @@ export type MatchView = {
   id: string; competitionId: string; competitionName: string; round: string; status: string; bestOf: number;
   scheduledAt: Date | null; confirmedAt: Date | null;
   p1: { id: string; name: string; photo: string | null } | null; p2: { id: string; name: string; photo: string | null } | null;
-  winnerId: string | null; gamesP1: number; gamesP2: number; games: Array<{ no: number; p1: number; p2: number }>;
+  winnerId: string | null; gamesP1: number; gamesP2: number; games: Array<{ no: number; p1: number; p2: number; stopped: boolean }>;
 };
 
 /** Matches with player names and game scores. Optional filters keep it cheap. */
@@ -52,7 +52,7 @@ export async function listMatches(tx: Tx, clubId: string, f: { competitionId?: s
     scheduledAt: m.scheduledAt, confirmedAt: m.confirmedAt,
     p1: m.player1Id ? byId.get(m.player1Id) ?? null : null, p2: m.player2Id ? byId.get(m.player2Id) ?? null : null,
     winnerId: m.winnerId, gamesP1: m.gamesP1, gamesP2: m.gamesP2,
-    games: gs.filter((g) => g.matchId === m.id).map((g) => ({ no: g.gameNo, p1: g.p1Points, p2: g.p2Points })),
+    games: gs.filter((g) => g.matchId === m.id).map((g) => ({ no: g.gameNo, p1: g.p1Points, p2: g.p2Points, stopped: g.stopped })),
   }));
 }
 

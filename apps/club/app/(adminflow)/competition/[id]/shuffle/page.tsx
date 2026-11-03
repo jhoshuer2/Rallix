@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { competitionEntries, memberships, playerProfiles, users } from "@rallix/db";
 import { inClub, requirePermission } from "../../../../../lib/context";
@@ -20,5 +20,7 @@ export default async function ShufflePage({ params }: { params: Promise<{ id: st
     return rows;
   });
   if (!data) notFound();
+  // Nothing to shuffle with fewer than four players.
+  if (data.length < 4) redirect(`/competition/${id}/groups`);
   return <Shuffle id={id} players={data.map((p) => ({ name: p.name, photo: p.photo ?? null }))} />;
 }

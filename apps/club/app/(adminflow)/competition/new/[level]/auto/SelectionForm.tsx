@@ -26,6 +26,8 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
   const dateBad = !!start && !!end && end < start;
   const spotsNum = spots ? Number(spots) : null;
   const spotsBad = openReg && spotsNum !== null && (spotsNum < 2 || spotsNum > 128 || ids.length > spotsNum);
+  // The shuffle animation only makes sense with enough players to mix: four or more (a knockout only when it is drawn by raffle).
+  const shuffles = !openReg && ids.length >= 4 && (format !== "knockout" || raffle);
   const valid = name.trim() && start && end && !dateBad && (openReg || ids.length >= 2) && !spotsBad;
 
   async function submit(e: React.FormEvent) {
@@ -34,7 +36,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
     setBusy(true);
     const r = await createCompetition({ name, level: level === "combined" ? null : (level as "junior" | "intermediate" | "senior"), format, drawMethod: format === "knockout" && raffle ? "raffle" : "seeded", startsOn: start, endsOn: end, memberIds: ids, openRegistration: openReg, maxPlayers: openReg ? spotsNum : null, closesOn: openReg && closes ? closes : null });
     if (!r.ok) { setBusy(false); return setError(r.error); }
-    router.push(r.draft ? `/competition/${r.id}/groups` : `/competition/${r.id}/shuffle`);
+    router.push(r.draft || !shuffles ? `/competition/${r.id}/groups` : `/competition/${r.id}/shuffle`);
   }
 
   return (
@@ -77,7 +79,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
         {tried && !openReg && ids.length < 2 ? <p className="rx-error" role="alert">Pick at least two players</p> : null}
         {error ? <p className="rx-error" role="alert">{error}</p> : null}
         <div style={{ height: 24 }} />
-        <button type="submit" disabled={busy} className="rx-btn rx-btn--block">{busy ? "Creating…" : openReg ? "Open sign-up" : format === "knockout" ? "Create bracket" : `Shuffle ${format === "group_stage" ? "group" : "one-on-one"}`}</button>
+        <button type="submit" disabled={busy} className="rx-btn rx-btn--block">{busy ? "Creating…" : openReg ? "Open sign-up" : format === "knockout" ? "Create bracket" : shuffles ? `Shuffle ${format === "group_stage" ? "group" : "one-on-one"}` : "Create competition"}</button>
       </form>
     </PageShell>
   );
