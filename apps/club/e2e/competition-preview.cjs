@@ -118,7 +118,7 @@ const stateOf=id=>sql(`select status||','||open_registration||','||coalesce(max_
   // ---------- Level rule ----------
   const lvl=sql(`insert into competitions (club_id,name,format,status,open_registration,level) values ('${club}','Seniors Only','group_stage','draft',true,'senior') returning id`).split('\n')[0];
   sql(`update player_profiles set level='junior' where membership_id=(select m.id from memberships m join users u on u.id=m.user_id where u.email='ade@example.com' and m.club_id='${club}')`);
-  await ade.goto(B+'/play/compete/'+lvl);ok(await ade.getByRole('button',{name:/For Senior players/}).isDisabled(),'a junior player cannot join a senior competition');
+  await ade.goto(B+'/play/compete/'+lvl);ok(await ade.getByRole('button',{name:/Senior only/}).isDisabled(),'a junior player cannot join a senior competition');
 
   const errs=[A,ade,pastor,jide,sule,dave].flatMap(p=>p.errs);ok(errs.length===0,'no page errors: '+JSON.stringify(errs).slice(0,300));
   await b.close();console.log(`\n${pass} passed, ${fail} failed`);process.exit(fail?1:0)
