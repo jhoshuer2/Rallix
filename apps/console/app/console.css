@@ -99,3 +99,7 @@ a { color: inherit; }
 }
 
 .cs-kpigroup + .cs-kpigroup { margin-top: 8px; }
+
+/* A select placed straight in a table cell (the role picker on the Team page) is sized like the other controls: at least 36px tall. */
+.cs-table select { box-sizing: border-box; font: inherit; min-height: 36px; padding: 4px 10px; border: 1px solid #bdb8a8; border-radius: 6px; background: #fff; }
+.cs-table select:focus-visible { outline: 3px solid var(--rx-blue); outline-offset: 2px; }
