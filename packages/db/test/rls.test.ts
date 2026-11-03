@@ -1155,3 +1155,49 @@ describe("points, seasons and awards", () => {
     expect(await denied(svc.execute(sql`insert into competition_awards (club_id, competition_id, membership_id, place) values (${ids.A}, ${ids.compA}, ${ids.mAdminB}, 3)`))).toBe("23503"); // another club's member
   });
 });
+
+describe("staff roles and the support inbox", () => {
+  const player = () => ({ userId: "playerA1", clubId: ids.A });
+  const fn = async (ctx: { userId: string; clubId?: string }, q: ReturnType<typeof sql>) => String((await rows(app, ctx as { userId: string; clubId: string }, q))[0]!.r);
+  const report = (ctx: { userId: string; clubId?: string }, title: string, body = "Details") => fn(ctx, sql`select app.report_issue(${title}, ${body}) as r`);
+  const clean = () => svc.execute(sql`delete from issues`);
+
+  it("a staff role is one of four, new staff start as support, and the last owner can never leave", async () => {
+    await svc.execute(sql`insert into users (id, name, email) values ('staff1', 'Staff One', 'staff1@x.com'), ('staff2', 'Staff Two', 'staff2@x.com')`);
+    await svc.execute(sql`insert into platform_admins (user_id) values ('staff1')`);
+    expect(String((await svc.execute(sql`select role from platform_admins where user_id = 'staff1'`)).rows[0]!.role)).toBe("support");
+    expect(await denied(svc.execute(sql`update platform_admins set role = 'boss' where user_id = 'staff1'`))).toBe("23514");
+    await svc.execute(sql`update platform_admins set role = 'owner' where user_id = 'staff1'`);
+    expect(await denied(svc.execute(sql`delete from platform_admins where user_id = 'staff1'`))).toBe("23514"); // the only owner
+    expect(await denied(svc.execute(sql`update platform_admins set role = 'admin' where user_id = 'staff1'`))).toBe("23514");
+    await svc.execute(sql`insert into platform_admins (user_id, role) values ('staff2', 'owner')`);
+    await svc.execute(sql`update platform_admins set role = 'finance' where user_id = 'staff1'`); // fine: staff2 is still an owner
+    expect(await denied(svc.execute(sql`update platform_admins set role = 'support' where user_id = 'staff2'`))).toBe("23514");
+    await svc.execute(sql`delete from platform_admins where user_id = 'staff1'`);
+  });
+  it("any member reports an issue; the club and reporter are set by the database; five a day", async () => {
+    await clean();
+    expect(await report(player(), "Scores will not save")).toBe("sent");
+    const row = (await svc.execute(sql`select club_id, reported_by, source, severity from issues`)).rows[0] as Record<string, string>;
+    expect([row.club_id, row.reported_by, row.source, row.severity]).toEqual([ids.A, "playerA1", "club", "normal"]);
+    expect(await report(player(), "ab")).toBe("invalid");
+    expect(await report(player(), "x".repeat(121))).toBe("invalid");
+    expect(await report(player(), "Fine title", "y".repeat(2001))).toBe("invalid");
+    expect(await report({ userId: "stranger", clubId: ids.A }, "Not a member")).toBe("denied");
+    expect(await report({ userId: "adminB", clubId: ids.A }, "Other club's admin")).toBe("denied");
+    for (let i = 0; i < 4; i++) expect(await report(player(), `Request number ${i + 2}`)).toBe("sent");
+    expect(await report(player(), "The sixth")).toBe("limit");
+    expect(await report({ userId: "playerA2", clubId: ids.A }, "A different person")).toBe("sent"); // the limit is per person
+  });
+  it("the app role cannot read or write issues directly; my_issues returns only your own requests", async () => {
+    expect(await denied(withTenant(app, player(), (tx) => tx.execute(sql`select * from issues`)))).toBe("42501");
+    expect(await denied(withTenant(app, player(), (tx) => tx.execute(sql`insert into issues (title) values ('x')`)))).toBe("42501");
+    const mine = await rows(app, player(), sql`select title, status from app.my_issues()`);
+    expect(mine).toHaveLength(5);
+    expect(mine.every((r) => r.status === "open")).toBe(true);
+    const theirs = await rows(app, { userId: "playerA2", clubId: ids.A }, sql`select title from app.my_issues()`);
+    expect(theirs.map((r) => r.title)).toEqual(["A different person"]);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select title from app.my_issues()`)).toHaveLength(0);
+    expect(await rows(app, { userId: "playerA1", clubId: ids.B }, sql`select title from app.my_issues()`)).toHaveLength(0); // wrong club context
+  });
+});

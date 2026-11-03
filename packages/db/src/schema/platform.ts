@@ -45,8 +45,10 @@ export const platformInvoices = pgTable("platform_invoices", {
 /* The tables below are console-only. The app role has no privileges on them. */
 export const platformAdmins = pgTable("platform_admins", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  /* owner | admin | finance | support. The last owner can never be removed or demoted (trigger). */
+  role: text("role").notNull().default("support"),
   createdAt: createdAt(),
-});
+}, (t) => [check("platform_admins_role", sql`${t.role} IN ('owner','admin','finance','support')`)]);
 
 export const notifications = pgTable("notifications", {
   id: id(),
@@ -91,16 +93,20 @@ export const issues = pgTable("issues", {
   clubId: uuid("club_id").references(() => clubs.id, { onDelete: "set null" }),
   reportedBy: text("reported_by").references(() => users.id, { onDelete: "set null" }),
   assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  /* staff: raised in the console. club: sent by a club member through the support form. */
+  source: text("source").notNull().default("staff"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-}, (t) => [index("issues_status_idx").on(t.status, t.severity), index("issues_club_idx").on(t.clubId)]);
+}, (t) => [index("issues_status_idx").on(t.status, t.severity), index("issues_club_idx").on(t.clubId), check("issues_source", sql`${t.source} IN ('staff','club')`)]);
 
 export const issueNotes = pgTable("issue_notes", {
   id: id(),
   issueId: uuid("issue_id").notNull().references(() => issues.id, { onDelete: "cascade" }),
   authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
   body: text("body").notNull(),
+  /* Set when this note was emailed to the person who reported the issue. */
+  emailedAt: timestamp("emailed_at", { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => [index("issue_notes_issue_idx").on(t.issueId)]);
 
@@ -169,7 +175,7 @@ export const paymentEvents = pgTable("payment_events", {
 export const emailLog = pgTable("email_log", {
   id: id(),
   toEmail: text("to_email").notNull(),
-  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast | application
+  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast | application | support
   templateKey: text("template_key"),
   status: text("status").notNull(), // sent | failed
   error: text("error"),
@@ -178,7 +184,7 @@ export const emailLog = pgTable("email_log", {
 }, (t) => [
   index("email_log_related_idx").on(t.relatedId, t.createdAt),
   index("email_log_created_idx").on(t.createdAt),
-  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast','application')`),
+  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast','application','support')`),
   check("email_log_status", sql`${t.status} IN ('sent','failed')`),
 ]);
 
