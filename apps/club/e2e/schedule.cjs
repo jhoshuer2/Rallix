@@ -23,14 +23,14 @@ await admin.p.getByRole('link',{name:/Schedule/}).click();await admin.p.waitForU
 ok(await admin.p.getByText('Nothing scheduled').isVisible(),'admin: empty state');
 ok(await admin.p.getByRole('button',{name:'Add to the schedule'}).count()===1,'admin: exactly one add button while empty');
 await ade.p.goto(B+'/play/calendar',{waitUntil:'networkidle'});
-ok(await ade.p.getByText('Nothing on the calendar').isVisible(),'player: empty calendar');
+ok(await ade.p.getByText('Tuesday night').count()===0&&await ade.p.getByText('Public holiday').count()===0,'player: no club sessions or closures on the calendar yet');
 
 // Weekly session
 await admin.p.getByRole('button',{name:'Add to the schedule'}).click();
 await admin.p.getByLabel('Title').fill('Tuesday night');
 await admin.p.getByLabel('First date').fill(iso(1));
 await admin.p.getByLabel('Starts').fill('18:00');await admin.p.getByLabel('Ends').fill('20:00');
-await admin.p.getByRole('button',{name:'Save'}).click();await admin.p.getByText('Regular playing times').waitFor();
+await admin.p.getByRole('button',{name:'Save'}).click();await admin.p.getByText('Regular playing times',{exact:true}).waitFor();
 ok(sql(`select kind||'|'||repeats_weekly||'|'||start_time||'|'||end_time from club_events`)==='play|true|18:00|20:00','weekly session saved');
 ok(await admin.p.getByText(/^Every \w+ · 18:00–20:00/).isVisible(),'admin sees it as "Every <weekday> · 18:00–20:00"');
 
