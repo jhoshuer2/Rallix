@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { invites } from "@rallix/db";
-import { ListGroup, ListRow, PageShell, Panel, Photo } from "@rallix/ui";
+import Link from "next/link";
+import { IconBadge, ListGroup, ListRow, PageShell, Panel, Photo } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requireRole } from "../../../lib/context";
 import { InviteLink } from "./InviteLink";
@@ -20,6 +21,7 @@ export default async function Profile() {
   return (
     <PageShell header={<ClubHeader />} title="Club">
       <ListGroup><ListRow media={<Photo src={ctx.user.image} name={ctx.user.name} alt="" />} title={ctx.user.name} subtitle={`Club admin · ${ctx.club.name}`} /></ListGroup>
+      <ListGroup label="Club page"><ListRow media={<IconBadge icon="edit" />} title="Club page" subtitle="What people read before they join" href="/profile/club-page" linkAs={Link} /></ListGroup>
       <Panel title="Your picture"><PhotoUploader kind="me" name={ctx.user.name} current={await myPhoto()} label="Profile picture" shape="person" /></Panel>
       <Panel title="Club pictures">
         <div style={{ display: "grid", gap: 20 }}>

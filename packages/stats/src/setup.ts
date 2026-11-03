@@ -7,14 +7,16 @@ export type SetupFacts = {
   hasPayouts: boolean;
   hasInvited: boolean; // an invite link exists, or at least one other member has joined
   hasCompetition: boolean;
+  hasClubPage: boolean; // the club wrote something people can read before joining
 };
 
-export type SetupStep = { key: "picture" | "court" | "plans" | "payouts" | "invite" | "competition"; title: string; hint: string; href: string; done: boolean };
+export type SetupStep = { key: "picture" | "clubpage" | "court" | "plans" | "payouts" | "invite" | "competition"; title: string; hint: string; href: string; done: boolean };
 
 /** The ordered steps, what each is for, and where to do it. A club picture counts as done with a logo OR a cover. */
 export function setupSteps(f: SetupFacts): SetupStep[] {
   return [
     { key: "picture", title: "Add your club picture", hint: "A logo or cover people recognise.", href: "/profile", done: f.hasLogo || f.hasCover },
+    { key: "clubpage", title: "Write your club page", hint: "Rules, schedule and dress code people read before they join.", href: "/profile/club-page", done: f.hasClubPage },
     { key: "invite", title: "Invite your players", hint: "Share the invite link in your group chat.", href: "/profile", done: f.hasInvited },
     { key: "plans", title: "Set your fees", hint: "Monthly or yearly dues, if your club charges any.", href: "/membership/subscriptions", done: f.hasPlans },
     { key: "payouts", title: "Choose where fees are paid", hint: "Your bank account for online payments.", href: "/membership/payouts", done: f.hasPayouts },

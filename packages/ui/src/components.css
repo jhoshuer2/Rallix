@@ -769,3 +769,12 @@ fieldset { min-width: 0; }
 .rx-metricgrid--3 .rx-metric__value { font-size: 24px; }
 .rx-block { margin-top: var(--rx-space-5); } .rx-block:first-child { margin-top: 0; }
 .rx-block > .rx-sectiontitle:first-child { margin-top: 0; }
+
+/* Count on a bottom-nav tab */
+.rx-nav__icon { position: relative; }
+.rx-nav__badge { position: absolute; top: -6px; right: -10px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center; border-radius: 9px; background: #c1121f; color: #fff; font-size: 11px; font-weight: 700; line-height: 1; }
+
+/* Fees list on a club page */
+.rx-feelist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.rx-feelist li { display: flex; justify-content: space-between; gap: var(--rx-space-3); align-items: baseline; }
+.rx-feelist b { font-weight: 700; } .rx-feelist small { font-weight: 400; color: var(--rx-ink-3); font-size: var(--rx-fs-caption); }

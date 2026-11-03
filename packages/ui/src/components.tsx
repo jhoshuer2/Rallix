@@ -112,13 +112,13 @@ export function AppHeader({ clubName, clubLogo, userName, userPhoto, onClubClick
   );
 }
 
-export type NavItem = { key: string; label: string; icon: IconName; href: string } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href">;
+export type NavItem = { key: string; label: string; icon: IconName; href: string; /** A small count on the tab, for things waiting on the person (hidden at 0). */ badge?: number } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href">;
 export function BottomNav({ items, current, label = "Main", linkAs: L = "a" }: { items: NavItem[]; current: string; label?: string; linkAs?: ElementType }) {
   return (
     <nav className="rx-nav" aria-label={label}>
-      {items.map(({ key, label: text, icon, href, ...rest }) => (
-        <L key={key} href={href} className="rx-nav__item" aria-current={current === key ? "page" : undefined} aria-label={text} {...rest}>
-          <span className="rx-nav__icon"><Icon name={icon} size={22} /></span>
+      {items.map(({ key, label: text, icon, href, badge, ...rest }) => (
+        <L key={key} href={href} className="rx-nav__item" aria-current={current === key ? "page" : undefined} aria-label={badge ? `${text}, ${badge} waiting` : text} {...rest}>
+          <span className="rx-nav__icon"><Icon name={icon} size={22} />{badge ? <span className="rx-nav__badge" aria-hidden="true">{badge > 9 ? "9+" : badge}</span> : null}</span>
           <span className="rx-nav__label">{text}</span>
         </L>
       ))}

@@ -8,6 +8,7 @@ import { inClub, requireRole } from "../../lib/context";
 import { dayLabel, isDone, byRecent } from "../../lib/highlights";
 import { payoutsEnabled } from "../../lib/payment-queries";
 import { getVenue } from "../../lib/arrival-queries";
+import { hasClubPageContent, pendingApplicationCount } from "../../lib/applications";
 import { entryCounts, listCompetitions, listDues, listMatches, listMembers, listPlans, naira, recentPayments, revenue } from "../../lib/queries";
 
 /** Admin home: one hero, then only what has something to show (at most four blocks). See docs/PRODUCT.md. */
@@ -24,6 +25,8 @@ export default async function Home() {
     entries: await entryCounts(tx, clubId),
     pays: await recentPayments(tx, clubId, 8),
     venue: await getVenue(tx, clubId),
+    clubPage: await hasClubPageContent(tx, clubId),
+    applications: await pendingApplicationCount(tx, clubId),
     invite: (await tx.select({ id: invites.id }).from(invites).where(and(eq(invites.clubId, clubId), isNull(invites.revokedAt), or(isNull(invites.expiresAt), gt(invites.expiresAt, new Date())))).limit(1))[0],
   }));
   const payouts = await payoutsEnabled(ctx);
@@ -35,7 +38,7 @@ export default async function Home() {
   const running = d.comps.filter((c) => c.status === "active" || c.status === "draft").slice(0, 8);
   const hasMoney = d.month.total > 0 || d.dues.length > 0;
 
-  const setup = setupProgress({ hasLogo: !!ctx.club.logoUrl, hasCover: !!ctx.club.coverUrl, hasCourt: !!d.venue, hasPlans: d.plans.length > 0, hasPayouts: payouts, hasInvited: !!d.invite || others > 0, hasCompetition: d.comps.length > 0 });
+  const setup = setupProgress({ hasLogo: !!ctx.club.logoUrl, hasCover: !!ctx.club.coverUrl, hasCourt: !!d.venue, hasPlans: d.plans.length > 0, hasPayouts: payouts, hasInvited: !!d.invite || others > 0, hasCompetition: d.comps.length > 0, hasClubPage: d.clubPage });
 
   const feed = mergeActivity([
     groupRegistrations(d.members.filter((m) => m.joinedAt.getTime() > Date.now() - 30 * 86400000).map((m) => ({ id: m.id, name: m.name, at: m.joinedAt })), { hrefOne: (id) => `/members/${id}`, hrefGroup: "/members" }).slice(0, 5),
@@ -45,10 +48,11 @@ export default async function Home() {
 
   // Blocks in priority order; each renders only when it has something to say. At most four below the hero.
   const blocks: Array<{ key: string; show: boolean; node: React.ReactNode }> = [
-    { key: "attention", show: unpaid > 0 || toScore > 0 || readyToStart.length > 0, node: (
+    { key: "attention", show: d.applications > 0 || unpaid > 0 || toScore > 0 || readyToStart.length > 0, node: (
       <>
         <SectionTitle title="Needs your attention" />
         <ListGroup label="Needs your attention">
+          {d.applications > 0 ? <ListRow media={<IconBadge icon="user-add" />} title={`${d.applications} ${d.applications === 1 ? "person wants" : "people want"} to join`} subtitle="Review the applications" href="/members" linkAs={Link} /> : null}
           {unpaid > 0 ? <ListRow media={<IconBadge icon="money" />} title={`${unpaid} unpaid ${unpaid === 1 ? "fee" : "fees"}`} subtitle={`${naira(outstanding)} outstanding`} href="/membership/payments" linkAs={Link} /> : null}
           {toScore > 0 ? <ListRow media={<IconBadge icon="trophy" />} title={`${toScore} ${toScore === 1 ? "match" : "matches"} to score`} subtitle="Record the results" href="/competition" linkAs={Link} /> : null}
           {readyToStart.map((c) => <ListRow key={c.id} media={<IconBadge icon="play" />} title={`${c.name} is ready to start`} subtitle={`${d.entries[c.id] ?? 0} players signed up`} href={`/competition/${c.id}/groups`} linkAs={Link} />)}

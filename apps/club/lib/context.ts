@@ -5,6 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { clubs, memberships, withTenant, type Tx } from "@rallix/db";
 import { auth } from "./auth";
 import { appDb } from "./db";
+import { myPendingApplications } from "./applications";
 
 export type Role = "admin" | "scorer" | "coach" | "player";
 export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null; roles: Role[] };
@@ -41,7 +42,11 @@ export const getCtx = cache(async (): Promise<Ctx | null> => {
 export async function requireClub(): Promise<Ctx & { club: MyClub }> {
   const ctx = await getCtx();
   if (!ctx) redirect("/sign-in");
-  if (!ctx.club) redirect(ctx.blocked.length ? "/suspended" : "/onboarding");
+  if (!ctx.club) {
+    if (ctx.blocked.length) redirect("/suspended");
+    if ((await myPendingApplications(ctx.user.id)).length > 0) redirect("/pending");
+    redirect("/onboarding");
+  }
   return ctx as Ctx & { club: MyClub };
 }
 

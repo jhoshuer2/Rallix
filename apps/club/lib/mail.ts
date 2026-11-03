@@ -8,7 +8,7 @@ const g = globalThis as unknown as { __rallixMail?: Mailer };
 export const mailer = (): Mailer => (g.__rallixMail ??= createMailer(process.env));
 
 /** Record that we tried to send. Never stores the message or the code. Logging must never break sending. */
-export async function logEmail(e: { to: string; kind: "otp" | "invoice" | "reminder" | "broadcast"; ok: boolean; error?: string; templateKey?: string; relatedId?: string }) {
+export async function logEmail(e: { to: string; kind: "otp" | "invoice" | "reminder" | "broadcast" | "application"; ok: boolean; error?: string; templateKey?: string; relatedId?: string }) {
   try { await serviceDb().insert(emailLog).values({ toEmail: e.to.toLowerCase(), kind: e.kind, status: e.ok ? "sent" : "failed", error: e.error?.slice(0, 300), templateKey: e.templateKey, relatedId: e.relatedId }); } catch { /* ignore */ }
 }
 

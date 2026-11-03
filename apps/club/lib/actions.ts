@@ -9,6 +9,7 @@ import { normalizePhone } from "@rallix/config/phone";
 import { CLUB_COOKIE, canScore, getCtx, inClub, isAdmin, requireClub } from "./context";
 import { appDb, serviceDb } from "./db";
 import { listMembers } from "./queries";
+import { savePhone } from "./contact";
 import { seedAndGenerate } from "./competition-core";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -20,20 +21,6 @@ async function setClubCookie(clubId: string) {
   (await cookies()).set(CLUB_COOKIE, clubId, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
 }
 const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/g, "") || "club";
-
-/**
- * Save the optional phone number for the signed-in user. The app role cannot read or write phone numbers (so club-mates
- * can't see each other's), so this uses the service role, scoped strictly to the user id from the session.
- * Returns an error message, or null when saved or when no number was given.
- */
-async function savePhone(userId: string, raw: string | undefined): Promise<string | null> {
-  const input = (raw ?? "").trim();
-  if (!input) return null;
-  const phone = normalizePhone(input);
-  if (!phone) return "Enter a valid Nigerian phone number, like 0803 000 0000, or leave it blank.";
-  try { await serviceDb().update(users).set({ phoneNumber: phone, phoneNumberVerified: false }).where(eq(users.id, userId)); return null; }
-  catch (e) { return pgCode(e) === "23505" ? "That phone number is already used by another account." : "Could not save the phone number."; }
-}
 
 /** Change the signed-in user's optional contact phone. Empty clears it. */
 export async function updateContact(input: { phone: string }): Promise<Result> {
@@ -72,29 +59,6 @@ export async function createClub(input: { clubName: string; yourName: string; lo
     }
   }
   return fail("Could not find a free club address. Try a different name.");
-}
-
-export async function joinClub(input: { code: string; yourName: string; level: "junior" | "intermediate" | "senior"; phone?: string }): Promise<Result<{ clubId: string }>> {
-  const ctx = await getCtx();
-  if (!ctx) return fail("Please sign in again.");
-  const name = input.yourName.trim();
-  if (name.length < 2) return fail("Enter your name.");
-  const phoneProblem = await savePhone(ctx.user.id, input.phone);
-  if (phoneProblem) return fail(phoneProblem);
-  try {
-    const clubId = await withTenant(appDb(), { userId: ctx.user.id }, async (tx) => {
-      await tx.update(users).set({ name }).where(eq(users.id, ctx.user.id));
-      const r = await tx.execute(sql`select app.join_club(${input.code.trim()}, ${input.level}::player_level) as id`);
-      const membershipId = (r.rows[0] as { id: string }).id;
-      const [m] = await tx.select({ clubId: memberships.clubId }).from(memberships).where(eq(memberships.id, membershipId));
-      return m!.clubId;
-    });
-    await setClubCookie(clubId);
-    return { ok: true, clubId };
-  } catch (e) {
-    if (pgCode(e) === "P0001") return fail("This invite link is invalid, expired or full. Ask your club admin for a new one.");
-    return fail("Could not join the club. Please try again.");
-  }
 }
 
 /** 8 characters from an alphabet without look-alikes (no 0/O, 1/I/L), so codes survive being read out or retyped. */

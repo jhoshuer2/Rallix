@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { setupProgress, setupSteps, playerStart } from "./setup";
 
-const none = { hasLogo: false, hasCover: false, hasCourt: false, hasPlans: false, hasPayouts: false, hasInvited: false, hasCompetition: false };
+const none = { hasLogo: false, hasCover: false, hasCourt: false, hasPlans: false, hasPayouts: false, hasInvited: false, hasCompetition: false, hasClubPage: false };
 describe("setupProgress", () => {
   it("starts at zero and points at the first step", () => {
     const p = setupProgress(none);
-    expect(p).toMatchObject({ done: 0, total: 6, complete: false });
+    expect(p).toMatchObject({ done: 0, total: 7, complete: false });
     expect(p.next?.key).toBe("picture");
   });
   it("counts a logo or a cover as the club picture", () => {
@@ -13,12 +13,13 @@ describe("setupProgress", () => {
     expect(setupSteps({ ...none, hasLogo: true }).find((s) => s.key === "picture")?.done).toBe(true);
   });
   it("moves the next step along as things are done", () => {
-    expect(setupProgress({ ...none, hasLogo: true }).next?.key).toBe("invite");
-    expect(setupProgress({ ...none, hasLogo: true, hasInvited: true, hasPlans: true }).next?.key).toBe("payouts");
+    expect(setupProgress({ ...none, hasLogo: true }).next?.key).toBe("clubpage");
+    expect(setupProgress({ ...none, hasLogo: true, hasClubPage: true }).next?.key).toBe("invite");
+    expect(setupProgress({ ...none, hasLogo: true, hasClubPage: true, hasInvited: true, hasPlans: true }).next?.key).toBe("payouts");
   });
   it("is complete when everything is done and has no next step", () => {
-    const all = { hasLogo: true, hasCover: true, hasCourt: true, hasPlans: true, hasPayouts: true, hasInvited: true, hasCompetition: true };
-    expect(setupProgress(all)).toMatchObject({ done: 6, complete: true, next: null });
+    const all = { hasLogo: true, hasCover: true, hasCourt: true, hasPlans: true, hasPayouts: true, hasInvited: true, hasCompetition: true, hasClubPage: true };
+    expect(setupProgress(all)).toMatchObject({ done: 7, complete: true, next: null });
   });
   it("gives every step a place to go", () => { for (const s of setupSteps(none)) expect(s.href.startsWith("/")).toBe(true); });
 });
