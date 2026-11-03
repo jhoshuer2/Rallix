@@ -42,7 +42,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
         <Panel>
           <TextField label="What will you name this competition?" icon="search" placeholder="E.g. Paris Arena Open" value={name} onChange={(e) => setName(e.target.value)} error={tried && !name.trim() ? "Give the competition a name" : undefined} />
           <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-            <legend className="rx-label">Date of Competition</legend>
+            <legend className="rx-legend">Date of competition</legend>
             <div className="rx-fieldpair">
               <TextField label="Start date" type="date" value={start} onChange={(e) => setStart(e.target.value)} error={tried && !start ? "Pick a start date" : undefined} />
               <TextField label="End date" type="date" value={end} onChange={(e) => setEnd(e.target.value)} error={dateBad ? "End must be after start" : tried && !end ? "Pick an end date" : undefined} />

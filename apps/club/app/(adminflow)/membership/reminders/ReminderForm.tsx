@@ -26,7 +26,7 @@ export function ReminderForm({ enabled: e0, offsets: o0, unpaid, optedOut }: { e
       </Panel>
 
       <Panel><fieldset style={{ border: 0, margin: 0, padding: 0 }} disabled={!enabled}>
-        <legend style={{ fontWeight: 700, padding: 0, marginBottom: 8 }}>When should we remind them?</legend>
+        <legend className="rx-legend">When should we remind them?</legend>
         <p style={{ margin: "0 0 8px", fontSize: 14 }}>Pick up to six days, counted from each member’s due date.</p>
         {OFFSET_CHOICES.map((v) => (
           <label key={v} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44 }}>
