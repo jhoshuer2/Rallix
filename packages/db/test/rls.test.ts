@@ -1349,3 +1349,86 @@ describe("doors open and I'm coming", () => {
     expect(await rows(app, OWNER(), sql`select id from event_rsvps where event_id = ${oneOff}`)).toHaveLength(0); // gone with the event
   });
 });
+
+describe("club approval, plans and the member limit", () => {
+  let n = 0;
+  const mkUser = async () => { const u = `lim${++n}`; await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`); return u; };
+  const mkClub = async (owner: string) => (await svc.execute(sql`insert into clubs (slug, name, owner_id) values (${`lim-club-${n}`}, ${`Limit Club ${n}`}, ${owner}) returning id`)).rows[0] as { id: string };
+  const mkPlan = async (limit: number | null, name = `Plan ${++n}`) => (await svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo, member_limit) values (${name}, 500000, 5000000, ${limit}) returning id`)).rows[0] as { id: string };
+  const subscribe = (club: string, plan: string, status = "active") => svc.execute(sql`insert into club_subscriptions (club_id, period, status, amount_kobo, plan_id) values (${club}, 'monthly', ${status}::subscription_status, 500000, ${plan})`);
+  const addPlayer = async (club: string) => { const u = await mkUser(); return svc.execute(sql`insert into memberships (club_id, user_id) values (${club}, ${u}) returning id`); };
+
+  it("a new club starts active, and pending when approval is on; a pending club's members are blocked", async () => {
+    await svc.execute(sql`update platform_settings set club_approval = false where id = 1`);
+    const a = await mkUser();
+    const c1 = String((await rows(app, { userId: a }, sql`select app.create_club('Open Club', ${`open-${n}`}, null) as r`))[0]!.r);
+    expect(String((await svc.execute(sql`select status from clubs where id = ${c1}`)).rows[0]!.status)).toBe("active");
+    await svc.execute(sql`update platform_settings set club_approval = true where id = 1`);
+    const b = await mkUser();
+    const c2 = String((await rows(app, { userId: b }, sql`select app.create_club('Waiting Club', ${`wait-${n}`}, null) as r`))[0]!.r);
+    expect(String((await svc.execute(sql`select status from clubs where id = ${c2}`)).rows[0]!.status)).toBe("pending");
+    expect(String((await rows(app, { userId: b }, sql`select status from app.blocked_clubs()`))[0]!.status)).toBe("pending");
+    expect(await rows(app, { userId: b, clubId: c2 }, sql`select membership_id from player_profiles`)).toHaveLength(0); // no access to its data until approved
+    await svc.execute(sql`update platform_settings set club_approval = false where id = 1`);
+    await svc.execute(sql`update clubs set status = 'active' where id = ${c2}`);
+    expect((await rows(app, { userId: b, clubId: c2 }, sql`select membership_id from player_profiles`)).length).toBe(1); // approved: the owner is in
+  });
+  it("the plan catalogue is console only, and a plan is sane", async () => {
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`select * from platform_plans`)))).toBe("42501");
+    expect(await denied(svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo) values ('', 1, 1)`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo) values ('Neg', -1, 1)`))).toBe("23514");
+    expect(await denied(svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo, member_limit) values ('Zero', 1, 1, 0)`))).toBe("23514");
+    const p = await mkPlan(5, "Dup plan");
+    expect(p.id).toBeTruthy();
+    expect(await denied(svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo) values ('Dup plan', 1, 1)`))).toBe("23505");
+  });
+  it("the member limit stops the next active player, however they arrive, and is lifted by upgrading", async () => {
+    const owner = await mkUser();
+    const club = (await mkClub(owner)).id;
+    await svc.execute(sql`insert into memberships (club_id, user_id, roles) values (${club}, ${owner}, ARRAY['admin']::member_role[])`); // an admin who is not a player is not counted
+    const plan = (await mkPlan(3)).id;
+    await subscribe(club, plan);
+    await addPlayer(club); await addPlayer(club); await addPlayer(club);
+    expect(await denied(addPlayer(club))).toBe("P0001"); // the fourth
+    expect(Number(await svc.execute(sql`select app.active_players(${club}) as n`).then((r) => (r.rows[0] as { n: number }).n))).toBe(3);
+    // a left member rejoining counts again, and cannot jump the limit either
+    const left = (await svc.execute(sql`update memberships set status = 'left' where club_id = ${club} and 'player' = ANY(roles) returning id`)).rows as Array<{ id: string }>;
+    expect(left).toHaveLength(3);
+    await svc.execute(sql`update memberships set status = 'active' where id = ${left[0]!.id}`);
+    await svc.execute(sql`update memberships set status = 'active' where id = ${left[1]!.id}`);
+    await svc.execute(sql`update memberships set status = 'active' where id = ${left[2]!.id}`);
+    expect(await denied(addPlayer(club))).toBe("P0001");
+    expect(await denied(svc.execute(sql`update memberships set roles = ARRAY['player']::member_role[] where club_id = ${club} and user_id = ${owner}`))).toBe("P0001"); // the admin becoming a player would be the 4th
+    // upgrade to a bigger plan
+    const big = (await mkPlan(null)).id;
+    await subscribe(club, big);
+    expect((await addPlayer(club)).rows).toHaveLength(1);
+  });
+  it("no plan or an ended plan means no limit; a past-due club keeps its limit", async () => {
+    const owner = await mkUser();
+    const club = (await mkClub(owner)).id;
+    for (let i = 0; i < 3; i++) await addPlayer(club);
+    expect(await svc.execute(sql`select app.club_member_limit(${club}) as l`).then((r) => (r.rows[0] as { l: number | null }).l)).toBeNull();
+    const plan = (await mkPlan(3)).id;
+    await subscribe(club, plan, "cancelled");
+    expect((await addPlayer(club)).rows).toHaveLength(1); // a cancelled plan limits nothing
+    const club2 = (await mkClub(await mkUser())).id;
+    await subscribe(club2, plan, "past_due");
+    await addPlayer(club2); await addPlayer(club2); await addPlayer(club2);
+    expect(await denied(addPlayer(club2))).toBe("P0001");
+  });
+  it("a club admin sees their own plan and room; players and other clubs do not", async () => {
+    const owner = await mkUser();
+    const club = (await mkClub(owner)).id;
+    await svc.execute(sql`insert into memberships (club_id, user_id, roles) values (${club}, ${owner}, ARRAY['admin']::member_role[])`);
+    const plan = (await mkPlan(10, "Club of ten")).id;
+    await subscribe(club, plan);
+    await addPlayer(club); await addPlayer(club);
+    const mine = await rows(app, { userId: owner, clubId: club }, sql`select plan_name, member_limit, members from app.my_club_plan()`);
+    expect(mine).toEqual([{ plan_name: "Club of ten", member_limit: 10, members: 2 }]);
+    const player = ((await svc.execute(sql`select user_id from memberships where club_id = ${club} and 'player' = ANY(roles) limit 1`)).rows[0] as { user_id: string }).user_id;
+    expect(await rows(app, { userId: player, clubId: club }, sql`select * from app.my_club_plan()`)).toHaveLength(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select * from app.my_club_plan()`)).toHaveLength(0);
+    expect(String((await rows(app, { userId: owner, clubId: club }, sql`select app.club_room(${club}) as r`))[0]!.r)).toBe("8");
+  });
+});

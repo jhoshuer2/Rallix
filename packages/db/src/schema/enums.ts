@@ -3,7 +3,7 @@ import { pgEnum } from "drizzle-orm/pg-core";
 export const memberRole = pgEnum("member_role", ["admin", "scorer", "coach", "player"]);
 export const memberStatus = pgEnum("member_status", ["invited", "active", "suspended", "left"]);
 export const level = pgEnum("player_level", ["junior", "intermediate", "senior"]);
-export const clubStatus = pgEnum("club_status", ["active", "suspended", "closed"]);
+export const clubStatus = pgEnum("club_status", ["active", "suspended", "closed", "pending"]);
 export const planPeriod = pgEnum("plan_period", ["monthly", "yearly"]);
 export const dueStatus = pgEnum("due_status", ["due", "paid", "overdue", "waived"]);
 export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "failed", "refunded"]);

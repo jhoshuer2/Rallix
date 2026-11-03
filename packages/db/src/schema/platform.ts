@@ -16,6 +16,7 @@ export const clubSubscriptions = pgTable("club_subscriptions", {
   amountKobo: integer("amount_kobo").notNull(),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   paystackSubscriptionCode: text("paystack_subscription_code"),
+  planId: uuid("plan_id"),
   createdAt: createdAt(),
 }, (t) => [index("club_subscriptions_club_idx").on(t.clubId)]);
 
@@ -134,6 +135,8 @@ export const platformSettings = pgTable("platform_settings", {
   vatPercent: integer("vat_percent").notNull().default(0),
   footerNote: text("footer_note").notNull().default("Thank you for using Rallix."),
   paymentInstructions: text("payment_instructions").notNull().default(""),
+  /* When on, a new club starts as "pending" until Rallix staff approve it. */
+  clubApproval: boolean("club_approval").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [check("platform_settings_single", sql`${t.id} = 1`), check("platform_settings_vat", sql`${t.vatPercent} BETWEEN 0 AND 100`)]);
 
@@ -175,7 +178,7 @@ export const paymentEvents = pgTable("payment_events", {
 export const emailLog = pgTable("email_log", {
   id: id(),
   toEmail: text("to_email").notNull(),
-  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast | application | support
+  kind: text("kind").notNull(), // otp | invoice | reminder | broadcast | application | support | club_review
   templateKey: text("template_key"),
   status: text("status").notNull(), // sent | failed
   error: text("error"),
@@ -184,7 +187,7 @@ export const emailLog = pgTable("email_log", {
 }, (t) => [
   index("email_log_related_idx").on(t.relatedId, t.createdAt),
   index("email_log_created_idx").on(t.createdAt),
-  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast','application','support')`),
+  check("email_log_kind", sql`${t.kind} IN ('otp','invoice','reminder','broadcast','application','support','club_review')`),
   check("email_log_status", sql`${t.status} IN ('sent','failed')`),
 ]);
 
@@ -229,4 +232,19 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 }, (t) => [
   index("push_subscriptions_user_idx").on(t.userId),
   check("push_subscriptions_endpoint", sql`${t.endpoint} ~ '^https://[^ ]+$'`),
+]);
+
+/** What Rallix sells: a named plan with prices and an optional member limit. Console only. */
+export const platformPlans = pgTable("platform_plans", {
+  id: id(),
+  name: text("name").notNull().unique(),
+  monthlyKobo: integer("monthly_kobo").notNull(),
+  yearlyKobo: integer("yearly_kobo").notNull(),
+  memberLimit: integer("member_limit"),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+}, (t) => [
+  check("platform_plans_name", sql`char_length(${t.name}) BETWEEN 1 AND 60`),
+  check("platform_plans_prices", sql`${t.monthlyKobo} >= 0 AND ${t.yearlyKobo} >= 0`),
+  check("platform_plans_limit", sql`${t.memberLimit} IS NULL OR ${t.memberLimit} BETWEEN 1 AND 100000`),
 ]);

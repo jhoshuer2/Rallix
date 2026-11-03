@@ -239,6 +239,13 @@
       "when": 1793681187562,
       "tag": "0033_doors_open_rsvps",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793681188562,
+      "tag": "0034_club_approval_plans",
+      "breakpoints": true
     }
   ]
 }
