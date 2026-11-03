@@ -1,4 +1,5 @@
 "use server";
+import { finishIfDone } from "./competition-finish";
 import { randomBytes, randomInt } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
@@ -193,6 +194,7 @@ export async function saveResult(input: { matchId: string; games: GameScore[] })
     });
     if (out.error !== null) return fail(out.error);
     await updateRatings(ctx.club.clubId, out.m.id, out.m.competitionId, out.winnerId, out.loserId);
+    await finishIfDone(ctx.club.clubId, out.m.competitionId); // completes the competition and records the podium when every match is decided
     revalidatePath("/", "layout");
     const [w] = await inClub(ctx, (tx) => tx.select({ name: users.name }).from(memberships).innerJoin(users, eq(users.id, memberships.userId)).where(eq(memberships.id, out.winnerId)));
     return { ok: true, winnerName: w?.name ?? "Winner" };

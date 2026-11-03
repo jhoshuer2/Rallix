@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { EmptyState, MediaCard, PageShell, SectionTitle } from "@rallix/ui";
+import { EmptyState, IconBadge, ListGroup, ListRow, MediaCard, PageShell, SectionTitle } from "@rallix/ui";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { inClub, requirePermission } from "../../../lib/context";
 import { listCompetitions } from "../../../lib/queries";
@@ -31,6 +31,7 @@ export default async function Competition() {
           </div>
         </>
       ) : null}
+      {comps.length ? <div style={{ marginTop: 24 }}><ListGroup label="Seasons"><ListRow media={<IconBadge icon="calendar" />} title="Seasons" subtitle="One table across several competitions" href="/competition/seasons" linkAs={Link} /></ListGroup></div> : null}
     </PageShell>
   );
 }

@@ -4,6 +4,8 @@ import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo, Pill, Sec
 import { spotsLabel } from "@rallix/stats";
 import { Entrants } from "../../../../../components/Entrants";
 import { RoundResults } from "../../../../../components/RoundResults";
+import { Podium, Standings } from "../../../../../components/CompetitionTables";
+import { listAwards, peopleOf, tablesFor } from "../../../../../lib/standings-queries";
 import { competitionEntries } from "@rallix/db";
 import { asc, eq } from "drizzle-orm";
 import { can, canScore, inClub, requireScoringAccess } from "../../../../../lib/context";
@@ -25,7 +27,9 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
     const drawn = c.format === "knockout" && c.drawMethod === "raffle" && !draft
       ? (await tx.select({ m: competitionEntries.membershipId, seed: competitionEntries.seed }).from(competitionEntries).where(eq(competitionEntries.competitionId, id)).orderBy(asc(competitionEntries.seed))) : [];
     const names = drawn.length ? await listMembers(tx, ctx.club.clubId) : [];
-    return { draw: drawn.map((d) => ({ seed: d.seed, ...(names.find((n) => n.id === d.m) ?? { name: "Former member", photo: null }) })), c, ms: await listMatches(tx, ctx.club.clubId, { competitionId: id }), entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
+    const ms = await listMatches(tx, ctx.club.clubId, { competitionId: id });
+    const awards = await listAwards(tx, id);
+    return { tables: tablesFor(ms, c.format, { win: c.pointsWin, loss: c.pointsLoss }, peopleOf(ms)), awards, draw: drawn.map((d) => ({ seed: d.seed, ...(names.find((n) => n.id === d.m) ?? { name: "Former member", photo: null }) })), c, ms, entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
   });
   if (!data) notFound();
   const mayScore = canScore(ctx.club);
@@ -42,6 +46,8 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
       ) : data.ms.length === 0 ? <EmptyState compact title="No matches yet" hint="Fixtures appear once the draw is made." /> : (
         <RoundResults matches={data.ms} hrefFor={(m) => (open(m) ? `/competition/${id}/score?match=${m.id}` : undefined)} actionFor={(m) => (open(m) ? "Score" : undefined)} />
       )}
+      {!draft ? <Podium awards={data.awards} /> : null}
+      {!draft ? <Standings tables={data.tables} /> : null}
       {data.draw.length ? (
         <>
           <SectionTitle title="The draw" />

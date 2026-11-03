@@ -40,7 +40,7 @@ export async function leaveCompetition(id: string): Promise<Result> {
 }
 
 /** Admin: the preview details and the sign-up settings. Only an admin's session passes row-level security for this update. */
-export async function saveCompetitionDetails(id: string, input: { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: number | null; closesOn: string | null }): Promise<Result> {
+export async function saveCompetitionDetails(id: string, input: { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: number | null; closesOn: string | null; pointsWin?: number; pointsLoss?: number; seasonId?: string | null }): Promise<Result> {
   const ctx = await requireClub();
   if (!can(ctx.club, "competitions")) return fail("Only club admins can edit competitions.");
   if (!UUID.test(id)) return fail("We couldn’t find that competition.");
@@ -52,6 +52,10 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
   if (max !== null && (!Number.isFinite(max) || max < 2 || max > 128)) return fail("Spots must be between 2 and 128.");
   const closes = input.closesOn || null;
   if (closes !== null && !DATE.test(closes)) return fail("Choose a valid closing date.");
+  const win = input.pointsWin === undefined ? undefined : Math.floor(Number(input.pointsWin)), loss = input.pointsLoss === undefined ? undefined : Math.floor(Number(input.pointsLoss));
+  if ((win !== undefined && (!Number.isInteger(win) || win < 0 || win > 10)) || (loss !== undefined && (!Number.isInteger(loss) || loss < 0 || loss > 10))) return fail("Points must be whole numbers from 0 to 10.");
+  if (win !== undefined && loss !== undefined && loss > win) return fail("A loss can’t be worth more than a win.");
+  if (input.seasonId !== undefined && input.seasonId !== null && !UUID.test(input.seasonId)) return fail("Choose a season from the list.");
   const done = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
     if (!c) return "missing";
@@ -59,7 +63,7 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
       const [{ n } = { n: 0 }] = (await tx.select({ n: sql<number>`count(*)::int` }).from(competitionEntries).where(eq(competitionEntries.competitionId, id)));
       if (max < n) return "below";
     }
-    await tx.update(competitions).set({ summary: summary || null, prize: prize || null, rules: rules || null, openRegistration: !!input.openRegistration && c.status === "draft", maxPlayers: max, registrationClosesOn: closes }).where(eq(competitions.id, id));
+    await tx.update(competitions).set({ summary: summary || null, prize: prize || null, rules: rules || null, openRegistration: !!input.openRegistration && c.status === "draft", maxPlayers: max, registrationClosesOn: closes, ...(win !== undefined ? { pointsWin: win } : {}), ...(loss !== undefined ? { pointsLoss: loss } : {}), ...(input.seasonId !== undefined ? { seasonId: input.seasonId } : {}) }).where(eq(competitions.id, id));
     return "ok";
   });
   if (done === "missing") return fail("We couldn’t find that competition.");

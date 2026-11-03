@@ -4,6 +4,8 @@ import { BackButton, CompetitionBanner, EmptyState, IconBadge, ListGroup, ListRo
 import { registrationState, spotsLabel, spotsPercent } from "@rallix/stats";
 import { CompetitionJoin } from "../../../../../components/CompetitionJoin";
 import { RulesSheet } from "../../../../../components/RulesSheet";
+import { Podium, Standings } from "../../../../../components/CompetitionTables";
+import { listAwards, peopleOf, tablesFor } from "../../../../../lib/standings-queries";
 import { todayInClub } from "../../../../../lib/highlights";
 import { can, inClub, requireClub } from "../../../../../lib/context";
 import { getCompetitionPreview, listMatches } from "../../../../../lib/queries";
@@ -24,7 +26,8 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
     const p = await getCompetitionPreview(tx, ctx.club.clubId, id, me);
     if (!p) return null;
     const running = p.c.status === "active" || p.c.status === "completed";
-    return { ...p, ms: running ? await listMatches(tx, ctx.club.clubId, { competitionId: id }) : [] };
+    const ms = running ? await listMatches(tx, ctx.club.clubId, { competitionId: id }) : [];
+    return { ...p, ms, awards: await listAwards(tx, id), tables: tablesFor(ms, p.c.format, { win: p.c.pointsWin, loss: p.c.pointsLoss }, peopleOf(ms)) };
   });
   if (!data) notFound();
   const { c, participants, registered, myLevel } = data;
@@ -63,6 +66,8 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
         </div>
       ) : <EmptyState compact title="No one yet" hint={draft ? "Be the first to join." : "Players will appear here."} />}
 
+      <Podium awards={data.awards} />
+      <Standings tables={data.tables} meId={me} />
       {data.ms.length ? (
         <>
           <SectionTitle title="Fixtures and results" />
