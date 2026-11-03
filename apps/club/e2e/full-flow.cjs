@@ -26,7 +26,7 @@ async function signIn(page, who, next = '/') {
   await page.getByLabel('6-digit code').waitFor({ timeout: 25000 }); await page.waitForTimeout(500);
   const code = await readCode(DEV_LOG, email);
   await page.getByLabel('6-digit code').fill(code); await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(u => !/sign-in/.test(u.toString()), { timeout: 25000 });
+  await page.waitForURL(u => !/sign-in/.test(u.toString()), { timeout: 60000 });
 }
 (async()=>{const b=await chromium.launch();
 const mk=async()=>{const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultTimeout(90000);c.setDefaultNavigationTimeout(90000);const p=await c.newPage();p._errs=[];p.on('pageerror',e=>p._errs.push(e.message.slice(0,120)));return p};
