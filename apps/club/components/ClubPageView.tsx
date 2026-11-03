@@ -10,7 +10,7 @@ export function ClubPageSections({ club }: { club: PublicClub }) {
   const nothing = ![...text, ...after].some(([, v]) => v) && club.fees.length === 0;
   return (
     <>
-      {text.map(([t, v]) => (v ? <Panel key={t} title={t}><p className="rx-rules">{v}</p></Panel> : null))}
+      {text.map(([t, v]) => (v ? <Panel key={t} title={t}><p className="rx-rules" style={{ paddingBottom: 0 }}>{v}</p></Panel> : null))}
       {club.fees.length ? (
         <Panel title="Fees">
           <ul className="rx-feelist">
@@ -18,7 +18,7 @@ export function ClubPageSections({ club }: { club: PublicClub }) {
           </ul>
         </Panel>
       ) : null}
-      {after.map(([t, v]) => (v ? <Panel key={t} title={t}><p className="rx-rules">{v}</p></Panel> : null))}
+      {after.map(([t, v]) => (v ? <Panel key={t} title={t}><p className="rx-rules" style={{ paddingBottom: 0 }}>{v}</p></Panel> : null))}
       {nothing ? <EmptyState compact title="No details yet" hint="This club has not added its rules, schedule or fees yet." /> : null}
     </>
   );
