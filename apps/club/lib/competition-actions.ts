@@ -80,7 +80,7 @@ export async function startCompetition(id: string): Promise<Result> {
     const entries = await tx.select({ id: competitionEntries.membershipId }).from(competitionEntries).where(eq(competitionEntries.competitionId, id));
     const roster = (await listMembers(tx, ctx.club.clubId)).filter((m) => entries.some((e) => e.id === m.id)); // best rating first
     if (roster.length < 2) return "few";
-    await seedAndGenerate(tx, ctx.club.clubId, id, c.format, roster, { entriesExist: true });
+    await seedAndGenerate(tx, ctx.club.clubId, id, c.format, roster, { entriesExist: true, drawMethod: c.drawMethod === "raffle" ? "raffle" : "seeded" });
     await tx.update(competitions).set({ status: "active", openRegistration: false }).where(eq(competitions.id, id));
     return "ok";
   });

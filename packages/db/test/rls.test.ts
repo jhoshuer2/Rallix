@@ -1088,3 +1088,22 @@ describe("door check-in", () => {
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into arrivals (club_id, membership_id, method) values (${ids.A}, ${ids.mP1}, 'door')`)))).toBe("42501");
   });
 });
+
+describe("competition draw", () => {
+  it("draw method is limited to seeded or raffle, and only the Competitions admin can set it", async () => {
+    const o = { userId: "adminA", clubId: ids.A };
+    expect((await rows(app, o, sql`update competitions set draw_method = 'raffle' where id = ${ids.compA} returning id`))).toHaveLength(1);
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`update competitions set draw_method = 'lottery' where id = ${ids.compA}`)))).toBe("23514");
+    expect(await rows(app, { userId: "playerA1", clubId: ids.A }, sql`update competitions set draw_method = 'seeded' where id = ${ids.compA} returning id`)).toHaveLength(0);
+    expect(String((await svc.execute(sql`select draw_method from competitions where id = ${ids.compA}`)).rows[0]!.draw_method)).toBe("raffle");
+    await svc.execute(sql`update competitions set draw_method = 'seeded' where id = ${ids.compA}`);
+  });
+  it("a knockout can link a match to the next round only inside its own club and competition", async () => {
+    const mk = async (round: string, feeds: string | null) => (await svc.execute(sql`insert into matches (club_id, competition_id, round, round_order, slot, feeds_match_id, feeds_slot) values (${ids.A}, ${ids.compA}, ${round}, 1, 1, ${feeds}, ${feeds ? 1 : null}) returning id`)).rows[0] as { id: string };
+    const final = await mk("Final", null);
+    const semi = await mk("Semi-final", final.id);
+    expect(semi.id).toBeTruthy();
+    const winner = ids.mP1;
+    await svc.execute(sql`insert into matches (club_id, competition_id, round, round_order, slot, player1_id, winner_id, status) values (${ids.A}, ${ids.compA}, 'Round of 8', 1, 9, ${winner}, ${winner}, 'walkover')`); // a bye: one player, decided without playing
+  });
+});

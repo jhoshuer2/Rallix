@@ -126,7 +126,7 @@ export async function billMembers(planId: string): Promise<Result<{ created: num
 
 /* ---------- Competitions ---------- */
 export async function createCompetition(input: {
-  name: string; level: "junior" | "intermediate" | "senior" | null; format: "group_stage" | "one_on_one"; startsOn: string; endsOn: string; memberIds: string[];
+  name: string; level: "junior" | "intermediate" | "senior" | null; format: "group_stage" | "one_on_one" | "knockout"; drawMethod?: "seeded" | "raffle"; startsOn: string; endsOn: string; memberIds: string[];
   /** Players sign up themselves; the competition stays a draft until an admin starts it. */
   openRegistration?: boolean; maxPlayers?: number | null; closesOn?: string | null;
 }): Promise<Result<{ id: string; draft: boolean }>> {
@@ -148,9 +148,9 @@ export async function createCompetition(input: {
       const roster = await listMembers(tx, ctx.club.clubId); // RLS-scoped; also gives seed order by rating
       const valid = roster.filter((m) => ids.includes(m.id));
       if (valid.length !== ids.length) throw new Error("INVALID_PLAYERS");
-      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, status: open ? "draft" : "active", openRegistration: open, maxPlayers: max, registrationClosesOn: closes, startsOn: input.startsOn, endsOn: input.endsOn, createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
+      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, drawMethod: input.drawMethod === "raffle" ? "raffle" : "seeded", status: open ? "draft" : "active", openRegistration: open, maxPlayers: max, registrationClosesOn: closes, startsOn: input.startsOn, endsOn: input.endsOn, createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
       if (open) { if (valid.length) await tx.insert(competitionEntries).values(valid.map((m) => ({ clubId: ctx.club.clubId, competitionId: c!.id, membershipId: m.id }))); }
-      else await seedAndGenerate(tx, ctx.club.clubId, c!.id, input.format, valid);
+      else await seedAndGenerate(tx, ctx.club.clubId, c!.id, input.format, valid, { drawMethod: input.drawMethod === "raffle" ? "raffle" : "seeded" });
       return c!.id;
     });
     revalidatePath("/competition");
@@ -182,6 +182,13 @@ export async function saveResult(input: { matchId: string; games: GameScore[] })
         .where(and(eq(matches.id, m.id), sql`${matches.status} NOT IN ('completed','walkover')`)).returning({ id: matches.id });
       if (!upd.length) return { error: "This match has already been recorded." };
       await tx.insert(games).values(input.games.map((g, i) => ({ clubId: ctx.club.clubId, matchId: m.id, gameNo: i + 1, p1Points: g.p1, p2Points: g.p2 })));
+      // Knockout: the winner moves into the next match; deciding the final completes the competition. Same transaction as the result.
+      if (m.feedsMatchId) {
+        await tx.update(matches).set(m.feedsSlot === 1 ? { player1Id: winnerId } : { player2Id: winnerId }).where(and(eq(matches.id, m.feedsMatchId), eq(matches.competitionId, m.competitionId)));
+      } else {
+        const [c] = await tx.select({ format: competitions.format }).from(competitions).where(eq(competitions.id, m.competitionId)).limit(1);
+        if (c?.format === "knockout") await tx.update(competitions).set({ status: "completed" }).where(eq(competitions.id, m.competitionId));
+      }
       return { error: null, m, winnerId, loserId };
     });
     if (out.error !== null) return fail(out.error);

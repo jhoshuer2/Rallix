@@ -13,7 +13,8 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
   const [name, setName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [format, setFormat] = useState<"group_stage" | "one_on_one">("group_stage");
+  const [format, setFormat] = useState<"group_stage" | "one_on_one" | "knockout">("group_stage");
+  const [raffle, setRaffle] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>(() => Object.fromEntries(members.map((p) => [p.id, !manual])));
   const [openReg, setOpenReg] = useState(false);
   const [spots, setSpots] = useState("");
@@ -31,7 +32,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
     e.preventDefault(); setTried(true); setError(undefined);
     if (!valid) return;
     setBusy(true);
-    const r = await createCompetition({ name, level: level === "combined" ? null : (level as "junior" | "intermediate" | "senior"), format, startsOn: start, endsOn: end, memberIds: ids, openRegistration: openReg, maxPlayers: openReg ? spotsNum : null, closesOn: openReg && closes ? closes : null });
+    const r = await createCompetition({ name, level: level === "combined" ? null : (level as "junior" | "intermediate" | "senior"), format, drawMethod: format === "knockout" && raffle ? "raffle" : "seeded", startsOn: start, endsOn: end, memberIds: ids, openRegistration: openReg, maxPlayers: openReg ? spotsNum : null, closesOn: openReg && closes ? closes : null });
     if (!r.ok) { setBusy(false); return setError(r.error); }
     router.push(r.draft ? `/competition/${r.id}/groups` : `/competition/${r.id}/shuffle`);
   }
@@ -49,7 +50,13 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
             </div>
           </fieldset>
           <ChoiceToggle label="What format will the competition be in?" value={format} onChange={setFormat}
-            options={[{ value: "group_stage", label: "Group Stage", icon: "grid" }, { value: "one_on_one", label: "One on One", icon: "members" }]} />
+            options={[{ value: "group_stage", label: "Group Stage", icon: "grid" }, { value: "one_on_one", label: "One on One", icon: "members" }, { value: "knockout", label: "Knockout", icon: "trophy" }]} />
+          {format === "knockout" ? (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div><strong style={{ display: "block", fontWeight: 600 }}>Draw by raffle</strong><span className="rx-muted" style={{ fontSize: 13 }}>Off: the best-rated players are kept apart. On: a random draw when it starts.</span></div>
+              <Switch label="Draw by raffle" checked={raffle} onChange={setRaffle} />
+            </div>
+          ) : null}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div><strong style={{ display: "block", fontWeight: 600 }}>Players can join themselves</strong><span className="rx-muted" style={{ fontSize: 13 }}>Open sign-up. You start the competition when you are ready.</span></div>
             <Switch label="Players can join themselves" checked={openReg} onChange={(v) => { setOpenReg(v); if (!manual) setPicked(Object.fromEntries(members.map((p) => [p.id, !v]))); }} />

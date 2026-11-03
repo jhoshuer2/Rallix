@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BackButton, EmptyState, PageShell, Pill, SectionTitle } from "@rallix/ui";
+import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo, Pill, SectionTitle } from "@rallix/ui";
 import { spotsLabel } from "@rallix/stats";
 import { Entrants } from "../../../../../components/Entrants";
 import { RoundResults } from "../../../../../components/RoundResults";
 import { competitionEntries } from "@rallix/db";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { can, canScore, inClub, requireScoringAccess } from "../../../../../lib/context";
 import { getCompetition, listMatches, listMembers } from "../../../../../lib/queries";
 
@@ -22,7 +22,10 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
     const entrantIds = draft ? (await tx.select({ m: competitionEntries.membershipId }).from(competitionEntries).where(eq(competitionEntries.competitionId, id))).map((e) => e.m) : [];
     const roster = draft ? await listMembers(tx, ctx.club.clubId) : [];
     const pick = (m: (typeof roster)[number]) => ({ id: m.id, name: m.name, photo: m.photo });
-    return { c, ms: await listMatches(tx, ctx.club.clubId, { competitionId: id }), entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
+    const drawn = c.format === "knockout" && c.drawMethod === "raffle" && !draft
+      ? (await tx.select({ m: competitionEntries.membershipId, seed: competitionEntries.seed }).from(competitionEntries).where(eq(competitionEntries.competitionId, id)).orderBy(asc(competitionEntries.seed))) : [];
+    const names = drawn.length ? await listMembers(tx, ctx.club.clubId) : [];
+    return { draw: drawn.map((d) => ({ seed: d.seed, ...(names.find((n) => n.id === d.m) ?? { name: "Former member", photo: null }) })), c, ms: await listMatches(tx, ctx.club.clubId, { competitionId: id }), entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
   });
   if (!data) notFound();
   const mayScore = canScore(ctx.club);
@@ -39,6 +42,12 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
       ) : data.ms.length === 0 ? <EmptyState compact title="No matches yet" hint="Fixtures appear once the draw is made." /> : (
         <RoundResults matches={data.ms} hrefFor={(m) => (open(m) ? `/competition/${id}/score?match=${m.id}` : undefined)} actionFor={(m) => (open(m) ? "Score" : undefined)} />
       )}
+      {data.draw.length ? (
+        <>
+          <SectionTitle title="The draw" />
+          <ListGroup label="Draw order">{data.draw.map((d, i) => <ListRow key={i} media={<Photo src={d.photo} name={d.name} alt="" />} title={d.name} trailing={`#${d.seed ?? i + 1}`} />)}</ListGroup>
+        </>
+      ) : null}
       {!draft ? <Link className="rx-btn rx-btn--block" style={{ marginTop: 32 }} href={`/competition/${id}/bracket`}>Results</Link> : null}
       {admin ? <Link className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 12, boxSizing: "border-box" }} href={`/competition/${id}/details`}>Edit details</Link> : null}
     </PageShell>

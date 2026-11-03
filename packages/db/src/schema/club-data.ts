@@ -105,6 +105,9 @@ export const competitions = pgTable("competitions", {
   rules: text("rules"),
   coverUrl: text("cover_url"),
   openRegistration: boolean("open_registration").notNull().default(false),
+  /* How seeds were decided when it started: by rating, or a random raffle. drawnAt is set once. */
+  drawMethod: text("draw_method").notNull().default("seeded"),
+  drawnAt: timestamp("drawn_at", { withTimezone: true }),
   maxPlayers: smallint("max_players"),
   registrationClosesOn: date("registration_closes_on"),
   createdBy: uuid("created_by"),
@@ -117,6 +120,7 @@ export const competitions = pgTable("competitions", {
   check("competitions_summary", sql`${t.summary} IS NULL OR char_length(${t.summary}) <= 140`),
   check("competitions_prize", sql`${t.prize} IS NULL OR char_length(${t.prize}) <= 100`),
   check("competitions_rules", sql`${t.rules} IS NULL OR char_length(${t.rules}) <= 8000`),
+  check("competitions_draw_method", sql`${t.drawMethod} IN ('seeded','raffle')`),
   check("competitions_max_players", sql`${t.maxPlayers} IS NULL OR ${t.maxPlayers} BETWEEN 2 AND 128`),
   check("competitions_cover_url", sql`${t.coverUrl} IS NULL OR ${t.coverUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
 ]);

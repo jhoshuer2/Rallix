@@ -16,7 +16,10 @@ export function RoundResults({ matches, hrefFor, actionFor }: { matches: MatchVi
             {matches.filter((m) => m.round === round).map((m) => {
               const done = m.status === "completed" || m.status === "walkover";
               const action = actionFor?.(m);
-              return <ListRow key={m.id} media={<Photo src={m.p1?.photo} name={m.p1?.name ?? "TBD"} alt="" />} title={`${m.p1?.name ?? "TBD"} vs ${m.p2?.name ?? "TBD"}`} subtitle={done ? day(m.confirmedAt) : day(m.scheduledAt)}
+              const bye = m.status === "walkover" && (!m.p1 || !m.p2);
+              const lone = m.p1 ?? m.p2;
+              if (bye) return <ListRow key={m.id} media={<Photo src={lone?.photo} name={lone?.name ?? "TBD"} alt="" />} title={`${lone?.name ?? "TBD"} has a bye`} subtitle="Goes straight to the next round" trailing={<Pill>Bye</Pill>} />;
+              return <ListRow key={m.id} media={<Photo src={m.p1?.photo} name={m.p1?.name ?? "TBD"} alt="" />} title={`${m.p1?.name ?? "To be decided"} vs ${m.p2?.name ?? "To be decided"}`} subtitle={done ? day(m.confirmedAt) : day(m.scheduledAt)}
                 trailing={done ? `${m.gamesP1}–${m.gamesP2}` : action ? <Pill tone="success">{action}</Pill> : <Pill tone={m.status === "live" ? "live" : "neutral"}>{m.status === "live" ? "Live" : "Upcoming"}</Pill>}
                 href={hrefFor?.(m)} linkAs={Link} ariaLabel={action && m.p1 && m.p2 ? `${action} ${m.p1.name} versus ${m.p2.name}` : undefined} />;
             })}
