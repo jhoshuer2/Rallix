@@ -1042,3 +1042,49 @@ describe("facilities", () => {
     expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into facility_log (club_id, item_id, kind) values (${ids.A}, ${itemB}, 'note')`)))).toBe("23503");
   });
 });
+
+describe("door check-in", () => {
+  let k = 0;
+  async function admin(perms: string[]) {
+    const u = `door${++k}`;
+    await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`);
+    await svc.execute(sql`insert into memberships (club_id, user_id, roles, permissions) values (${ids.A}, ${u}, ARRAY['admin']::member_role[], ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)})`);
+    return { userId: u, clubId: ids.A };
+  }
+  const fn = async (ctx: { userId: string; clubId: string }, q: ReturnType<typeof sql>) => String((await rows(app, ctx, q))[0]!.r);
+  const inn = (ctx: { userId: string; clubId: string }, m: string) => fn(ctx, sql`select app.door_check_in(${m}::uuid) as r`);
+  const out = (ctx: { userId: string; clubId: string }, m: string) => fn(ctx, sql`select app.door_check_out(${m}::uuid) as r`);
+  const open = async (m: string) => Number((await svc.execute(sql`select count(*) as n from arrivals where membership_id = ${m} and left_at is null`)).rows[0]!.n);
+  const reset = () => svc.execute(sql`delete from arrivals`);
+
+  it("the Members admin (or owner) lets someone in; it is idempotent and recorded as a door check-in", async () => {
+    await reset();
+    const mem = await admin(["members"]);
+    expect(await inn(mem, ids.mP1)).toBe("in");
+    expect(await inn(mem, ids.mP1)).toBe("already");
+    expect(await inn({ userId: "adminA", clubId: ids.A }, ids.mP1)).toBe("already");
+    expect(await open(ids.mP1)).toBe(1);
+    expect(String((await svc.execute(sql`select method from arrivals where membership_id = ${ids.mP1}`)).rows[0]!.method)).toBe("door");
+    expect(await out(mem, ids.mP1)).toBe("out");
+    expect(await out(mem, ids.mP1)).toBe("none");
+    expect(await inn({ userId: "adminA", clubId: ids.A }, ids.mP2)).toBe("in");
+  });
+  it("other admins, players and other clubs cannot", async () => {
+    await reset();
+    const fin = await admin(["finance"]);
+    expect(await inn(fin, ids.mP1)).toBe("denied");
+    expect(await inn({ userId: "playerA2", clubId: ids.A }, ids.mP1)).toBe("denied");
+    expect(await inn({ userId: "adminB", clubId: ids.B }, ids.mP1)).toBe("denied");
+    expect(await out(fin, ids.mP1)).toBe("denied");
+    expect(await inn(fin, "00000000-0000-0000-0000-000000000000")).toBe("unknown");
+    expect(await open(ids.mP1)).toBe(0);
+  });
+  it("a stale open arrival does not block today, and a player cannot record themselves as a door check-in", async () => {
+    await reset();
+    await svc.execute(sql`insert into arrivals (club_id, membership_id, arrived_at, method) values (${ids.A}, ${ids.mP1}, now() - interval '9 hours', 'manual')`);
+    expect(await inn({ userId: "adminA", clubId: ids.A }, ids.mP1)).toBe("in");
+    expect(await open(ids.mP1)).toBe(1);
+    await reset();
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into arrivals (club_id, membership_id, method) values (${ids.A}, ${ids.mP1}, 'door')`)))).toBe("42501");
+  });
+});

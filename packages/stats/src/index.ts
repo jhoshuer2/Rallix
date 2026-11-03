@@ -10,3 +10,4 @@ export * from "./setup";
 export * from "./friendly";
 export * from "./schedule";
 export * from "./facilities";
+export * from "./attendance";

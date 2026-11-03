@@ -290,7 +290,7 @@ export const arrivals = pgTable("arrivals", {
   foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "arrivals_membership_fk" }).onDelete("cascade"),
   uniqueIndex("arrivals_one_open").on(t.membershipId).where(sql`${t.leftAt} IS NULL`),
   index("arrivals_club_idx").on(t.clubId, t.arrivedAt),
-  check("arrivals_method", sql`${t.method} IN ('manual','auto')`),
+  check("arrivals_method", sql`${t.method} IN ('manual','auto','door')`),
   check("arrivals_left_after", sql`${t.leftAt} IS NULL OR ${t.leftAt} >= ${t.arrivedAt}`),
 ]);
 
