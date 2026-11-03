@@ -103,7 +103,8 @@ console.log('D. new user creates a club, invites another');
 const N=await mk();await signIn(N,'+2348039999999','/');await N.waitForURL(/onboarding/,{timeout:15000});ok(true,'user with no club is sent to onboarding');
 await N.getByLabel('What is your club called?').fill('Test Club');await N.getByLabel('What’s your name').fill('Ngozi Test');await N.getByLabel('Where are you located').fill('Enugu');
 await N.getByRole('button',{name:'Create my club'}).click();await N.waitForURL(u=>!/onboarding/.test(u.toString()),{timeout:20000});await N.waitForLoadState('networkidle');
-ok(/Test Club/i.test(await text(N)),'new club created, user is its admin');
+await N.getByText('Test Club').first().waitFor({timeout:30000}).catch(()=>{}); // the Home page streams in after a loading skeleton
+{const tN=await text(N);ok(/Test Club/i.test(tN),'new club created, user is its admin'+(/Test Club/i.test(tN)?'':' | page said: '+N.url()+' '+tN.replace(/\n+/g,' | ').slice(0,240)));}
 ok(sql(`select slug from clubs where name='Test Club'`)==='test-club','club slug generated');
 await N.goto(B+'/members');{const rt=await text(N);ok(/Ngozi Test/i.test(rt)&&!/Jide|Pastor|Sule|Nurudeen|Dorathy|Nathaniel/i.test(rt),'new club roster is just its founder, none of Paris Arena’s players');}
 await N.goto(B+'/competition');ok(!/Senior Cup|Group Stage/i.test(await text(N)),'new club sees none of Paris Arena’s competitions');
