@@ -73,8 +73,8 @@ sql(`insert into platform_admins (user_id, role) select id, 'finance' from users
 sql(`insert into platform_admins (user_id, role) select id, 'admin' from users where email='pastor@example.com'`);
 const sup=await mk(b,1280,900);await signIn(sup,CON,'nurudeen@example.com');
 await sup.goto(CON+'/issues',{waitUntil:'networkidle'});ok(/\/issues/.test(sup.url()),'support can open Issues');
-ok(!(await sup.locator('nav a',{hasText:'Billing'}).count())&&!(await sup.locator('nav a',{hasText:'Team'}).count()),'support does not see Billing or Team in the menu');
-ok(await sup.locator('nav a',{hasText:'Issues'}).count()===1&&await sup.locator('nav a',{hasText:'Clubs'}).count()===1,'support sees Clubs and Issues');
+ok(!(await sup.locator('.cs-nav a',{hasText:'Billing'}).count())&&!(await sup.locator('.cs-nav a',{hasText:'Team'}).count()),'support does not see Billing or Team in the menu');
+ok(await sup.locator('.cs-nav a',{hasText:'Issues'}).count()===1&&await sup.locator('.cs-nav a',{hasText:'Clubs'}).count()===1,'support sees Clubs and Issues');
 await sup.goto(CON+'/billing',{waitUntil:'networkidle'});ok(!/\/billing/.test(sup.url())&&/no-access=1/.test(sup.url()),'support is sent away from Billing: '+sup.url());
 await sup.goto(CON+'/team',{waitUntil:'networkidle'});ok(!/\/team/.test(sup.url()),'support is sent away from Team');
 await sup.goto(CON+'/clubs',{waitUntil:'networkidle'});await sup.locator('a.cs-rowlink').first().click();await sup.waitForURL(/clubs\/[0-9a-f-]{36}/);
@@ -99,7 +99,7 @@ ok(await own.getByText('There must always be at least one owner.').waitFor({time
 ok(sql(`select role from platform_admins where user_id=(select id from users where email='owner@rallix.app')`)==='owner','and is still an owner');
 // add with a role
 sql(`insert into users (id, name, email) values ('newstaff','New Staff','newstaff@example.com')`);
-await own.getByLabel('Email address').fill('newstaff@example.com');await own.getByLabel('Role').selectOption('support');await own.getByRole('button',{name:'Add to team'}).click();await own.getByText('Added to the platform team.').waitFor();
+await own.getByLabel('Email address').fill('newstaff@example.com');await own.locator('label.cs-field',{hasText:'Role'}).locator('select').selectOption('support');await own.getByRole('button',{name:'Add to team'}).click();await own.getByText('Added to the platform team.').waitFor();
 ok(sql(`select role from platform_admins where user_id='newstaff'`)==='support','a new member is added with the chosen role');
 
 ok([own,sup,fin,adm2,ade,adm].every(p=>p.errs.length===0),'no console errors '+[own,sup,fin,adm2,ade,adm].flatMap(p=>p.errs).join('|'));

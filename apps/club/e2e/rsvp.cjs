@@ -35,7 +35,7 @@ sql(`insert into club_events (club_id, kind, title, starts_on, start_time) value
 // Player: calendar chips and I'm coming
 await ade.goto(B+'/play/calendar',{waitUntil:'networkidle'});
 ok(await ade.getByRole('radio',{name:'This week'}).getAttribute('aria-checked')==='true','"This week" is the default range');
-ok(await ade.getByText('Doors open 17:45 · 18:00').first().isVisible(),'today\'s session shows "Doors open 17:45 · 18:00"');
+ok(await ade.getByText('Doors open 17:45 · from 18:00').first().isVisible(),'today\'s session shows "Doors open 17:45 · from 18:00"');
 ok(await ade.getByText('Tomorrow social').isVisible()&&!(await ade.getByText('Month-end cup').count()),'this week shows tomorrow\'s event but not the one 20 days away');
 await ade.getByRole('radio',{name:'This month'}).click();
 ok(await ade.getByText('Month-end cup').isVisible(),'"This month" adds the later event');

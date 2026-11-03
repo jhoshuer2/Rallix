@@ -19,7 +19,7 @@ const queue=()=>sql(`select coalesce(string_agg(u.email, ',' order by w.created_
 const open=async(p)=>{await p.goto(B+`/play/compete/${comp}`,{waitUntil:'networkidle'})};
 
 (async()=>{const b=await chromium.launch();
-comp=sql(`insert into competitions (club_id, name, format, status, open_registration, max_players, starts_on, ends_on) values (${club}, 'E2E Waitlist Cup', 'group_stage', 'draft', true, 2, '${iso(10)}', '${iso(20)}') returning id`);
+comp=sql(`insert into competitions (club_id, name, format, status, open_registration, max_players, starts_on, ends_on) values (${club}, 'E2E Waitlist Cup', 'group_stage', 'draft', true, 2, '${iso(10)}', '${iso(20)}') returning id`).split('\n')[0];
 const ade=await who(b,'ade@example.com'), pastor=await who(b,'pastor@example.com'), jide=await who(b,'jide@example.com'), sule=await who(b,'sule@example.com'), adm=await who(b,'admin@example.com');
 
 // Spots left on the Compete list, then fill the competition
