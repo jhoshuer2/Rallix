@@ -20,7 +20,7 @@ async function crawl(p,role,routes,errs,max){
   for(const [name,path0] of routes){
     const path=path0.replace('{token}',PAYTOKEN).replace('{comp}',ids.comp()).replace('{match}',ids.match()).replace('{member}',ids.member());
     // The dev server restarts itself when its memory fills up during a long crawl; a dropped connection is retried a few times.
-    for(let a=0;;a++){try{await p.goto(B+path);break}catch(e){if(a>=3||!/ERR_CONNECTION|ERR_ABORTED/.test(e.message))throw e;await p.waitForTimeout(8000)}}
+    for(let a=0;;a++){try{await p.goto(B+path,{timeout:a===0?90000:45000});break}catch(e){if(a>=3||!/ERR_CONNECTION|ERR_ABORTED|Timeout/.test(e.message))throw e;await p.waitForTimeout(8000)}}
     await p.waitForLoadState('networkidle');await p.waitForTimeout(250);
     const words=(await p.locator('body').innerText()).split(/\s+/).filter(Boolean).length;
     const noscroll=await p.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth);
