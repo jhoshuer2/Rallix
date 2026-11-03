@@ -225,6 +225,13 @@
       "when": 1793681185562,
       "tag": "0031_staff_roles_support",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793681186562,
+      "tag": "0032_waitlist",
+      "breakpoints": true
     }
   ]
 }

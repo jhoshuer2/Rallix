@@ -1201,3 +1201,90 @@ describe("staff roles and the support inbox", () => {
     expect(await rows(app, { userId: "playerA1", clubId: ids.B }, sql`select title from app.my_issues()`)).toHaveLength(0); // wrong club context
   });
 });
+
+describe("competition waitlist", () => {
+  let comp = "";
+  const people: Record<string, { userId: string; clubId: string; member: string }> = {};
+  const as = (n: string) => ({ userId: people[n]!.userId, clubId: ids.A });
+  const fn = async (ctx: { userId: string; clubId: string }, q: ReturnType<typeof sql>) => String((await rows(app, ctx, q))[0]!.r);
+  const join = (n: string) => fn(as(n), sql`select app.join_competition(${comp}::uuid) as r`);
+  const wait = (n: string) => fn(as(n), sql`select app.join_waitlist(${comp}::uuid) as r`);
+  const leaveW = (n: string) => fn(as(n), sql`select app.leave_waitlist(${comp}::uuid) as r`);
+  const leave = (n: string) => fn(as(n), sql`select app.leave_competition(${comp}::uuid) as r`);
+  const entered = async () => (await svc.execute(sql`select m.user_id from competition_entries e join memberships m on m.id = e.membership_id where e.competition_id = ${comp} order by e.created_at, m.user_id`)).rows.map((r) => String((r as { user_id: string }).user_id));
+  const queue = async () => (await svc.execute(sql`select m.user_id from competition_waitlist w join memberships m on m.id = w.membership_id where w.competition_id = ${comp} order by w.created_at, w.id`)).rows.map((r) => String((r as { user_id: string }).user_id));
+
+  it("setup: a two-spot open competition and four players", async () => {
+    for (const n of ["wl1", "wl2", "wl3", "wl4"]) {
+      await svc.execute(sql`insert into users (id, name, email) values (${n}, ${n}, ${`${n}@x.com`})`);
+      const m = (await svc.execute(sql`insert into memberships (club_id, user_id) values (${ids.A}, ${n}) returning id`)).rows[0] as { id: string };
+      people[n] = { userId: n, clubId: ids.A, member: m.id };
+    }
+    comp = ((await svc.execute(sql`insert into competitions (club_id, name, format, status, open_registration, max_players, starts_on, ends_on) values (${ids.A}, 'Waitlist Cup', 'group_stage', 'draft', true, 2, '2030-01-01', '2030-01-10') returning id`)).rows[0] as { id: string }).id;
+    expect(await join("wl1")).toBe("joined");
+    expect(await join("wl2")).toBe("joined");
+    expect(await join("wl3")).toBe("full");
+  });
+  it("only a really full competition has a queue; you cannot queue twice or after joining", async () => {
+    expect(await wait("wl3")).toBe("waiting");
+    expect(await wait("wl3")).toBe("already");
+    expect(await wait("wl1")).toBe("registered");
+    await svc.execute(sql`update competitions set max_players = 5 where id = ${comp}`);
+    expect(await wait("wl4")).toBe("room");
+    await svc.execute(sql`update competitions set max_players = 2 where id = ${comp}`);
+    expect(await wait("wl4")).toBe("waiting");
+    expect(await queue()).toEqual(["wl3", "wl4"]);
+  });
+  it("the queue is readable by members of the club only and nobody can write it directly", async () => {
+    expect((await rows(app, as("wl1"), sql`select id from competition_waitlist`)).length).toBe(2);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from competition_waitlist`)).toHaveLength(0);
+    expect(await denied(withTenant(app, as("wl1"), (tx) => tx.execute(sql`insert into competition_waitlist (club_id, competition_id, membership_id) values (${ids.A}, ${comp}, ${people.wl1!.member})`)))).toBe("42501");
+    expect(await denied(withTenant(app, as("wl3"), (tx) => tx.execute(sql`delete from competition_waitlist`)))).toBe("42501");
+    expect(await denied(withTenant(app, as("wl1"), (tx) => tx.execute(sql`select app.promote_waitlist_internal(${comp}::uuid)`)))).toBe("42501");
+  });
+  it("a spot that opens goes to the oldest waiter, in order, with no queue jumping", async () => {
+    expect(await leave("wl1")).toBe("left");
+    expect(await entered()).toEqual(["wl2", "wl3"]);
+    expect(await queue()).toEqual(["wl4"]);
+    expect(await join("wl1")).toBe("full"); // the spot is taken; a newcomer cannot jump the queue
+    expect(await wait("wl1")).toBe("waiting");
+    expect(await queue()).toEqual(["wl4", "wl1"]);
+    // An admin removing someone has the same effect.
+    await withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`delete from competition_entries where competition_id = ${comp} and membership_id = ${people.wl2!.member}`));
+    expect(await entered()).toEqual(["wl3", "wl4"]);
+    expect(await queue()).toEqual(["wl1"]);
+  });
+  it("leaving the queue works, raising the limit fills it, and an admin adding someone takes them off the queue", async () => {
+    expect(await leaveW("wl1")).toBe("left");
+    expect(await queue()).toEqual([]);
+    expect(await wait("wl1")).toBe("waiting");
+    const raised = await fn({ userId: "adminA", clubId: ids.A }, sql`select app.promote_waitlist(${comp}::uuid) as r`);
+    expect(raised).toBe("0"); // still full at two
+    await svc.execute(sql`update competitions set max_players = 3 where id = ${comp}`);
+    expect(await fn({ userId: "playerA1", clubId: ids.A }, sql`select app.promote_waitlist(${comp}::uuid) as r`)).toBe("0"); // a player cannot trigger it
+    expect(await fn({ userId: "adminA", clubId: ids.A }, sql`select app.promote_waitlist(${comp}::uuid) as r`)).toBe("1");
+    expect(await entered()).toEqual(["wl3", "wl4", "wl1"]);
+    // adding by hand removes the waiter
+    await svc.execute(sql`update competitions set max_players = 3 where id = ${comp}`);
+    await svc.execute(sql`delete from competition_entries where competition_id = ${comp} and membership_id = ${people.wl1!.member}`);
+    await svc.execute(sql`insert into competition_waitlist (club_id, competition_id, membership_id) values (${ids.A}, ${comp}, ${people.wl2!.member})`);
+    await svc.execute(sql`insert into competition_entries (club_id, competition_id, membership_id) values (${ids.A}, ${comp}, ${people.wl2!.member}) on conflict do nothing`);
+    expect(await queue()).toEqual([]);
+  });
+  it("nothing is promoted once the competition has started or sign-up closed, and wrong-level waiters are skipped", async () => {
+    await svc.execute(sql`update competitions set max_players = 2 where id = ${comp}`);
+    await svc.execute(sql`delete from competition_entries where competition_id = ${comp}`);
+    await svc.execute(sql`delete from competition_waitlist where competition_id = ${comp}`);
+    await svc.execute(sql`insert into competition_entries (club_id, competition_id, membership_id) values (${ids.A}, ${comp}, ${people.wl3!.member}), (${ids.A}, ${comp}, ${people.wl4!.member})`);
+    expect(await wait("wl1")).toBe("waiting");
+    await svc.execute(sql`update competitions set status = 'active' where id = ${comp}`);
+    await svc.execute(sql`delete from competition_entries where competition_id = ${comp} and membership_id = ${people.wl3!.member}`);
+    expect(await entered()).toEqual(["wl4"]); // started: no promotion
+    expect(await wait("wl2")).toBe("closed");
+    await svc.execute(sql`update competitions set status = 'draft', level = 'senior' where id = ${comp}`);
+    await svc.execute(sql`insert into player_profiles (membership_id, club_id, level) values (${people.wl1!.member}, ${ids.A}, 'junior') on conflict (membership_id) do update set level = 'junior'`);
+    await svc.execute(sql`delete from competition_entries where competition_id = ${comp} and membership_id = ${people.wl4!.member}`);
+    expect(await entered()).toEqual([]); // wl1 is junior in a senior competition, so is skipped
+    expect(await queue()).toEqual(["wl1"]);
+  });
+});

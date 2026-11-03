@@ -435,3 +435,17 @@ export const competitionAwards = pgTable("competition_awards", {
   foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "awards_membership_fk" }),
   check("competition_awards_place", sql`${t.place} BETWEEN 1 AND 3`),
 ]);
+
+/** People queued for a full competition. Written only by the database functions; the oldest is promoted when a spot opens. */
+export const competitionWaitlist = pgTable("competition_waitlist", {
+  id: id(),
+  clubId: clubId(),
+  competitionId: uuid("competition_id").notNull(),
+  membershipId: uuid("membership_id").notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  unique("competition_waitlist_uq").on(t.competitionId, t.membershipId),
+  foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "waitlist_competition_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.membershipId, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "waitlist_membership_fk" }).onDelete("cascade"),
+  index("competition_waitlist_idx").on(t.competitionId, t.createdAt),
+]);
