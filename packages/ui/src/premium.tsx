@@ -109,14 +109,14 @@ export function Skeleton({ w = "100%", h = 16, round, className }: { w?: number 
 
 /* ---------- Admin: club hero, attention tiles, actions, tiles ---------- */
 /** Admin hero on the blue block: the club's logo and name, this month's revenue as the one big number, members count. */
-export function ClubBanner({ name, logo, cover, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; /** Optional wide picture shown behind the club details. */ cover?: string | null; figure: string; figureLabel: string; members: number; membersLabel?: string }) {
+export function ClubBanner({ name, logo, cover, figure, figureLabel, members, membersLabel = "Members" }: { name: string; logo?: string | null; /** Optional wide picture shown behind the club details. */ cover?: string | null; /** Leave out until the club has money to show: a zero is not information. */ figure?: string; figureLabel?: string; members: number; membersLabel?: string }) {
   // Only plain web addresses or local paths go into CSS (the database enforces this too).
   const bg = cover && /^(https:\/\/|\/(?!\/))[^"'()\s\\]+$/.test(cover) ? { backgroundImage: `linear-gradient(180deg, rgba(8,18,53,.35), rgba(8,18,53,.78)), url("${cover}")` } : undefined;
   return (
     <section className={cx("rx-cb", bg && "rx-cb--cover")} style={bg} aria-label={`${name} overview`}>
       <div className="rx-cb__head"><Photo src={logo} name={name} kind="club" alt={`${name} logo`} className="rx-cb__logo" /><p className="rx-cb__name">{name}</p></div>
       <div className="rx-cb__stats">
-        <div><p className="rx-cb__figure">{figure}</p><p className="rx-cb__label">{figureLabel}</p></div>
+        {figure ? <div><p className="rx-cb__figure">{figure}</p><p className="rx-cb__label">{figureLabel}</p></div> : <div />}
         <div className="rx-cb__side"><b>{members}</b><span>{membersLabel}</span></div>
       </div>
     </section>
@@ -235,7 +235,7 @@ export function MetricCard({ label, value, hint, tone }: { label: string; value:
     </div>
   );
 }
-export const MetricGrid = ({ children, kpi }: { children: ReactNode; kpi?: boolean }) => <div className={cx("rx-metricgrid", kpi && "rx-metricgrid--kpi")}>{children}</div>;
+export const MetricGrid = ({ children, kpi, three }: { children: ReactNode; kpi?: boolean; /** Three small figures in one row. */ three?: boolean }) => <div className={cx("rx-metricgrid", kpi && "rx-metricgrid--kpi", three && "rx-metricgrid--3")}>{children}</div>;
 
 /** One small status pill, four tones. The only badge style in the app. */
 export function Pill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "live" }) {
@@ -393,4 +393,23 @@ export function CompetitionBanner({ name, summary, cover, status }: { name: stri
 /** Thin bar showing how many spots are taken. Decorative: the number next to it carries the meaning. */
 export function SpotsBar({ percent }: { percent: number }) {
   return <div className="rx-spots" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>;
+}
+
+
+/** A short to-do list with progress, shown until the work is done. Numbered steps; finished ones get a tick; the next one is highlighted. */
+export function Checklist({ title, steps, linkAs: L = "a" }: { title: string; steps: Array<{ key: string; title: string; hint?: string; href: string; done: boolean }>; linkAs?: ElementType }) {
+  const done = steps.filter((x) => x.done).length;
+  const nextKey = steps.find((x) => !x.done)?.key;
+  return (
+    <Panel>
+      <div className="rx-check-head"><h2 className="rx-check-title">{title}</h2><span className="rx-check-count">{done} of {steps.length}</span></div>
+      <SpotsBar percent={steps.length ? (done / steps.length) * 100 : 0} />
+      <ListGroup bare label={title}>
+        {steps.map((st, i) => (
+          <ListRow key={st.key} media={<span className={cx("rx-stepdot", st.done && "is-done")} aria-hidden="true">{st.done ? <Icon name="check" size={18} /> : i + 1}</span>}
+            title={st.title} subtitle={st.done ? undefined : st.hint} href={st.href} linkAs={L} current={st.key === nextKey} ariaLabel={`${st.title}${st.done ? ", done" : ""}`} />
+        ))}
+      </ListGroup>
+    </Panel>
+  );
 }

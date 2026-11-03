@@ -18,7 +18,7 @@ export default async function Profile() {
   const [inv] = await inClub(ctx, (tx) => tx.select({ code: invites.code }).from(invites)
     .where(and(eq(invites.clubId, ctx.club.clubId), isNull(invites.revokedAt), or(isNull(invites.expiresAt), gt(invites.expiresAt, new Date())))).orderBy(desc(invites.createdAt)).limit(1));
   return (
-    <PageShell header={<ClubHeader />} title="Profile">
+    <PageShell header={<ClubHeader />} title="Club">
       <ListGroup><ListRow media={<Photo src={ctx.user.image} name={ctx.user.name} alt="" />} title={ctx.user.name} subtitle={`Club admin · ${ctx.club.name}`} /></ListGroup>
       <Panel title="Your picture"><PhotoUploader kind="me" name={ctx.user.name} current={await myPhoto()} label="Profile picture" shape="person" /></Panel>
       <Panel title="Club pictures">

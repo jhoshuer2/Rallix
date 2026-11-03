@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Carousel, Celebrations, EmptyState, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, Pill, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, MediaCard, MetricCard, MetricGrid, PageShell, ResultCard, SectionTitle, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
@@ -8,7 +8,7 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { celebrationTiles, celebrations, spotsLabel } from "@rallix/stats";
+import { celebrationTiles, celebrations, playerStart, spotsLabel } from "@rallix/stats";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
 
 const first = (n: string) => n.split(/\s+/)[0] ?? n;
@@ -29,7 +29,7 @@ export default async function PlayerHome() {
   }));
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
-  const celebs = celebrations(d.members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
+  const celebs = celebrations(d.members.filter((x) => x.id !== me).map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
   const done = d.clubMatches.filter(isDone).sort(byRecent).slice(0, 8);
   const stories = buildStories(d.clubMatches, (m) => `/play/compete/${m.competitionId}`, "See the draw");
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
@@ -46,73 +46,58 @@ export default async function PlayerHome() {
   const dueDay = due ? dayLabel(new Date(`${due.dueDate}T12:00:00`)) : "";
 
   const vs = (m: (typeof next)[number]) => `${first(m.p1!.id === me ? m.p2!.name : m.p1!.name)}`;
+  const hero = next[0];
+  const comingMatches = next.slice(1);
+  const hasComing = comingMatches.length > 0 || upcoming.length > 0;
+  const start = playerStart({ hasPhoto: !!mine?.photo, levelSet: true, playedMatch: r.played > 0, alertsOn: d.arrival.notify });
+
+  // Blocks in priority order; each shows only when it has something to say. At most four below the hero (see docs/PRODUCT.md).
+  const blocks: Array<{ key: string; show: boolean; node: React.ReactNode }> = [
+    { key: "start", show: r.played === 0 && start.some((x) => !x.done), node: <Checklist title="Getting started" steps={start.map((x) => ({ ...x, hint: undefined }))} linkAs={Link} /> },
+    { key: "coming", show: hasComing, node: (
+      <>
+        <SectionTitle title="Coming up" href="/play/compete" linkAs={Link} label="See all competitions" />
+        <Carousel label="Coming up">
+          {comingMatches.map((m) => <MediaCard key={m.id} name={`vs ${vs(m)}`} detail={`${m.competitionName} · ${m.status === "live" ? "Live now" : when(m.scheduledAt)}`} tag={m.status === "live" ? "Live" : "Next"} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
+          {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
+        </Carousel>
+      </>) },
+    { key: "court", show: !!d.venue, node: <ArrivalCard venueLabel={d.venue?.label ?? null} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> },
+    { key: "performance", show: r.played > 0, node: (
+      <>
+        <SectionTitle title="My performance" href="/play/stats" linkAs={Link} label="See my stats" />
+        <MetricGrid three>
+          <MetricCard label="Ranking" value={mine ? `#${mine.rank}` : "—"} hint={mine ? `of ${d.members.length}` : undefined} />
+          <MetricCard label="Rating" value={mine ? String(mine.rating) : "—"} />
+          <MetricCard label="Win rate" value={`${r.winPct}%`} tone={r.winPct >= 50 ? "good" : undefined} />
+        </MetricGrid>
+      </>) },
+    { key: "results", show: results.length > 0, node: (
+      <>
+        <SectionTitle title={myDone.length ? "My results" : "Latest results"} href="/play/compete" linkAs={Link} label="See all competitions" />
+        <Carousel label="Recent results">
+          {results.map((m) => <ResultCard key={m.id} a={m.p1!} b={m.p2!} scoreA={m.gamesP1} scoreB={m.gamesP2} winner={winnerSide(m)} competition={m.competitionName} when={dayLabel(m.confirmedAt)} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
+        </Carousel>
+      </>) },
+    { key: "updates", show: celebs.length > 0, node: <><SectionTitle title="Club updates" href="/play/updates" linkAs={Link} label="See all club updates" /><Celebrations tiles={celebrationTiles(celebs)} allHref="/play/updates" linkAs={Link} /></> },
+  ];
+  const shown = blocks.filter((b) => b.show).slice(0, 4);
+
   return (
-    <PageShell home header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={<Stories items={stories} label="Match highlights" />}>
+    <PageShell home header={<ClubHeader />} title={`Hi, ${first(ctx.user.name)}`} band={stories.length ? <Stories items={stories} label="Match highlights" /> : undefined}
+      lead={hero ? (
+        <HeroMatch competition={hero.competitionName} whenLabel={when(hero.scheduledAt)} startsAt={hero.status === "live" ? null : hero.scheduledAt} live={hero.status === "live"}
+          a={hero.p1!} b={hero.p2!} scoreA={hero.status === "live" ? hero.gamesP1 : null} scoreB={hero.status === "live" ? hero.gamesP2 : null}
+          href={`/play/compete/${hero.competitionId}`} linkAs={Link} cta={hero.status === "live" ? "Follow live" : "Match details"} />
+      ) : null}>
       {due ? (
         <div className="rx-duebar" role="status">
           <p>{naira(due.amountKobo)} {due.status === "overdue" ? "overdue" : `due ${dueDay}`}</p>
           <PayButton dueId={due.id} amount={naira(due.amountKobo)} enabled={payOn} />
         </div>
       ) : null}
-
-      <SectionTitle title="My performance" href="/play/stats" linkAs={Link} label="See my stats" />
-      <MetricGrid kpi>
-        <MetricCard label="Ranking" value={mine ? `#${mine.rank}` : "—"} hint={mine ? `of ${d.members.length}` : undefined} />
-        <MetricCard label="Rating" value={mine ? String(mine.rating) : "—"} hint="points" />
-        <MetricCard label="Win rate" value={r.played ? `${r.winPct}%` : "—"} hint={r.played ? `Streak: ${streakLabel(r.streak)}` : undefined} tone={r.played && r.winPct >= 50 ? "good" : undefined} />
-      </MetricGrid>
-
-      {d.venue ? <ArrivalCard venueLabel={d.venue.label} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> : null}
-
-      {next.length ? (
-        <>
-          <SectionTitle title="Upcoming matches" href="/play/compete" linkAs={Link} label="See all competitions" />
-          <Carousel label="Upcoming matches">
-            {next.map((m) => <MediaCard key={m.id} name={`vs ${vs(m)}`} detail={`${m.competitionName} · ${m.status === "live" ? "Live now" : when(m.scheduledAt)}`} tag={m.status === "live" ? "Live" : "Next"} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
-          </Carousel>
-        </>
-      ) : null}
-
-      {results.length ? (
-        <>
-          <SectionTitle title="Latest results" href="/play/compete" linkAs={Link} label="See all competitions" />
-          <Carousel label="Recent results">
-            {results.map((m) => <ResultCard key={m.id} a={m.p1!} b={m.p2!} scoreA={m.gamesP1} scoreB={m.gamesP2} winner={winnerSide(m)} competition={m.competitionName} when={dayLabel(m.confirmedAt)} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
-          </Carousel>
-        </>
-      ) : null}
-
-      {top5.length ? (
-        <>
-          <SectionTitle title="Leaderboard" href="/play/ranks" linkAs={Link} label="See the full leaderboard" />
-          <ListGroup label="Top five players">
-            {top5.map((m) => <ListRow key={m.id} media={<Photo src={m.photo} name={m.name} alt="" />} eyebrow={`#${m.rank}`} title={m.id === me ? `${m.name} (you)` : m.name} subtitle={`Rating ${m.rating}`} current={m.id === me} href="/play/ranks" linkAs={Link} />)}
-          </ListGroup>
-        </>
-      ) : null}
-
-      {upcoming.length ? (
-        <>
-          <SectionTitle title="Upcoming competitions" href="/play/compete" linkAs={Link} label="See all competitions" />
-          <Carousel label="Upcoming competitions">
-            {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
-          </Carousel>
-        </>
-      ) : null}
-
-      {celebs.length || lastWinner ? (
-        <>
-          <SectionTitle title="Club updates" href="/play/updates" linkAs={Link} label="See all club updates" />
-          {celebs.length ? <Celebrations tiles={celebrationTiles(celebs)} allHref="/play/updates" linkAs={Link} /> : null}
-          {lastWinner ? (
-            <ListGroup label="Featured player">
-              <ListRow media={<Photo src={lastWinner.photo} name={lastWinner.name} alt="" />} eyebrow="Featured player" title={lastWinner.name} subtitle={`Won the latest result · rating ${lastWinner.rating}`} trailing={<Pill tone="success">Winner</Pill>} />
-            </ListGroup>
-          ) : null}
-        </>
-      ) : null}
-
-      {!next.length && results.length === 0 && upcoming.length === 0 ? <EmptyState title="Nothing on yet" hint="When your club schedules matches, they show up here." /> : null}
+      {shown.map((b) => <div className="rx-block" key={b.key}>{b.node}</div>)}
+      {!hero && shown.length === 0 && !due ? <EmptyState title="Nothing on yet" hint="When your club schedules matches or opens a competition, it shows up here." /> : null}
     </PageShell>
   );
 }

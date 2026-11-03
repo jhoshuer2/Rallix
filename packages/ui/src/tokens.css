@@ -51,6 +51,9 @@
   --rx-space-5: 24px; --rx-space-6: 32px;
   --rx-radius-sm: 4px; --rx-radius-md: 8px; --rx-radius-pill: 999px;
   --rx-tap: 44px;
+
+  /* Type scale. Display: page title and ONE hero figure per screen. Title: card and hero names, KPI values. Section: headings of a block. */
+  --rx-fs-display: 36px; --rx-fs-title: 26px; --rx-fs-section: 19px; --rx-fs-body: 16px; --rx-fs-caption: 13px; --rx-fs-micro: 12px;
   --rx-dur-fast: 120ms; --rx-dur-base: 200ms; --rx-dur-slow: 320ms;
   --rx-ease: cubic-bezier(0.2, 0, 0, 1);
 }
@@ -60,5 +63,6 @@
 }
 
 body { margin: 0; background: var(--rx-bg); color: var(--rx-text-on-bg); font-family: var(--rx-font-body); }
-h1, h2, h3, .rx-display { font-family: var(--rx-font-display); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
+h1, h2, h3 { font-family: var(--rx-font-body); font-weight: 600; letter-spacing: 0; }
+.rx-display { font-family: var(--rx-font-display); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
 :focus-visible { outline: 3px solid var(--rx-focus); outline-offset: 2px; }

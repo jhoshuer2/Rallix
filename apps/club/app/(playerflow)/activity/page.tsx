@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo } from "@rallix/ui";
+import { BackButton, EmptyState, IconBadge, ListGroup, ListRow, PageShell } from "@rallix/ui";
 import { groupRegistrations, mergeActivity, type Activity } from "@rallix/stats";
 import { inClub, requireClub } from "../../../lib/context";
 import { byRecent, dayLabel, isDone } from "../../../lib/highlights";
@@ -26,7 +26,7 @@ export default async function ActivityPage() {
     <PageShell back={<BackButton href={admin ? "/" : "/play"} linkAs={Link} />} title="Activity">
       {feed.length ? (
         <ListGroup label="Recent activity">
-          {feed.map((a) => <ListRow key={a.id} media={<Photo name={a.title} alt="" />} title={a.title} subtitle={[a.detail, dayLabel(a.at)].filter(Boolean).join(" · ")} href={a.href} />)}
+          {feed.map((a) => <ListRow key={a.id} media={<IconBadge icon={a.kind === "payment" ? "money" : a.kind === "result" ? "trophy" : "user-add"} />} title={a.title} subtitle={[a.detail, dayLabel(a.at)].filter(Boolean).join(" · ")} href={a.href} />)}
         </ListGroup>
       ) : <EmptyState title="Nothing yet" hint="Results, new members and payments show up here." />}
     </PageShell>

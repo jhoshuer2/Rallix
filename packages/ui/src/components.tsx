@@ -130,9 +130,9 @@ export function BottomNav({ items, current, label = "Main", linkAs: L = "a" }: {
 export const clubAdminNav = (base = ""): NavItem[] => [
   { key: "home", label: "Home", icon: "home", href: `${base}/` },
   { key: "members", label: "Members", icon: "members", href: `${base}/members` },
-  { key: "competition", label: "Competition", icon: "trophy", href: `${base}/competition` },
-  { key: "membership", label: "Membership", icon: "money", href: `${base}/membership` },
-  { key: "profile", label: "Profile", icon: "profile", href: `${base}/profile` },
+  { key: "competition", label: "Competitions", icon: "trophy", href: `${base}/competition` },
+  { key: "membership", label: "Fees", icon: "money", href: `${base}/membership` },
+  { key: "profile", label: "Club", icon: "settings", href: `${base}/profile` },
 ];
 
 /** Player app tab set. */

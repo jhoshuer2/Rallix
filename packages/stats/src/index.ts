@@ -6,3 +6,4 @@ export * from "./celebrations";
 export * from "./overview";
 export * from "./geo";
 export * from "./registration";
+export * from "./setup";

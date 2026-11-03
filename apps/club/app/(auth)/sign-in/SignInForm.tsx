@@ -43,6 +43,7 @@ export function SignInForm({ next }: { next: string }) {
           <TextField label="6-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} error={error} />
         )}
         <Button type="submit" block disabled={busy}>{busy ? "Please wait…" : step === "email" ? "Email me a code" : "Sign in"}</Button>
+        {step === "email" ? <p className="rx-muted" style={{ margin: "16px 0 0", fontSize: 14 }}>New here? Sign in with your email and we will help you create your club, or open the invite link your club sent you.</p> : null}
         {step === "code" ? (
           <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" block disabled={busy || wait > 0} onClick={() => send()}>{wait > 0 ? `Send a new code in ${wait}s` : "Send a new code"}</Button>

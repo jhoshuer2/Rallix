@@ -35,3 +35,30 @@ describe("every club screen follows the design system", () => {
     });
   }
 });
+
+/** The type scale keeps the app calm: no oversized text outside the few allowed exceptions, and section titles stay quiet. */
+describe("type scale", () => {
+  const css = readFileSync(join(__dirname, "components.css"), "utf8");
+  const tokens = readFileSync(join(__dirname, "tokens.css"), "utf8");
+  const rules = css.split("\n").flatMap((l) => { const m = l.match(/^([^{@}][^{]*?) \{(.*)\}\s*(?:\/\*.*\*\/)?\s*$/); return m ? [{ sel: m[1]!.trim(), body: m[2]! }] : []; });
+  const lastOf = (sel: string, prop: RegExp) => { let v: string | undefined; for (const r of rules) if (r.sel === sel) { const m = r.body.match(prop); if (m) v = m[1]; } return v; };
+  const BIG_ALLOWED = new Set([".rx-score__num", ".rx-splash__word", ".rx-viewer__score"]);
+
+  it("defines the scale as tokens", () => { for (const t of ["--rx-fs-display", "--rx-fs-title", "--rx-fs-section", "--rx-fs-body", "--rx-fs-caption"]) expect(tokens).toContain(t); });
+  it("declares no font size above 40px except the live score, the splash word and the viewer", () => {
+    const over = rules.filter((r) => { const m = r.body.match(/font-size:\s*(\d+)px/); return m && Number(m[1]) > 40 && !BIG_ALLOWED.has(r.sel); }).map((r) => r.sel);
+    expect(over).toEqual([]);
+  });
+  it("keeps section titles quiet: sentence case, no larger than the section size", () => {
+    expect(lastOf(".rx-sectiontitle__h", /text-transform:\s*(\w+)/)).toBe("none");
+    expect(lastOf(".rx-sectiontitle__h", /font-size:\s*([^;]+);/)).toBe("var(--rx-fs-section)");
+  });
+  it("lets only page-level titles use uppercase headings", () => {
+    expect(tokens).not.toMatch(/h1, h2, h3[^}]*text-transform:\s*uppercase/);
+  });
+  it("keeps KPI values and hero names at card-title size or below", () => {
+    for (const sel of [".rx-metric__value", ".rx-metricgrid--kpi .rx-metric__value", ".rx-cb__side b", ".rx-mhero__name", ".rx-cb__name"]) {
+      const v = lastOf(sel, /font-size:\s*(\d+)px/); if (v) expect(Number(v), sel).toBeLessThanOrEqual(28);
+    }
+  });
+});

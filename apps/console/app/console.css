@@ -4,7 +4,7 @@ a { color: inherit; }
 
 .cs-shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100dvh; }
 .cs-side { background: var(--rx-blue); color: #fff; padding: 20px 14px; position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
-.cs-brand { font-family: var(--rx-font-display); font-style: italic; text-transform: uppercase; font-size: 22px; padding: 4px 10px 16px; }
+.cs-brand { font-family: var(--rx-font-display); text-transform: uppercase; font-size: 22px; padding: 4px 10px 16px; }
 .cs-brand small { display: block; font-family: var(--rx-font-body); font-style: normal; text-transform: none; font-size: 12px; opacity: .8; }
 .cs-nav { display: flex; flex-direction: column; gap: 2px; }
 .cs-nav a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 6px; color: #fff; text-decoration: none; font-weight: 500; }
@@ -15,8 +15,8 @@ a { color: inherit; }
 .cs-who a { display: inline-flex; min-height: 44px; align-items: center; }
 .cs-main { padding: 28px 36px 64px; min-width: 0; max-width: 1280px; }
 
-.cs-h1 { font-family: var(--rx-font-display); font-style: italic; text-transform: uppercase; font-size: 28px; margin: 0 0 4px; line-height: 1.1; }
-.cs-h2 { font-family: var(--rx-font-display); font-style: italic; text-transform: uppercase; font-size: 16px; margin: 28px 0 12px; }
+.cs-h1 { font-family: var(--rx-font-display); text-transform: uppercase; font-size: var(--rx-fs-display); margin: 0 0 4px; line-height: 1.1; }
+.cs-h2 { font-family: var(--rx-font-body); font-weight: 600; font-size: var(--rx-fs-section); margin: 32px 0 12px; color: var(--rx-ink); }
 .cs-eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .7; margin: 0 0 4px; }
 .cs-muted { color: #555; margin: 0 0 16px; }
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -28,7 +28,7 @@ a { color: inherit; }
 .cs-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .cs-kpi { background: #fff; border: 1px solid var(--rx-cream-3); border-radius: 8px; padding: 14px 16px; }
 .cs-kpi dt { font-size: 13px; color: #555; }
-.cs-kpi dd { margin: 4px 0 0; font-family: var(--rx-font-display); font-style: italic; font-size: 26px; }
+.cs-kpi dd { margin: 4px 0 0; font-family: var(--rx-font-display); font-weight: 700; font-size: 28px; }
 .cs-kpi small { display: block; font-family: var(--rx-font-body); font-style: normal; font-size: 12px; color: #555; }
 
 .cs-tablewrap { overflow-x: auto; background: #fff; border: 1px solid var(--rx-cream-3); border-radius: 8px; }
@@ -82,7 +82,7 @@ a { color: inherit; }
 
 /* Invoice (screen and print) */
 .cs-invoice { background: #fff; max-width: 780px; padding: 48px; border: 1px solid var(--rx-cream-3); }
-.cs-invoice h1 { font-family: var(--rx-font-display); font-style: italic; text-transform: uppercase; margin: 0 0 24px; }
+.cs-invoice h1 { font-family: var(--rx-font-display); text-transform: uppercase; margin: 0 0 24px; }
 .cs-invoice table { width: 100%; border-collapse: collapse; margin: 24px 0; }
 .cs-invoice th, .cs-invoice td { padding: 10px 0; border-bottom: 1px solid #ddd; text-align: left; }
 .cs-invoice .num { text-align: right; }
@@ -97,3 +97,5 @@ a { color: inherit; }
   .cs-grid--2, .cs-grid--3 { grid-template-columns: 1fr; }
   .cs-brand { padding: 0 10px; }
 }
+
+.cs-kpigroup + .cs-kpigroup { margin-top: 8px; }

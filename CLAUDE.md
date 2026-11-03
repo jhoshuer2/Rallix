@@ -1,5 +1,7 @@
 # Rallix
 
+**Read `docs/PRODUCT.md` first: it defines what Rallix is, who uses it and the principles every screen follows (calm, show a section only when it has data, understandable without the creator).**
+
 Mobile-first PWA for table tennis clubs in Nigeria. Slack-style multi-tenancy: one platform, many clubs, each on its own subdomain. A player account can belong to several clubs, and each club's data is separate.
 
 ## Layout (pnpm + Turborepo monorepo)
