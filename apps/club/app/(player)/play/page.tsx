@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, ResultCard, SectionTitle, Stories } from "@rallix/ui";
+import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, ResultCard, SectionTitle, SpotsFaces, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
 import { ClubHeader } from "../../../components/ClubHeader";
 import { PayButton } from "../../../components/PayButton";
@@ -8,7 +8,7 @@ import { getArrivalSettings, getVenue, listHere } from "../../../lib/arrival-que
 import { inClub, requireClub } from "../../../lib/context";
 import { payoutsEnabled } from "../../../lib/payment-queries";
 import { buildStories, byRecent, dayLabel, isDone, todayInClub, winnerSide } from "../../../lib/highlights";
-import { closureNotice, celebrationTiles, celebrations, playerStart, spotsLabel } from "@rallix/stats";
+import { closureNotice, celebrationTiles, celebrations, playerStart, spotsLabel, spotsLeftLabel } from "@rallix/stats";
 import { listScheduleEvents } from "../../../lib/schedule-queries";
 import { listMyChallenges, needsMe } from "../../../lib/friendly-queries";
 import { listCompetitionsForPlayer, listDues, listMatches, listMembers, memberStats, naira } from "../../../lib/queries";
@@ -65,7 +65,7 @@ export default async function PlayerHome() {
         <SectionTitle title="Coming up" href="/play/compete" linkAs={Link} label="See all competitions" />
         <Carousel label="Coming up">
           {comingMatches.map((m) => <MediaCard key={m.id} name={`vs ${vs(m)}`} detail={`${m.competitionName} · ${m.status === "live" ? "Live now" : when(m.scheduledAt)}`} tag={m.status === "live" ? "Live" : "Next"} href={`/play/compete/${m.competitionId}`} linkAs={Link} />)}
-          {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
+          {upcoming.map((c) => <MediaCard key={c.id} name={c.name} cover={c.coverUrl} foot={c.status === "draft" ? <SpotsFaces left={spotsLeftLabel(c.entries, c.maxPlayers)} faces={c.faces} /> : undefined} detail={c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : c.startsOn ? `Started ${dayLabel(new Date(`${c.startsOn}T12:00:00`))}` : (c.level ?? "Open to all")} tag={c.registered ? "Registered" : c.status === "draft" ? "Open" : "Active"} href={`/play/compete/${c.id}`} linkAs={Link} />)}
         </Carousel>
       </>) },
     { key: "court", show: !!d.venue, node: <ArrivalCard venueLabel={d.venue?.label ?? null} here={d.here.map((h) => ({ id: h.id, name: h.name, photo: h.photo, since: h.since.toISOString() }))} iAmHere={d.here.some((h) => h.membershipId === me)} share={d.arrival.share} auto={d.arrival.auto} /> },

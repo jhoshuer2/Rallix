@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackButton, CompetitionBanner, EmptyState, IconBadge, ListGroup, ListRow, PageShell, Photo, Pill, SectionTitle, SpotsBar, countdown } from "@rallix/ui";
-import { registrationState, spotsLabel, spotsPercent } from "@rallix/stats";
+import { registrationState, spotsLabel, spotsLeftLabel, spotsPercent, waitlistPosition } from "@rallix/stats";
 import { CompetitionJoin } from "../../../../../components/CompetitionJoin";
 import { RulesSheet } from "../../../../../components/RulesSheet";
+import { ShareRow } from "../../../../../components/ShareRow";
 import { Podium, Standings } from "../../../../../components/CompetitionTables";
 import { listAwards, peopleOf, tablesFor } from "../../../../../lib/standings-queries";
 import { todayInClub } from "../../../../../lib/highlights";
@@ -31,8 +32,9 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
   });
   if (!data) notFound();
   const { c, participants, registered, myLevel } = data;
+  const position = waitlistPosition(data.waitlist, me);
   const today = todayInClub();
-  const state = registrationState({ status: c.status, openRegistration: c.openRegistration, maxPlayers: c.maxPlayers, entries: participants.length, closesOn: c.registrationClosesOn, today, registered, level: c.level, myLevel });
+  const state = registrationState({ status: c.status, openRegistration: c.openRegistration, maxPlayers: c.maxPlayers, entries: participants.length, closesOn: c.registrationClosesOn, today, registered, waiting: data.waitlist.some((w) => w.id === me), level: c.level, myLevel });
   const draft = c.status === "draft";
   const startsAt = c.startsOn ? new Date(`${c.startsOn}T00:00:00+01:00`) : null;
   const when = draft || c.status === "active" && startsAt && startsAt.getTime() > Date.now()
@@ -44,7 +46,7 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
   const statusPill = <Pill tone={c.status === "active" ? "live" : draft ? "success" : "neutral"}>{draft ? "Open for sign-up" : c.status === "active" ? "Running" : cap(c.status)}</Pill>;
   return (
     <PageShell back={<BackButton href="/play/compete" linkAs={Link} />} lead={<CompetitionBanner name={c.name} summary={c.summary} cover={c.coverUrl} status={statusPill} />}>
-      {state !== "hidden" && (draft || registered) ? <CompetitionJoin id={id} state={state} canLeave={draft} level={c.level ? cap(c.level) : null} /> : null}
+      {state !== "hidden" && (draft || registered) ? <CompetitionJoin id={id} state={state} canLeave={draft} level={c.level ? cap(c.level) : null} spots={draft ? (spotsLeftLabel(participants.length, c.maxPlayers) ?? spotsLabel(participants.length, c.maxPlayers)) : null} position={position} /> : null}
       {can(ctx.club, "competitions") ? <Link className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 12, boxSizing: "border-box" }} href={`/competition/${id}/groups`}>Manage competition</Link> : null}
 
       <ListGroup label="Competition details">
@@ -57,6 +59,7 @@ export default async function CompDetail({ params }: { params: Promise<{ id: str
       {percent !== null && draft ? <SpotsBar percent={percent} /> : null}
 
       {c.rules ? <RulesSheet rules={c.rules} name={c.name} /> : null}
+      {draft || c.status === "active" ? <ShareRow title={c.name} text={`${c.name} at ${ctx.club.name} on Rallix.`} path={`/club/${ctx.club.slug}`} /> : null}
 
       <SectionTitle title="Players" />
       {participants.length ? (

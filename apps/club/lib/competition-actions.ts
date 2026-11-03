@@ -14,7 +14,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const JOIN_MESSAGES: Record<string, string> = {
   already: "You’re already registered.",
-  full: "Sorry, this competition is full.",
+  full: "This competition is full. Join the waitlist and we’ll move you up if a spot opens.",
   closed: "Registration for this competition is closed.",
   level: "This competition is for a different level.",
 };
@@ -29,6 +29,32 @@ export async function joinCompetition(id: string): Promise<Result<{ status: "joi
   if (code === "joined") return { ok: true, status: "joined" };
   if (code === "already") return { ok: true, status: "already" };
   return fail(JOIN_MESSAGES[code] ?? "We couldn’t register you. Please try again.");
+}
+
+const WAIT_MESSAGES: Record<string, string> = {
+  room: "There is room now. Join the competition instead.",
+  closed: "Registration for this competition is closed.",
+  level: "This competition is for a different level.",
+  registered: "You’re already registered.",
+};
+
+/** Join the queue for a full competition. When a spot opens, the oldest waiter is moved in by the database. */
+export async function joinWaitlist(id: string): Promise<Result<{ status: "waiting" | "already" }>> {
+  const ctx = await requireClub();
+  if (!UUID.test(id)) return fail("We couldn’t find that competition.");
+  const r = await inClub(ctx, (tx) => tx.execute(sql`select app.join_waitlist(${id}) as r`));
+  const code = (r.rows[0] as { r: string }).r;
+  revalidatePath("/play", "layout");
+  if (code === "waiting" || code === "already") return { ok: true, status: code };
+  return fail(WAIT_MESSAGES[code] ?? "We couldn’t add you to the waitlist. Please try again.");
+}
+
+export async function leaveWaitlist(id: string): Promise<Result> {
+  const ctx = await requireClub();
+  if (!UUID.test(id)) return fail("We couldn’t find that competition.");
+  await inClub(ctx, (tx) => tx.execute(sql`select app.leave_waitlist(${id}) as r`));
+  revalidatePath("/play", "layout");
+  return { ok: true };
 }
 
 export async function leaveCompetition(id: string): Promise<Result> {
@@ -64,6 +90,7 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
       if (max < n) return "below";
     }
     await tx.update(competitions).set({ summary: summary || null, prize: prize || null, rules: rules || null, openRegistration: !!input.openRegistration && c.status === "draft", maxPlayers: max, registrationClosesOn: closes, ...(win !== undefined ? { pointsWin: win } : {}), ...(loss !== undefined ? { pointsLoss: loss } : {}), ...(input.seasonId !== undefined ? { seasonId: input.seasonId } : {}) }).where(eq(competitions.id, id));
+    await tx.execute(sql`select app.promote_waitlist(${id})`); // a higher limit fills from the queue
     return "ok";
   });
   if (done === "missing") return fail("We couldn’t find that competition.");

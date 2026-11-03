@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { competitionEntries, competitions, dues, games, matches, memberships, payments, plans, playerProfiles, ratings, users, type Tx } from "@rallix/db";
+import { competitionEntries, competitionWaitlist, competitions, dues, games, matches, memberships, payments, plans, playerProfiles, ratings, users, type Tx } from "@rallix/db";
 import { computeRecord, headToHead, type PlayedMatch } from "@rallix/stats";
 
 export type MemberView = {
@@ -143,7 +143,7 @@ export async function recentPayments(tx: Tx, clubId: string, limit = 8) {
     .where(and(eq(payments.clubId, clubId), eq(payments.status, "paid"))).orderBy(desc(payments.paidAt)).limit(limit);
 }
 
-export type CompetitionCard = typeof competitions.$inferSelect & { entries: number; registered: boolean };
+export type CompetitionCard = typeof competitions.$inferSelect & { entries: number; registered: boolean; waiting: boolean; faces: Array<{ id: string; name: string; photo: string | null }> };
 
 /** Every competition this player may see (row-level security hides hidden drafts), with the sign-up count and whether they are in it. */
 export async function listCompetitionsForPlayer(tx: Tx, clubId: string, me: string): Promise<CompetitionCard[]> {
@@ -151,7 +151,14 @@ export async function listCompetitionsForPlayer(tx: Tx, clubId: string, me: stri
   const counts = await entryCounts(tx, clubId);
   const mine = await tx.select({ id: competitionEntries.competitionId }).from(competitionEntries).where(eq(competitionEntries.membershipId, me));
   const inIt = new Set(mine.map((m) => m.id));
-  return rows.map((c) => ({ ...c, entries: counts[c.id] ?? 0, registered: inIt.has(c.id) }));
+  const queued = await tx.select({ id: competitionWaitlist.competitionId }).from(competitionWaitlist).where(eq(competitionWaitlist.membershipId, me));
+  const waitingIn = new Set(queued.map((m) => m.id));
+  // A few faces per open competition for the list rows (newest sign-ups last).
+  const open = rows.filter((c) => c.status === "draft" || c.status === "active").map((c) => c.id);
+  const faces = open.length ? await tx.select({ competitionId: competitionEntries.competitionId, id: memberships.id, name: users.name, photo: playerProfiles.photoUrl }).from(competitionEntries)
+    .innerJoin(memberships, eq(memberships.id, competitionEntries.membershipId)).innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(playerProfiles, eq(playerProfiles.membershipId, memberships.id)).where(inArray(competitionEntries.competitionId, open)).orderBy(asc(competitionEntries.createdAt)) : [];
+  return rows.map((c) => ({ ...c, entries: counts[c.id] ?? 0, registered: inIt.has(c.id), waiting: waitingIn.has(c.id), faces: faces.filter((f) => f.competitionId === c.id).slice(0, 3).map((f) => ({ id: f.id, name: f.name, photo: f.photo ?? null })) }));
 }
 
 export type Participant = { id: string; name: string; photo: string | null };
@@ -168,5 +175,6 @@ export async function getCompetitionPreview(tx: Tx, clubId: string, id: string, 
     .where(eq(competitionEntries.competitionId, id))
     .orderBy(asc(competitionEntries.createdAt));
   const [profile] = await tx.select({ level: playerProfiles.level }).from(playerProfiles).where(eq(playerProfiles.membershipId, me)).limit(1);
-  return { c, participants: people as Participant[], registered: people.some((p) => p.id === me), myLevel: profile?.level ?? null };
+  const queue = await tx.select({ id: competitionWaitlist.membershipId, at: competitionWaitlist.createdAt }).from(competitionWaitlist).where(eq(competitionWaitlist.competitionId, id));
+  return { c, participants: people as Participant[], registered: people.some((p) => p.id === me), waitlist: queue, myLevel: profile?.level ?? null };
 }

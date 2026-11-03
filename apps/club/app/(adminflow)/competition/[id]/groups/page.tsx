@@ -6,7 +6,7 @@ import { Entrants } from "../../../../../components/Entrants";
 import { RoundResults } from "../../../../../components/RoundResults";
 import { Podium, Standings } from "../../../../../components/CompetitionTables";
 import { listAwards, peopleOf, tablesFor } from "../../../../../lib/standings-queries";
-import { competitionEntries } from "@rallix/db";
+import { competitionEntries, competitionWaitlist } from "@rallix/db";
 import { asc, eq } from "drizzle-orm";
 import { can, canScore, inClub, requireScoringAccess } from "../../../../../lib/context";
 import { getCompetition, listMatches, listMembers } from "../../../../../lib/queries";
@@ -27,9 +27,12 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
     const drawn = c.format === "knockout" && c.drawMethod === "raffle" && !draft
       ? (await tx.select({ m: competitionEntries.membershipId, seed: competitionEntries.seed }).from(competitionEntries).where(eq(competitionEntries.competitionId, id)).orderBy(asc(competitionEntries.seed))) : [];
     const names = drawn.length ? await listMembers(tx, ctx.club.clubId) : [];
+    const queued = draft ? await tx.select({ m: competitionWaitlist.membershipId }).from(competitionWaitlist).where(eq(competitionWaitlist.competitionId, id)).orderBy(asc(competitionWaitlist.createdAt)) : [];
+    const everyone = queued.length ? await listMembers(tx, ctx.club.clubId) : [];
+    const waiters = queued.map((q) => everyone.find((m) => m.id === q.m)).filter((m): m is NonNullable<typeof m> => !!m).map((m) => ({ id: m.id, name: m.name, photo: m.photo }));
     const ms = await listMatches(tx, ctx.club.clubId, { competitionId: id });
     const awards = await listAwards(tx, id);
-    return { tables: tablesFor(ms, c.format, { win: c.pointsWin, loss: c.pointsLoss }, peopleOf(ms)), awards, draw: drawn.map((d) => ({ seed: d.seed, ...(names.find((n) => n.id === d.m) ?? { name: "Former member", photo: null }) })), c, ms, entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
+    return { waiters, tables: tablesFor(ms, c.format, { win: c.pointsWin, loss: c.pointsLoss }, peopleOf(ms)), awards, draw: drawn.map((d) => ({ seed: d.seed, ...(names.find((n) => n.id === d.m) ?? { name: "Former member", photo: null }) })), c, ms, entrants: roster.filter((m) => entrantIds.includes(m.id)).map(pick), others: roster.filter((m) => !entrantIds.includes(m.id)).map(pick) };
   });
   if (!data) notFound();
   const mayScore = canScore(ctx.club);
@@ -46,6 +49,13 @@ export default async function Groups({ params }: { params: Promise<{ id: string 
       ) : data.ms.length === 0 ? <EmptyState compact title="No matches yet" hint="Fixtures appear once the draw is made." /> : (
         <RoundResults matches={data.ms} hrefFor={(m) => (open(m) ? `/competition/${id}/score?match=${m.id}` : undefined)} actionFor={(m) => (open(m) ? "Score" : undefined)} />
       )}
+      {draft && data.waiters.length ? (
+        <>
+          <SectionTitle title={`Waitlist (${data.waiters.length})`} />
+          <ListGroup label="Waitlist">{data.waiters.map((w, i) => <ListRow key={w.id} media={<Photo src={w.photo} name={w.name} alt="" />} title={w.name} subtitle={i === 0 ? "Next in line" : undefined} trailing={`#${i + 1}`} />)}</ListGroup>
+          <p className="rx-muted" style={{ margin: "8px 0 0" }}>When a spot opens, or you raise the limit, the first in line is added automatically.</p>
+        </>
+      ) : null}
       {!draft ? <Podium awards={data.awards} /> : null}
       {!draft ? <Standings tables={data.tables} /> : null}
       {data.draw.length ? (

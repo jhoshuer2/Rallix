@@ -4,7 +4,7 @@ import { ClubHeader } from "../../../../components/ClubHeader";
 import { inClub, requireClub } from "../../../../lib/context";
 import { listCompetitionsForPlayer } from "../../../../lib/queries";
 import { listMyChallenges, needsMe } from "../../../../lib/friendly-queries";
-import { spotsLabel } from "@rallix/stats";
+import { spotsLabel, spotsLeftLabel } from "@rallix/stats";
 import { CompeteList } from "./CompeteList";
 
 const short = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short" }) : "");
@@ -18,7 +18,7 @@ export default async function Compete() {
     <PageShell flat header={<ClubHeader />} title="Compete">
       <ListGroup label="Friendlies and calendar"><ListRow title="Calendar" subtitle="Playing times, events and closures" href="/play/calendar" linkAs={Link} /><ListRow title="Friendlies" subtitle={waiting ? `${waiting} need${waiting === 1 ? "s" : ""} you` : friendlies.length ? "Your matches with other members" : "Challenge another member"} href="/play/friendlies" linkAs={Link} /></ListGroup>
       <div style={{ height: 16 }} />
-      <CompeteList rows={comps.map((c) => ({ id: c.id, name: c.name, level: c.level, tab: tab(c.status) as "Active" | "Upcoming" | "Past", dates: c.startsOn && c.endsOn ? `${short(c.startsOn)} – ${short(c.endsOn)}` : c.startsOn ? `From ${short(c.startsOn)}` : "Dates to be set", cover: c.coverUrl, registered: c.registered, open: c.status === "draft", spots: c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : null }))} />
+      <CompeteList rows={comps.map((c) => ({ id: c.id, name: c.name, level: c.level, tab: tab(c.status) as "Active" | "Upcoming" | "Past", dates: c.startsOn && c.endsOn ? `${short(c.startsOn)} – ${short(c.endsOn)}` : c.startsOn ? `From ${short(c.startsOn)}` : "Dates to be set", cover: c.coverUrl, registered: c.registered, waiting: c.waiting, left: spotsLeftLabel(c.entries, c.maxPlayers), faces: c.faces, open: c.status === "draft", spots: c.status === "draft" ? spotsLabel(c.entries, c.maxPlayers) : null }))} />
     </PageShell>
   );
 }

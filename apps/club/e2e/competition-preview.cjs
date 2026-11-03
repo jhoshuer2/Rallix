@@ -63,13 +63,13 @@ const stateOf=id=>sql(`select status||','||open_registration||','||coalesce(max_
   ok(/Starts in \d+d/.test(t),'the start date has a live countdown');
   ok(/Trophy and ₦50,000/.test(t)&&/Prize/.test(t),'the prize row is shown');
   ok(/0 of 2 spots/.test(t)&&/Sign-up closes/.test(t),'spots and the closing date are shown');
-  ok(await ade.getByRole('button',{name:'Join competition'}).isVisible(),'one main button: Join competition');
+  ok(await ade.getByRole('button',{name:'Join',exact:true}).isVisible(),'one main button: Join');
   ok((await ade.getByRole('button',{name:/Join|Registered|Leave/}).count())===1,'only one action is visible before joining');
   await ade.getByRole('button',{name:/Rules/}).click();const dlg=ade.locator('dialog[open]');await dlg.waitFor();
   ok(/Matches start on time/.test(await dlg.innerText()),'Rules open in a sheet');
   const head0=await dlg.locator('.rx-sheetdlg__head').boundingBox();await dlg.locator('.rx-sheetdlg__body').evaluate(e=>e.scrollTop=50);const head1=await dlg.locator('.rx-sheetdlg__head').boundingBox();ok(head0.y===head1.y,'the rules sheet header stays fixed');
   await ade.keyboard.press('Escape');
-  await ade.getByRole('button',{name:'Join competition'}).click();await ade.getByText('Registered ✓').waitFor({timeout:15000});
+  await ade.getByRole('button',{name:'Join',exact:true}).click();await ade.getByText('Registered ✓').waitFor({timeout:15000});
   ok(sql(`select count(*) from competition_entries where competition_id='${id}'`)==='1','Ade joined: one entry');
   ok(/1 of 2 spots/.test(await text(ade)),'the count updates to 1 of 2 spots');
   ok(await ade.getByRole('button',{name:'Leave competition'}).isVisible(),'a quiet Leave action appears once registered');
@@ -78,14 +78,14 @@ const stateOf=id=>sql(`select status||','||open_registration||','||coalesce(max_
   await ade.screenshot({path:SC+'/preview_player.png',fullPage:true});
 
   const pastor=await who(b,'pastor@example.com');await pastor.goto(B+'/play/compete/'+id);
-  await pastor.getByRole('button',{name:'Join competition'}).click();await pastor.getByText('Registered ✓').waitFor({timeout:15000});
+  await pastor.getByRole('button',{name:'Join',exact:true}).click();await pastor.getByText('Registered ✓').waitFor({timeout:15000});
   ok(/2 of 2 spots/.test(await text(pastor)),'the second player fills the last spot');
   const jide=await who(b,'jide@example.com');await jide.goto(B+'/play/compete/'+id);
-  ok(await jide.getByRole('button',{name:'Full'}).isDisabled()&&(await jide.getByRole('button',{name:'Join competition'}).count())===0,'a third player sees Full and cannot join');
+  ok(await jide.getByRole('button',{name:'Join waitlist'}).isVisible()&&(await jide.getByRole('button',{name:'Join',exact:true}).count())===0,'a third player is offered the waitlist and cannot take a spot');
   // Ade leaves, Jide takes the spot
-  await ade.getByRole('button',{name:'Leave competition'}).click();await ade.getByRole('button',{name:'Join competition'}).waitFor({timeout:15000});
+  await ade.getByRole('button',{name:'Leave competition'}).click();await ade.getByRole('button',{name:'Join',exact:true}).waitFor({timeout:15000});
   ok(sql(`select count(*) from competition_entries where competition_id='${id}'`)==='1','leaving frees the spot');
-  await jide.reload();await jide.getByRole('button',{name:'Join competition'}).click();await jide.getByText('Registered ✓').waitFor({timeout:15000});
+  await jide.reload();await jide.getByRole('button',{name:'Join',exact:true}).click();await jide.getByText('Registered ✓').waitFor({timeout:15000});
   ok(sql(`select count(*) from competition_entries where competition_id='${id}'`)==='2','the freed spot can be taken');
 
   // ---------- Hidden draft ----------
@@ -114,7 +114,7 @@ const stateOf=id=>sql(`select status||','||open_registration||','||coalesce(max_
   ok(/Running/i.test(t)&&/Fixtures and results/i.test(t),'a player sees Running and the fixtures');
   ok(/Pastor|Sule/.test(t),'the fixture names the players');
   const dave=await who(b,'dorathy@example.com');await dave.goto(B+'/play/compete/'+id);
-  ok((await dave.getByRole('button',{name:'Join competition'}).count())===0,'nobody can join once it has started');
+  ok((await dave.getByRole('button',{name:'Join',exact:true}).count())===0,'nobody can join once it has started');
   // ---------- Level rule ----------
   const lvl=sql(`insert into competitions (club_id,name,format,status,open_registration,level) values ('${club}','Seniors Only','group_stage','draft',true,'senior') returning id`).split('\n')[0];
   sql(`update player_profiles set level='junior' where membership_id=(select m.id from memberships m join users u on u.id=m.user_id where u.email='ade@example.com' and m.club_id='${club}')`);

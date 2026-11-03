@@ -92,11 +92,11 @@ export function ResultCard({ a, b, scoreA, scoreB, winner, competition, when, hr
 }
 
 /** MediaCard: a wide picture (placeholder until uploaded), a title and one detail. Used for competitions and anything with a cover. */
-export function MediaCard({ name, detail, cover, href, linkAs: L = "a", tag, className }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string; className?: string }) {
+export function MediaCard({ name, detail, cover, href, linkAs: L = "a", tag, className, foot }: { name: string; detail: string; cover?: string | null; href: string; linkAs?: ElementType; tag?: string; className?: string; /** Optional last line, for example faces and "3 spots left". */ foot?: ReactNode }) {
   return (
     <L href={href} className={cx("rx-ccard", className)}>
       <div className="rx-ccard__cover"><Photo src={cover} name={name} kind="cover" alt="" className="rx-ccard__img" />{tag ? <span className="rx-ccard__tag">{tag}</span> : null}</div>
-      <div className="rx-cardtext"><p className="rx-rcard__title">{name}</p><p className="rx-rcard__sub">{detail}</p></div>
+      <div className="rx-cardtext"><p className="rx-rcard__title">{name}</p><p className="rx-rcard__sub">{detail}</p>{foot ? <div className="rx-ccard__foot">{foot}</div> : null}</div>
     </L>
   );
 }
@@ -411,5 +411,27 @@ export function Checklist({ title, steps, linkAs: L = "a" }: { title: string; st
         ))}
       </ListGroup>
     </Panel>
+  );
+}
+
+/* ---------- Spots and faces, and the sticky action bar ---------- */
+/** "3 spots left" in the accent colour, with a few faces. Decorative faces: the text carries the meaning. */
+export function SpotsFaces({ left, faces }: { left: string | null; faces: Array<{ id: string; name: string; photo: string | null }> }) {
+  if (!left && faces.length === 0) return null;
+  return (
+    <span className="rx-spotsfaces">
+      {faces.length ? <span className="rx-avstack rx-avstack--sm" aria-hidden="true">{faces.map((f) => <Photo key={f.id} src={f.photo} name={f.name} alt="" />)}</span> : null}
+      {left ? <span className={left === "Full" ? "rx-spotsleft rx-spotsleft--full" : "rx-spotsleft"}>{left}</span> : null}
+    </span>
+  );
+}
+
+/** The one main action of a page, fixed to the bottom of the screen. The page keeps its own space (spacer) so nothing hides behind it. */
+export function StickyBar({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <>
+      <div className="rx-stickybar__spacer" aria-hidden="true" />
+      <div className="rx-stickybar" role="region" aria-label={label}>{children}</div>
+    </>
   );
 }
