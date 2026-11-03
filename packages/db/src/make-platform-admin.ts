@@ -5,6 +5,7 @@ import { platformAdmins, users } from "./schema";
 /**
  * Grant platform-console access. Usage: pnpm --filter @rallix/db make-platform-admin you@example.com "Full Name"
  * Creates the account if it doesn't exist (email marked verified: you are vouching for it by running this).
+ * They become an OWNER (full access, including the team page). Owners then add everyone else with a narrower role in the console.
  * They sign in to the console with an emailed code.
  */
 async function main() {
@@ -19,8 +20,8 @@ async function main() {
       [u] = await db.insert(users).values({ id: crypto.randomUUID(), name, email, emailVerified: true }).returning();
       console.log(`created account for ${name}`);
     }
-    await db.insert(platformAdmins).values({ userId: u!.id }).onConflictDoNothing();
-    console.log(`${u!.name} (${email}) can now sign in to the console with an emailed code`);
+    await db.insert(platformAdmins).values({ userId: u!.id, role: "owner" }).onConflictDoUpdate({ target: platformAdmins.userId, set: { role: "owner" } });
+    console.log(`${u!.name} (${email}) is now a platform OWNER and can sign in to the console with an emailed code`);
   } finally { await db.pool.end(); }
 }
 main().catch((e) => { console.error(e); process.exit(1); });

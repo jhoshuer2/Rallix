@@ -112,3 +112,20 @@ export async function deliverNotification(id: string, limit = 100): Promise<{ se
     status = ${done ? (t!.sent === 0 && t!.failed > 0 ? "failed" : "sent") : "queued"}::notification_status, sent_at = case when ${done} then coalesce(sent_at, now()) else sent_at end where id = ${id}`);
   return { sent, failed, remaining: t!.pending };
 }
+
+/** Email a staff reply to whoever sent a support request from the club app. Operational mail, so it is sent even if they opted out of announcements. */
+export async function sendSupportReply(issueId: string, reply: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [i] = await rows<{ title: string; email: string | null; name: string | null; club_name: string | null }>(sql`select i.title, u.email, u.name, c.name as club_name from issues i left join users u on u.id = i.reported_by left join clubs c on c.id = i.club_id where i.id = ${issueId} and i.source = 'club'`);
+  if (!i) return { ok: false, error: "This request did not come from a club member." };
+  if (!i.email) return { ok: false, error: "The person who sent it no longer has an account." };
+  const one = (v: string) => v.replace(/[\r\n]+/g, " ").trim();
+  try {
+    const m = compose({ subject: "Re: {{title}}", body: "Hello {{name}},\n\n{{reply}}\n\nRallix support", vars: { title: one(i.title), name: one(i.name ?? "there"), reply: reply.trim() }, footer: `You are receiving this because you contacted Rallix support${i.club_name ? ` from ${one(i.club_name)}` : ""}. Reply to this email to continue.` });
+    const r = await mailer().send({ to: i.email, subject: m.subject, text: m.text, html: m.html });
+    await logEmail({ to: i.email, kind: "support", ok: r.ok, error: r.ok ? undefined : r.error, relatedId: issueId });
+    return r.ok ? { ok: true } : { ok: false, error: "The email could not be sent. Try again." };
+  } catch (e) {
+    await logEmail({ to: i.email, kind: "support", ok: false, error: (e as Error).message, relatedId: issueId });
+    return { ok: false, error: "The email could not be sent. Try again." };
+  }
+}

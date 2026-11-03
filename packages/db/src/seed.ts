@@ -63,7 +63,7 @@ export async function seed(db: Db) {
 
   // ----- Platform console data -----
   await db.insert(s.users).values({ id: "u_platform", name: "Platform Owner", email: "owner@rallix.app", phoneNumber: "+2348030000200", phoneNumberVerified: false }).onConflictDoNothing();
-  await db.insert(s.platformAdmins).values({ userId: "u_platform" }).onConflictDoNothing();
+  await db.insert(s.platformAdmins).values({ userId: "u_platform", role: "owner" }).onConflictDoNothing();
   await db.insert(s.clubSubscriptions).values([
     { clubId: paris.id, period: "monthly", status: "active", amountKobo: 2000000, currentPeriodEnd: new Date(Date.now() + 20 * 86400000) },
     { clubId: lagos.id, period: "monthly", status: "past_due", amountKobo: 2000000, currentPeriodEnd: new Date(Date.now() - 5 * 86400000) },

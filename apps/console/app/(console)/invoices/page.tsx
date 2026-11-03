@@ -1,3 +1,4 @@
+import { requireAdmin } from "../../../lib/guard";
 import Link from "next/link";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { NewInvoiceForm } from "../../../components/Forms";
@@ -7,6 +8,7 @@ import { clubOptions, listInvoices } from "../../../lib/queries";
 const tabs = [["", "All"], ["draft", "Draft"], ["issued", "Issued"], ["paid", "Paid"], ["void", "Void"]] as const;
 
 export default async function Invoices({ searchParams }: { searchParams: Promise<{ status?: string; new?: string }> }) {
+  await requireAdmin("billing");
   const sp = await searchParams;
   const [rows, clubs] = await Promise.all([listInvoices(sp.status), clubOptions()]);
   return (

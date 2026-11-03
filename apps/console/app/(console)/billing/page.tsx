@@ -1,3 +1,4 @@
+import { requireAdmin } from "../../../lib/guard";
 import Link from "next/link";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { NewSubscriptionForm, RunButton } from "../../../components/Forms";
@@ -6,6 +7,7 @@ import { clubsWithoutSubscription, listSubscriptions } from "../../../lib/querie
 import { generateInvoices, setSubscriptionStatus } from "../../../lib/actions";
 
 export default async function Billing() {
+  await requireAdmin("billing");
   const [subs, without] = await Promise.all([listSubscriptions(), clubsWithoutSubscription()]);
   const mrr = subs.filter((s) => s.status === "active").reduce((a, s) => a + (s.period === "monthly" ? s.amount_kobo : s.amount_kobo / 12), 0);
   return (

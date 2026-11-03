@@ -1,3 +1,4 @@
+import { requireAdmin } from "../../../lib/guard";
 import { Badge, Empty, Kpi, PageHead } from "../../../components/ui";
 import { dateTime, naira } from "../../../lib/format";
 import Link from "next/link";
@@ -16,6 +17,7 @@ const hint: Record<string, string> = {
 };
 
 export default async function Payments() {
+  await requireAdmin("billing");
   const [events, s, stuck, rem] = await Promise.all([paymentEvents(), paymentsSummary(), paidButSuspended(), reminderStats()]);
   const attention = events.filter((e) => ATTENTION.includes(e.outcome) && e.event !== "return.verify");
   return (

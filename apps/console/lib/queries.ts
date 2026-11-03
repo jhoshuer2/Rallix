@@ -114,22 +114,24 @@ export async function getInvoice(id: string) {
 export const listTemplates = () => q<{ id: string; key: string; kind: string; name: string; subject: string | null; body: string; updated_at: Date }>(sql`select id, key, kind, name, subject, body, updated_at from templates order by kind, name`);
 export const getSettings = () => one<{ company_name: string; address: string; email: string; phone: string; invoice_prefix: string; invoice_next: number; vat_percent: number; footer_note: string; payment_instructions: string }>(sql`select * from platform_settings where id = 1`);
 
-export async function listIssues(f: { status?: string; severity?: string }) {
+export async function listIssues(f: { status?: string; severity?: string; source?: string }) {
+  const source = f.source === "club" ? "club" : f.source === "staff" ? "staff" : null;
   const status = f.status === "all" ? null : f.status === "closed" ? "closed" : ["open", "investigating", "resolved"].includes(f.status ?? "") ? f.status! : "active";
   const sev = ["low", "normal", "high", "critical"].includes(f.severity ?? "") ? f.severity! : null;
-  return q<{ id: string; title: string; severity: string; status: string; club_name: string | null; assignee: string | null; created_at: Date; updated_at: Date }>(
-    sql`select i.id, i.title, i.severity, i.status, c.name as club_name, a.name as assignee, i.created_at, i.updated_at
+  return q<{ id: string; title: string; severity: string; status: string; club_name: string | null; assignee: string | null; source: string; created_at: Date; updated_at: Date }>(
+    sql`select i.id, i.title, i.severity, i.status, i.source, c.name as club_name, a.name as assignee, i.created_at, i.updated_at
         from issues i left join clubs c on c.id = i.club_id left join users a on a.id = i.assigned_to
         where (${status}::text is null or (${status} = 'active' and i.status in ('open','investigating')) or i.status::text = ${status})
           and (${sev}::text is null or i.severity::text = ${sev})
+          and (${source}::text is null or i.source = ${source})
         order by (i.status in ('open','investigating')) desc, case i.severity when 'critical' then 0 when 'high' then 1 when 'normal' then 2 else 3 end, i.created_at desc limit 300`);
 }
 export async function getIssue(id: string) {
-  const issue = await one<{ id: string; title: string; body: string | null; severity: string; status: string; club_id: string | null; club_name: string | null; reporter: string | null; assigned_to: string | null; created_at: Date; resolved_at: Date | null }>(
-    sql`select i.id, i.title, i.body, i.severity, i.status, i.club_id, c.name as club_name, r.name as reporter, i.assigned_to, i.created_at, i.resolved_at
+  const issue = await one<{ id: string; title: string; body: string | null; severity: string; status: string; club_id: string | null; club_name: string | null; reporter: string | null; source: string; assigned_to: string | null; created_at: Date; resolved_at: Date | null }>(
+    sql`select i.id, i.title, i.body, i.severity, i.status, i.club_id, c.name as club_name, r.name as reporter, i.source, i.assigned_to, i.created_at, i.resolved_at
         from issues i left join clubs c on c.id = i.club_id left join users r on r.id = i.reported_by where i.id = ${id}`);
   if (!issue) return null;
-  const notes = await q<{ id: string; body: string; author: string | null; created_at: Date }>(sql`select n.id, n.body, u.name as author, n.created_at from issue_notes n left join users u on u.id = n.author_id where n.issue_id = ${id} order by n.created_at`);
+  const notes = await q<{ id: string; body: string; author: string | null; emailed_at: Date | null; created_at: Date }>(sql`select n.id, n.body, u.name as author, n.emailed_at, n.created_at from issue_notes n left join users u on u.id = n.author_id where n.issue_id = ${id} order by n.created_at`);
   return { issue, notes };
 }
 
@@ -146,7 +148,7 @@ export async function listAudit(f: { action?: string }) {
   return q<{ id: string; actor: string | null; action: string; entity: string | null; entity_id: string | null; meta: unknown; at: Date }>(
     sql`select l.id, u.name as actor, l.action, l.entity, l.entity_id, l.meta, l.at from audit_log l left join users u on u.id = l.actor_id where (${a}::text is null or l.action ilike ${a}) order by l.at desc limit 200`);
 }
-export const listTeam = () => q<{ user_id: string; name: string; email: string; created_at: Date }>(sql`select a.user_id, u.name, u.email, a.created_at from platform_admins a join users u on u.id = a.user_id order by u.name`);
+export const listTeam = () => q<{ user_id: string; name: string; email: string; role: string; created_at: Date }>(sql`select a.user_id, u.name, u.email, a.role, a.created_at from platform_admins a join users u on u.id = a.user_id order by u.name`);
 
 /** Distinct people a broadcast would reach. Only active members of active clubs. */
 export async function audienceCount(a: { type: "all_admins" | "all_players" | "clubs"; clubIds?: string[] }) {

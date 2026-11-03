@@ -1,3 +1,5 @@
+import { staffCan } from "@rallix/config/staff";
+import { requireAdmin } from "../../../../lib/guard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Empty, Kpi, PageHead } from "../../../../components/ui";
@@ -6,6 +8,7 @@ import { ago, date, naira, uuid } from "../../../../lib/format";
 import { getClub, health } from "../../../../lib/queries";
 
 export default async function ClubDetail({ params }: { params: Promise<{ id: string }> }) {
+  const staff = await requireAdmin("clubs");
   const { id } = await params;
   if (!uuid.test(id)) notFound();
   const d = await getClub(id);
@@ -33,7 +36,7 @@ export default async function ClubDetail({ params }: { params: Promise<{ id: str
         <section className="cs-card">
           <h2 className="cs-h2" style={{ marginTop: 0 }}>Access</h2>
           <p className="cs-muted">Status: <Badge tone={c.status === "active" ? "ok" : "bad"}>{c.status}</Badge></p>
-          <ClubStatusForm clubId={c.id} status={c.status} />
+          {staffCan(staff.role, "clubs_manage") ? <ClubStatusForm clubId={c.id} status={c.status} /> : <p className="cs-muted">Your role can look at this club but not change its status.</p>}
         </section>
       </div>
       <h2 className="cs-h2">Subscription</h2>

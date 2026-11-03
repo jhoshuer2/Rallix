@@ -1,9 +1,11 @@
+import { requireAdmin } from "../../../lib/guard";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { NotificationForm, NotificationProgress } from "../../../components/Forms";
 import { dateTime } from "../../../lib/format";
 import { clubOptions, listNotifications } from "../../../lib/queries";
 
 export default async function Notifications() {
+  await requireAdmin("notifications");
   const [clubs, history] = await Promise.all([clubOptions(), listNotifications()]);
   const names = new Map(clubs.map((c) => [c.id, c.name]));
   const audience = (a: { type?: string; clubIds?: string[] }) => a.type === "all_admins" ? "All club admins" : a.type === "all_players" ? "All players" : `Clubs: ${(a.clubIds ?? []).map((i) => names.get(i) ?? "?").join(", ")}`;

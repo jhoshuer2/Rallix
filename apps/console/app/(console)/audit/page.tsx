@@ -1,9 +1,11 @@
+import { requireAdmin } from "../../../lib/guard";
 import Link from "next/link";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { dateTime } from "../../../lib/format";
 import { listAudit } from "../../../lib/queries";
 
 export default async function Audit({ searchParams }: { searchParams: Promise<{ action?: string }> }) {
+  await requireAdmin("audit");
   const sp = await searchParams;
   const rows = await listAudit(sp);
   return (

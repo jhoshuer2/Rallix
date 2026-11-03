@@ -1,3 +1,4 @@
+import { requireAdmin } from "../../../../lib/guard";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, PageHead } from "../../../../components/ui";
@@ -10,6 +11,7 @@ import { db } from "../../../../lib/db";
 import { sql } from "drizzle-orm";
 
 export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ emailed?: string; failed?: string }> }) {
+  await requireAdmin("billing");
   const { id } = await params;
   const sp = await searchParams;
   if (!uuid.test(id)) notFound();

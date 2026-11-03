@@ -1,3 +1,4 @@
+import { requireAdmin } from "../../../lib/guard";
 import { PageHead } from "../../../components/ui";
 import { SettingsForm, TemplateForm } from "../../../components/Forms";
 import { getSettings, listTemplates } from "../../../lib/queries";
@@ -7,6 +8,7 @@ const sample: Record<string, string> = { admin_name: "Innocent", player_name: "A
 const render = (t: string) => t.replace(/\{\{(\w+)\}\}/g, (_, k: string) => sample[k] ?? `{{${k}}}`);
 
 export default async function Templates() {
+  await requireAdmin("templates");
   const [templates, s] = await Promise.all([listTemplates(), getSettings()]);
   return (
     <>

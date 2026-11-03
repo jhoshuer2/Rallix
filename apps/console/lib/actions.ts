@@ -7,7 +7,8 @@ import { requireAdmin } from "./guard";
 import { audienceCount } from "./queries";
 import { uuid } from "./format";
 import { clubAppUrl, newPayToken, payLinkUrl } from "./pay-link";
-import { createDeliveries, deliverNotification, sendInvoiceEmails } from "./email-core";
+import { createDeliveries, deliverNotification, sendInvoiceEmails, sendSupportReply } from "./email-core";
+import { isStaffRole } from "@rallix/config/staff";
 import { PLACEHOLDERS } from "./placeholders";
 import { placeholdersIn } from "@rallix/mailer";
 
@@ -19,12 +20,13 @@ const pgCode = (e: unknown) => (e as { cause?: { code?: string }; code?: string 
 async function audit(actor: string, action: string, entity: string, entityId: string | null, meta: Record<string, unknown> = {}) {
   await db().execute(sql`insert into audit_log (actor_id, action, entity, entity_id, meta) values (${actor}, ${action}, ${entity}, ${entityId}, ${JSON.stringify(meta)}::jsonb)`);
 }
+const uuidLike = (v: string) => uuid.test(v);
 const nairaToKobo = (n: number) => Math.round(n * 100);
 const validMoney = (k: number) => Number.isFinite(k) && k >= 0 && k <= 100_000_000_00;
 
 /* ---------- Clubs ---------- */
 export async function setClubStatus(clubId: string, status: "active" | "suspended" | "closed", reason: string, reasonType: "non_payment" | "other" = "other"): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("clubs_manage");
   if (!uuid.test(clubId) || !["active", "suspended", "closed"].includes(status) || !["non_payment", "other"].includes(reasonType)) return fail("Invalid request.");
   if (status !== "active" && reason.trim().length < 3) return fail("Give a short reason. It is recorded in the audit log.");
   // The reason type decides whether paying an overdue invoice brings the club back automatically. Only a non-payment suspension does.
@@ -38,7 +40,7 @@ export async function setClubStatus(clubId: string, status: "active" | "suspende
 
 /* ---------- Billing ---------- */
 export async function createSubscription(input: { clubId: string; period: "monthly" | "yearly"; naira: number }): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   const kobo = nairaToKobo(input.naira);
   if (!uuid.test(input.clubId) || !["monthly", "yearly"].includes(input.period) || !validMoney(kobo)) return fail("Check the club, period and amount.");
   const end = new Date(); if (input.period === "monthly") end.setMonth(end.getMonth() + 1); else end.setFullYear(end.getFullYear() + 1);
@@ -48,7 +50,7 @@ export async function createSubscription(input: { clubId: string; period: "month
   return { ok: true };
 }
 export async function setSubscriptionStatus(id: string, status: "trialing" | "active" | "past_due" | "cancelled"): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(id) || !["trialing", "active", "past_due", "cancelled"].includes(status)) return fail("Invalid request.");
   await db().execute(sql`update club_subscriptions set status = ${status}::subscription_status where id = ${id}`);
   await audit(staff.id, "subscription.status", "club_subscription", id, { status });
@@ -57,7 +59,7 @@ export async function setSubscriptionStatus(id: string, status: "trialing" | "ac
 }
 
 export async function createInvoice(input: { clubId: string; periodLabel: string; naira: number; description: string; issueNow: boolean; emailNow?: boolean }): Promise<Res<{ id: string; emailed?: { sent: number; failed: number } | { error: string } }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   const kobo = nairaToKobo(input.naira);
   if (!uuid.test(input.clubId) || !validMoney(kobo) || input.periodLabel.trim().length < 3) return fail("Check the club, period label and amount.");
   try {
@@ -80,7 +82,7 @@ export async function createInvoice(input: { clubId: string; periodLabel: string
   }
 }
 export async function setInvoiceStatus(id: string, status: "issued" | "paid" | "void", paymentRef?: string): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(id) || !["issued", "paid", "void"].includes(status)) return fail("Invalid request.");
   if (status === "paid" && (paymentRef ?? "").trim().length < 2) return fail("Enter the payment reference (bank transfer or Paystack reference).");
   const r = await db().execute(sql`update platform_invoices set status = ${status}::invoice_status,
@@ -97,7 +99,7 @@ export async function setInvoiceStatus(id: string, status: "issued" | "paid" | "
 }
 /** One invoice per active subscription for the period. Monthly subs get YYYY-MM, yearly subs get YYYY. Safe to run twice. */
 export async function generateInvoices(): Promise<Res<{ created: number }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   const now = new Date();
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`, year = String(now.getFullYear());
   const subs = (await db().execute(sql`select s.club_id, s.period, s.amount_kobo from club_subscriptions s join clubs c on c.id = s.club_id where s.status = 'active' and c.status = 'active'`)).rows as Array<{ club_id: string; period: string; amount_kobo: number }>;
@@ -116,7 +118,7 @@ export async function generateInvoices(): Promise<Res<{ created: number }>> {
 
 /* ---------- Templates and settings ---------- */
 export async function saveTemplate(input: { id: string; subject: string; body: string }): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("templates");
   if (!uuid.test(input.id) || input.body.trim().length < 5 || input.body.length > 2000) return fail("The message body must be 5 to 2,000 characters.");
   const found = (await db().execute(sql`select key from templates where id = ${input.id}`)).rows[0] as { key: string } | undefined;
   if (!found) return fail("Template not found.");
@@ -131,7 +133,7 @@ export async function saveTemplate(input: { id: string; subject: string; body: s
   return { ok: true };
 }
 export async function saveSettings(input: { companyName: string; address: string; email: string; phone: string; invoicePrefix: string; vatPercent: number; footerNote: string; paymentInstructions: string }): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (input.companyName.trim().length < 2) return fail("Enter the company name.");
   if (!/^[A-Z0-9]{2,6}$/.test(input.invoicePrefix)) return fail("The invoice prefix must be 2 to 6 capital letters or digits.");
   if (!Number.isInteger(input.vatPercent) || input.vatPercent < 0 || input.vatPercent > 100) return fail("VAT must be a whole number from 0 to 100.");
@@ -144,7 +146,7 @@ export async function saveSettings(input: { companyName: string; address: string
 
 /* ---------- Notifications ---------- */
 export async function sendNotification(input: { title: string; body: string; channel: "push" | "email" | "sms" | "whatsapp"; audience: "all_admins" | "all_players" | "clubs"; clubIds: string[] }): Promise<Res<{ recipients: number; sent?: number; failed?: number; remaining?: number }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("notifications");
   if (input.title.trim().length < 3 || input.body.trim().length < 5) return fail("Add a title and a message.");
   if (!["push", "email", "sms", "whatsapp"].includes(input.channel) || !["all_admins", "all_players", "clubs"].includes(input.audience)) return fail("Invalid request.");
   if (/[\r\n]/.test(input.title)) return fail("The title must be a single line.");
@@ -167,7 +169,7 @@ export async function sendNotification(input: { title: string; body: string; cha
 
 /* ---------- Issues ---------- */
 export async function createIssue(input: { title: string; body: string; severity: "low" | "normal" | "high" | "critical"; clubId: string | null }): Promise<Res<{ id: string }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("support");
   if (input.title.trim().length < 3) return fail("Give the issue a title.");
   if (!["low", "normal", "high", "critical"].includes(input.severity) || (input.clubId && !uuid.test(input.clubId))) return fail("Invalid request.");
   const r = await db().execute(sql`insert into issues (title, body, severity, club_id, reported_by, assigned_to) values (${input.title.trim()}, ${input.body.trim() || null}, ${input.severity}::issue_severity, ${input.clubId}, ${staff.id}, ${staff.id}) returning id`);
@@ -177,7 +179,7 @@ export async function createIssue(input: { title: string; body: string; severity
   return { ok: true, id };
 }
 export async function updateIssue(id: string, patch: { status?: "open" | "investigating" | "resolved" | "closed"; severity?: "low" | "normal" | "high" | "critical"; assignToMe?: boolean }): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("support");
   if (!uuid.test(id)) return fail("Invalid request.");
   if (patch.status && !["open", "investigating", "resolved", "closed"].includes(patch.status)) return fail("Invalid status.");
   if (patch.severity && !["low", "normal", "high", "critical"].includes(patch.severity)) return fail("Invalid severity.");
@@ -189,7 +191,7 @@ export async function updateIssue(id: string, patch: { status?: "open" | "invest
   return { ok: true };
 }
 export async function addIssueNote(id: string, body: string): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("support");
   if (!uuid.test(id) || body.trim().length < 2) return fail("Write a note first.");
   await db().execute(sql`insert into issue_notes (issue_id, author_id, body) values (${id}, ${staff.id}, ${body.trim()})`);
   await db().execute(sql`update issues set updated_at = now() where id = ${id}`);
@@ -198,24 +200,61 @@ export async function addIssueNote(id: string, body: string): Promise<Res> {
   return { ok: true };
 }
 
+/* ---------- Support replies ---------- */
+/** Reply to a request sent from the club app: emailed to the person who sent it, and kept as a note. */
+export async function replyToIssue(id: string, body: string): Promise<Res> {
+  const staff = await requireAdmin("support");
+  const text = String(body ?? "").trim();
+  if (!uuid.test(id)) return fail("Invalid request.");
+  if (text.length < 2 || text.length > 4000) return fail("Write a reply (up to 4,000 characters).");
+  const sent = await sendSupportReply(id, text);
+  if (!sent.ok) return fail(sent.error);
+  await db().execute(sql`insert into issue_notes (issue_id, author_id, body, emailed_at) values (${id}, ${staff.id}, ${text}, now())`);
+  await db().execute(sql`update issues set updated_at = now(), status = case when status = 'open' then 'investigating'::issue_status else status end where id = ${id}`);
+  await audit(staff.id, "issue.reply", "issue", id);
+  revalidatePath(`/issues/${id}`);
+  return { ok: true };
+}
+
 /* ---------- Team ---------- */
-export async function addTeamMember(emailInput: string): Promise<Res> {
-  const staff = await requireAdmin();
+const ownerMessage = "There must always be at least one owner.";
+export async function addTeamMember(emailInput: string, role: string = "support"): Promise<Res> {
+  const staff = await requireAdmin("team");
   const email = emailInput.trim().toLowerCase();
   if (!isEmail(email)) return fail("Enter a valid email address.");
+  if (!isStaffRole(role)) return fail("Choose a role.");
   const u = (await db().execute(sql`select id, name from users where lower(email) = ${email}`)).rows[0] as { id: string; name: string } | undefined;
   if (!u) return fail("No account has that email yet. They need to sign in to the Rallix club app once first, then you can add them.");
-  await db().execute(sql`insert into platform_admins (user_id) values (${u.id}) on conflict do nothing`);
-  await audit(staff.id, "team.add", "user", u.id, { name: u.name });
+  await db().execute(sql`insert into platform_admins (user_id, role) values (${u.id}, ${role}) on conflict do nothing`);
+  await audit(staff.id, "team.add", "user", u.id, { name: u.name, role });
+  revalidatePath("/team");
+  return { ok: true };
+}
+/** Change someone's role. Only owners reach this; the database refuses to demote the last owner. */
+export async function setTeamRole(userId: string, role: string): Promise<Res> {
+  const staff = await requireAdmin("team");
+  if (!uuidLike(userId) || !isStaffRole(role)) return fail("Invalid request.");
+  try {
+    const r = await db().execute(sql`update platform_admins set role = ${role} where user_id = ${userId} returning user_id`);
+    if (!r.rows.length) return fail("That person is not on the team.");
+  } catch (e) {
+    if (pgCode(e) === "23514") return fail(ownerMessage);
+    throw e;
+  }
+  await audit(staff.id, "team.role", "user", userId, { role });
   revalidatePath("/team");
   return { ok: true };
 }
 export async function removeTeamMember(userId: string): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("team");
   if (userId === staff.id) return fail("You can’t remove yourself.");
-  const left = Number(((await db().execute(sql`select count(*)::int as n from platform_admins`)).rows[0] as { n: number }).n);
-  if (left <= 1) return fail("The last platform admin can’t be removed.");
-  await db().execute(sql`delete from platform_admins where user_id = ${userId}`);
+  try {
+    const r = await db().execute(sql`delete from platform_admins where user_id = ${userId} returning user_id`);
+    if (!r.rows.length) return fail("That person is not on the team.");
+  } catch (e) {
+    if (pgCode(e) === "23514") return fail(ownerMessage);
+    throw e;
+  }
   // Existing sessions are left alone on purpose: every request re-checks the platform_admins list, so removal is immediate.
   await audit(staff.id, "team.remove", "user", userId);
   revalidatePath("/team");
@@ -225,7 +264,7 @@ export async function removeTeamMember(userId: string): Promise<Res> {
 /* ---------- Pay links ---------- */
 /** Get (creating if needed) the public pay link for an issued invoice. */
 export async function ensurePayLink(invoiceId: string): Promise<Res<{ url: string }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(invoiceId)) return fail("Invalid request.");
   const r = await db().execute(sql`update platform_invoices set pay_token = coalesce(pay_token, ${newPayToken()}), pay_token_revoked_at = null where id = ${invoiceId} and status = 'issued' returning pay_token, number`);
   const row = r.rows[0] as { pay_token: string; number: string } | undefined;
@@ -235,7 +274,7 @@ export async function ensurePayLink(invoiceId: string): Promise<Res<{ url: strin
 }
 /** Replace the link: the old one stops working immediately. */
 export async function replacePayLink(invoiceId: string): Promise<Res<{ url: string }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(invoiceId)) return fail("Invalid request.");
   const r = await db().execute(sql`update platform_invoices set pay_token = ${newPayToken()}, pay_token_revoked_at = null where id = ${invoiceId} and status = 'issued' returning pay_token, number`);
   const row = r.rows[0] as { pay_token: string; number: string } | undefined;
@@ -246,7 +285,7 @@ export async function replacePayLink(invoiceId: string): Promise<Res<{ url: stri
 }
 /** Turn the link off without replacing it. */
 export async function disablePayLink(invoiceId: string): Promise<Res> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(invoiceId)) return fail("Invalid request.");
   const r = await db().execute(sql`update platform_invoices set pay_token = null, pay_token_revoked_at = now() where id = ${invoiceId} returning number`);
   if (!r.rows.length) return fail("Invoice not found.");
@@ -258,7 +297,7 @@ export async function disablePayLink(invoiceId: string): Promise<Res> {
 /* ---------- Email ---------- */
 /** Email an issued invoice (or a past-due reminder) to the club's admins. Asks for confirmation before sending twice within 24 hours. */
 export async function emailInvoice(invoiceId: string, kind: "invoice" | "reminder", force = false): Promise<{ ok: true; sent: number; failed: number; recipients: number } | { ok: false; error: string; needsConfirm?: true }> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   if (!uuid.test(invoiceId) || !["invoice", "reminder"].includes(kind)) return fail("Invalid request.");
   const r = await sendInvoiceEmails(invoiceId, kind, force);
   if ("error" in r) return { ok: false, error: r.error, needsConfirm: r.needsConfirm };
@@ -269,7 +308,7 @@ export async function emailInvoice(invoiceId: string, kind: "invoice" | "reminde
 
 /** Send the next batch (up to 100) of an email broadcast. Safe to click repeatedly. */
 export async function continueNotification(id: string): Promise<Res<{ sent: number; failed: number; remaining: number }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("notifications");
   if (!uuid.test(id)) return fail("Invalid request.");
   const r = await deliverNotification(id, 100);
   if ("error" in r) return fail(r.error);
@@ -280,7 +319,7 @@ export async function continueNotification(id: string): Promise<Res<{ sent: numb
 
 /** Put failed deliveries back in the queue so the next send retries them. */
 export async function retryFailedDeliveries(id: string): Promise<Res<{ requeued: number }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("notifications");
   if (!uuid.test(id)) return fail("Invalid request.");
   const r = await db().execute(sql`update notification_deliveries set status = 'pending', error = null, sent_at = null where notification_id = ${id} and status = 'failed' returning id`);
   await db().execute(sql`update notifications set status = 'queued' where id = ${id} and ${r.rows.length > 0}`);
@@ -292,7 +331,7 @@ export async function retryFailedDeliveries(id: string): Promise<Res<{ requeued:
 /* ---------- Dues reminders ---------- */
 /** Run the club app's daily reminder job now. It is the same code the scheduler calls, and safe to repeat. */
 export async function runRemindersJob(): Promise<Res<{ sent: number; failed: number }>> {
-  const staff = await requireAdmin();
+  const staff = await requireAdmin("billing");
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 16) return fail("CRON_SECRET is not set for the console, so it can't call the job.");
   try {

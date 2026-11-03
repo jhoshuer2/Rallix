@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import * as A from "../lib/actions";
+import { ROLE_HINT, ROLE_LABEL, STAFF_ROLES, type StaffRole } from "@rallix/config/staff";
 
 type Res = { ok: boolean; error?: string } & Record<string, unknown>;
 
@@ -226,10 +227,35 @@ export function IssueNoteForm({ id }: { id: string }) {
 export function TeamForm() {
   const { run, pending, note } = useRun();
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>("support");
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.addTeamMember(email), "Added to the platform team.", () => setEmail("")); }} className="cs-filters">
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.addTeamMember(email, role), "Added to the platform team.", () => setEmail("")); }} className="cs-filters">
       <Field label="Email address" hint="They must have signed in to the Rallix club app once."><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" required /></Field>
+      <Field label="Role" hint={ROLE_HINT[role]}><select value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>{STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></Field>
       <button className="cs-btn" disabled={pending}>Add to team</button>{note}
+    </form>
+  );
+}
+
+/** Change a team member's role. The database refuses to demote the last owner, and the message says so. */
+export function RoleSelect({ userId, role, name }: { userId: string; role: string; name: string }) {
+  const { run, pending, note } = useRun();
+  return (
+    <span>
+      <select aria-label={`Role for ${name}`} defaultValue={role} disabled={pending} onChange={(e) => run(() => A.setTeamRole(userId, e.target.value), "Role updated.")}>{STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select>
+      {note}
+    </span>
+  );
+}
+
+/** Reply to a request that came from the club app. The reply is emailed to the person who sent it. */
+export function IssueReplyForm({ id }: { id: string }) {
+  const { run, pending, note } = useRun();
+  const [body, setBody] = useState("");
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.replyToIssue(id, body), "Reply sent by email.", () => setBody("")); }}>
+      <Field label="Reply to the person who sent this" hint="Sent by email. They can answer from their inbox."><textarea value={body} onChange={(e) => setBody(e.target.value)} required minLength={2} maxLength={4000} /></Field>
+      <button className="cs-btn" disabled={pending}>Send reply</button>{note}
     </form>
   );
 }

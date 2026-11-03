@@ -1,9 +1,11 @@
+import { requireAdmin } from "../../../lib/guard";
 import Link from "next/link";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { ago, date } from "../../../lib/format";
 import { health, listClubs } from "../../../lib/queries";
 
 export default async function Clubs({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
+  await requireAdmin("clubs");
   const sp = await searchParams;
   const clubs = await listClubs(sp);
   return (
