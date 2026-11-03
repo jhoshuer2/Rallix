@@ -183,6 +183,13 @@
       "when": 1793681179562,
       "tag": "0025_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793681180562,
+      "tag": "0026_club_events",
+      "breakpoints": true
     }
   ]
 }

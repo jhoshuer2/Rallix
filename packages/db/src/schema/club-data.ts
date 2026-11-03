@@ -331,3 +331,29 @@ export const challenges = pgTable("challenges", {
   check("challenges_best_of", sql`${t.bestOf} IN (1,3,5)`),
   check("challenges_message", sql`${t.message} IS NULL OR char_length(${t.message}) <= 140`),
 ]);
+
+/** What is on at the club: regular playing sessions, one-off events, and closures (holidays, maintenance). */
+export const clubEvents = pgTable("club_events", {
+  id: id(),
+  clubId: clubId(),
+  kind: text("kind").notNull(), // play | event | closed
+  title: text("title").notNull(),
+  note: text("note"),
+  startsOn: date("starts_on").notNull(),
+  endsOn: date("ends_on"),
+  startTime: text("start_time"), // "HH:MM" local to the club, null = all day
+  endTime: text("end_time"),
+  repeatsWeekly: boolean("repeats_weekly").notNull().default(false),
+  until: date("until"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("club_events_club_idx").on(t.clubId, t.startsOn),
+  check("club_events_kind", sql`${t.kind} IN ('play','event','closed')`),
+  check("club_events_title", sql`char_length(${t.title}) BETWEEN 1 AND 80`),
+  check("club_events_note", sql`${t.note} IS NULL OR char_length(${t.note}) <= 280`),
+  check("club_events_range", sql`${t.endsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
+  check("club_events_times", sql`(${t.startTime} IS NULL OR ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${t.endTime} IS NULL OR ${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$') AND (${t.endTime} IS NULL OR ${t.startTime} IS NOT NULL) AND (${t.endTime} IS NULL OR ${t.endTime} > ${t.startTime})`),
+  check("club_events_repeat", sql`NOT ${t.repeatsWeekly} OR (${t.kind} = 'play' AND ${t.endsOn} IS NULL)`),
+  check("club_events_until", sql`${t.until} IS NULL OR (${t.repeatsWeekly} AND ${t.until} >= ${t.startsOn})`),
+]);

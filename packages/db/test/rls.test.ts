@@ -935,3 +935,45 @@ describe("friendly challenges", () => {
     await svc.execute(sql`update clubs set status = 'active', suspension_reason = null where id = ${ids.A}`);
   });
 });
+
+describe("club schedule", () => {
+  let k = 0;
+  async function admin(perms: string[]) {
+    const u = `sched${++k}`;
+    await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`);
+    await svc.execute(sql`insert into memberships (club_id, user_id, roles, permissions) values (${ids.A}, ${u}, ARRAY['admin']::member_role[], ${sql.raw(`ARRAY[${perms.map((p) => `'${p}'`).join(",")}]::text[]`)})`);
+    return { userId: u, clubId: ids.A };
+  }
+  const add = (ctx: { userId: string; clubId: string }, extra = "") =>
+    withTenant(app, ctx, (tx) => tx.execute(sql.raw(`insert into club_events (club_id, kind, title, starts_on${extra ? ", " + extra.split("|")[0] : ""}) values ('${ctx.clubId}', 'play', 'Tuesday night', '2030-01-01'${extra ? ", " + extra.split("|")[1] : ""}) returning id`)));
+  const player = () => ({ userId: "playerA1", clubId: ids.A });
+
+  it("only the Facilities admin (or owner) writes the schedule; every member of the club reads it", async () => {
+    const fac = await admin(["facilities"]), fin = await admin(["finance"]);
+    expect((await add(fac)).rows).toHaveLength(1);
+    expect((await add({ userId: "adminA", clubId: ids.A })).rows).toHaveLength(1);
+    expect(await denied(add(fin))).toBe("42501");
+    expect(await denied(add(player()))).toBe("42501");
+    expect((await rows(app, player(), sql`select id from club_events`)).length).toBeGreaterThanOrEqual(2);
+    expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select id from club_events`)).toHaveLength(0);
+    expect(await rows(app, { userId: "adminB", clubId: ids.A }, sql`select id from club_events`)).toHaveLength(0);
+    expect((await rows(app, fin, sql`update club_events set title = 'x' returning id`))).toHaveLength(0);
+    expect((await rows(app, player(), sql`delete from club_events returning id`))).toHaveLength(0);
+    expect((await rows(app, fac, sql`update club_events set title = 'Tuesday play' returning id`)).length).toBeGreaterThan(0);
+  });
+  it("bad schedule values are refused by the database", async () => {
+    const o = { userId: "adminA", clubId: ids.A };
+    expect(await denied(add(o, "ends_on|'2029-12-31'"))).toBe("23514"); // ends before it starts
+    expect(await denied(add(o, "start_time|'25:00'"))).toBe("23514");
+    expect(await denied(add(o, "start_time, end_time|'18:00', '17:00'"))).toBe("23514");
+    expect(await denied(add(o, "end_time|'17:00'"))).toBe("23514"); // an end without a start
+    expect(await denied(add(o, "repeats_weekly, ends_on|true, '2030-01-02'"))).toBe("23514"); // repeating sessions are not ranges
+    expect(await denied(add(o, "until|'2031-01-01'"))).toBe("23514"); // until without repeating
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into club_events (club_id, kind, title, starts_on) values (${ids.A}, 'party', 'x', '2030-01-01')`)))).toBe("23514");
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`insert into club_events (club_id, kind, title, starts_on, repeats_weekly) values (${ids.A}, 'event', 'x', '2030-01-01', true)`)))).toBe("23514"); // only play repeats
+    expect((await add(o, "start_time, end_time, repeats_weekly, until|'18:00', '20:00', true, '2030-12-31'")).rows).toHaveLength(1);
+  });
+  it("a suspended club's schedule is not writable, and another club's admin cannot write here", async () => {
+    expect(await denied(add({ userId: "adminB", clubId: ids.A }))).toBe("42501");
+  });
+});
