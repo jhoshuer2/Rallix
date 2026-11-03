@@ -7,7 +7,8 @@ import { requireAdmin } from "./guard";
 import { audienceCount } from "./queries";
 import { uuid } from "./format";
 import { clubAppUrl, newPayToken, payLinkUrl } from "./pay-link";
-import { createDeliveries, deliverNotification, sendInvoiceEmails, sendSupportReply } from "./email-core";
+import { createDeliveries, deliverNotification, sendClubReview, sendInvoiceEmails, sendSupportReply } from "./email-core";
+import { canChangeClubStatus } from "@rallix/config/club-status";
 import { isStaffRole } from "@rallix/config/staff";
 import { PLACEHOLDERS } from "./placeholders";
 import { placeholdersIn } from "@rallix/mailer";
@@ -29,6 +30,8 @@ export async function setClubStatus(clubId: string, status: "active" | "suspende
   if (!uuid.test(clubId) || !["active", "suspended", "closed"].includes(status) || !["non_payment", "other"].includes(reasonType)) return fail("Invalid request.");
   if (status !== "active" && reason.trim().length < 3) return fail("Give a short reason. It is recorded in the audit log.");
   // The reason type decides whether paying an overdue invoice brings the club back automatically. Only a non-payment suspension does.
+  const cur = (await db().execute(sql`select status::text as s from clubs where id = ${clubId}`)).rows[0] as { s: string } | undefined;
+  if (cur?.s === "pending") return fail("This club is waiting for approval. Approve or decline it first.");
   const stored = status === "suspended" ? reasonType : null;
   const r = await db().execute(sql`update clubs set status = ${status}::club_status, suspension_reason = ${stored}::suspension_reason where id = ${clubId} returning name`);
   if (!r.rows.length) return fail("Club not found.");
@@ -37,14 +40,73 @@ export async function setClubStatus(clubId: string, status: "active" | "suspende
   return { ok: true };
 }
 
-/* ---------- Billing ---------- */
-export async function createSubscription(input: { clubId: string; period: "monthly" | "yearly"; naira: number }): Promise<Res> {
+/** Switch club approval on or off. When on, every NEW club starts pending (existing clubs are untouched). */
+export async function setClubApproval(on: boolean): Promise<Res> {
+  const staff = await requireAdmin("clubs_manage");
+  await db().execute(sql`update platform_settings set club_approval = ${!!on}, updated_at = now() where id = 1`);
+  await audit(staff.id, on ? "clubs.approval_on" : "clubs.approval_off", "platform", null);
+  revalidatePath("/clubs");
+  return { ok: true };
+}
+async function reviewClub(clubId: string, approve: boolean, reason: string): Promise<Res> {
+  const staff = await requireAdmin("clubs_manage");
+  if (!uuid.test(clubId)) return fail("Invalid request.");
+  if (!approve && reason.trim().length < 3) return fail("Give a short reason. The owner is told, and it is recorded in the audit log.");
+  const cur = (await db().execute(sql`select status::text as s, name from clubs where id = ${clubId}`)).rows[0] as { s: string; name: string } | undefined;
+  if (!cur) return fail("Club not found.");
+  const to = approve ? "active" : "closed";
+  if (!canChangeClubStatus(cur.s, to) || cur.s !== "pending") return fail("This club is no longer waiting for approval.");
+  const r = await db().execute(sql`update clubs set status = ${to}::club_status where id = ${clubId} and status = 'pending' returning id`);
+  if (!r.rows.length) return fail("This club is no longer waiting for approval.");
+  await audit(staff.id, approve ? "club.approve" : "club.decline", "club", clubId, { name: cur.name, reason: reason.trim() || null });
+  await sendClubReview(clubId, approve ? "approved" : "declined", reason.trim() || undefined);
+  revalidatePath("/clubs", "layout");
+  return { ok: true };
+}
+export const approveClub = async (clubId: string): Promise<Res> => reviewClub(clubId, true, "");
+export const declineClub = async (clubId: string, reason: string): Promise<Res> => reviewClub(clubId, false, reason);
+
+/* ---------- Plans ---------- */
+/** Create or edit a plan. Plans are never deleted: switch one off and it stops being offered, clubs on it keep it. */
+export async function savePlan(input: { id?: string | null; name: string; monthlyNaira: number; yearlyNaira: number; memberLimit: number | null; active: boolean }): Promise<Res> {
   const staff = await requireAdmin("billing");
-  const kobo = nairaToKobo(input.naira);
+  const name = String(input?.name ?? "").trim();
+  const monthly = nairaToKobo(Number(input.monthlyNaira)), yearly = nairaToKobo(Number(input.yearlyNaira));
+  const limit = input.memberLimit === null || (input.memberLimit as unknown) === "" ? null : Number(input.memberLimit);
+  if (name.length < 1 || name.length > 60) return fail("Give the plan a name (up to 60 characters).");
+  if (!validMoney(monthly) || !validMoney(yearly)) return fail("Check the prices.");
+  if (limit !== null && (!Number.isInteger(limit) || limit < 1 || limit > 100000)) return fail("The member limit must be a whole number, or empty for no limit.");
+  if (input.id && !uuid.test(input.id)) return fail("Invalid request.");
+  try {
+    const r = input.id
+      ? await db().execute(sql`update platform_plans set name = ${name}, monthly_kobo = ${monthly}, yearly_kobo = ${yearly}, member_limit = ${limit}, active = ${!!input.active} where id = ${input.id} returning id`)
+      : await db().execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo, member_limit, active) values (${name}, ${monthly}, ${yearly}, ${limit}, ${!!input.active}) returning id`);
+    if (!r.rows.length) return fail("Plan not found.");
+    await audit(staff.id, input.id ? "plan.update" : "plan.create", "plan", (r.rows[0] as { id: string }).id, { name, monthly, yearly, limit, active: !!input.active });
+  } catch (e) {
+    if (pgCode(e) === "23505") return fail("There is already a plan with that name.");
+    throw e;
+  }
+  revalidatePath("/plans"); revalidatePath("/billing");
+  return { ok: true };
+}
+
+/* ---------- Billing ---------- */
+export async function createSubscription(input: { clubId: string; period: "monthly" | "yearly"; naira: number; planId?: string | null }): Promise<Res> {
+  const staff = await requireAdmin("billing");
+  let kobo = nairaToKobo(input.naira);
+  let planId: string | null = null;
+  if (input.planId) {
+    // The price comes from the catalogue, never from the form.
+    if (!uuid.test(input.planId) || !["monthly", "yearly"].includes(input.period)) return fail("Check the plan and period.");
+    const pl = (await db().execute(sql`select id, monthly_kobo, yearly_kobo from platform_plans where id = ${input.planId} and active`)).rows[0] as { id: string; monthly_kobo: number; yearly_kobo: number } | undefined;
+    if (!pl) return fail("That plan isn’t available.");
+    planId = pl.id; kobo = input.period === "monthly" ? pl.monthly_kobo : pl.yearly_kobo;
+  }
   if (!uuid.test(input.clubId) || !["monthly", "yearly"].includes(input.period) || !validMoney(kobo)) return fail("Check the club, period and amount.");
   const end = new Date(); if (input.period === "monthly") end.setMonth(end.getMonth() + 1); else end.setFullYear(end.getFullYear() + 1);
-  const r = await db().execute(sql`insert into club_subscriptions (club_id, period, status, amount_kobo, current_period_end) values (${input.clubId}, ${input.period}::plan_period, 'active', ${kobo}, ${end}) returning id`);
-  await audit(staff.id, "subscription.create", "club_subscription", (r.rows[0] as { id: string }).id, { clubId: input.clubId, period: input.period, kobo });
+  const r = await db().execute(sql`insert into club_subscriptions (club_id, period, status, amount_kobo, current_period_end, plan_id) values (${input.clubId}, ${input.period}::plan_period, 'active', ${kobo}, ${end}, ${planId}) returning id`);
+  await audit(staff.id, "subscription.create", "club_subscription", (r.rows[0] as { id: string }).id, { clubId: input.clubId, period: input.period, kobo, planId });
   revalidatePath("/billing");
   return { ok: true };
 }

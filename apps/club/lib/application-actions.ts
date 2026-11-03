@@ -28,11 +28,18 @@ export async function applyToClub(input: { code: string; yourName: string; level
   const phoneProblem = await savePhone(ctx.user.id, input.phone);
   if (phoneProblem) return fail(phoneProblem);
   const message = (input.message ?? "").trim().slice(0, 500);
-  const code = await withTenant(appDb(), { userId: ctx.user.id }, async (tx) => {
-    await tx.update(users).set({ name }).where(eq(users.id, ctx.user.id));
-    const r = await tx.execute(sql`select app.apply_to_club(${input.code}, ${name}, ${input.level}::player_level, ${message}) as r`);
-    return (r.rows[0] as { r: string }).r;
-  });
+  let code: string;
+  try {
+    code = await withTenant(appDb(), { userId: ctx.user.id }, async (tx) => {
+      await tx.update(users).set({ name }).where(eq(users.id, ctx.user.id));
+      const r = await tx.execute(sql`select app.apply_to_club(${input.code}, ${name}, ${input.level}::player_level, ${message}) as r`);
+      return (r.rows[0] as { r: string }).r;
+    });
+  } catch (e) {
+    // An open-join club that has reached its plan's member limit: the database refuses the place.
+    if (isClubFull(e)) return fail("This club is full right now. Please ask the club to make room, then try again.");
+    throw e;
+  }
   if (code === "invalid") return fail("This invite link is invalid, expired or full. Ask your club admin for a new one.");
   if (code === "blocked") return fail("You can't join this club right now. Please contact the club.");
   if (code === "limit") return fail("You have sent several applications today. Please try again tomorrow.");
@@ -62,14 +69,21 @@ export async function decideApplication(id: string, approve: boolean, note?: str
   const ctx = await requireClub();
   if (!can(ctx.club, "members")) return fail("Only club admins can review applications.");
   if (!/^[0-9a-f-]{36}$/i.test(id)) return fail("Something went wrong. Please try again.");
-  const r = await inClub(ctx, (tx) => tx.execute(sql`select app.decide_application(${id}, ${!!approve}, ${(note ?? "").trim().slice(0, 300)}) as r`));
-  const code = (r.rows[0] as { r: string }).r;
+  let code: string;
+  try {
+    const r = await inClub(ctx, (tx) => tx.execute(sql`select app.decide_application(${id}, ${!!approve}, ${(note ?? "").trim().slice(0, 300)}) as r`));
+    code = (r.rows[0] as { r: string }).r;
+  } catch (e) {
+    if (isClubFull(e)) return fail("Your club has reached the member limit of its plan, so no one else can be added. Make room or ask Rallix about a bigger plan.");
+    throw e;
+  }
   if (code !== "approved" && code !== "declined") return fail("This application was already decided.");
   void notifyApplicant(id);
   revalidatePath("/", "layout");
   return { ok: true, decision: code };
 }
 
+const isClubFull = (e: unknown) => /club_full/.test(String((e as { cause?: { message?: string } })?.cause?.message ?? (e as Error)?.message ?? ""));
 const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 /** Admins write what people see before they join. Length limits are also enforced by the database. */

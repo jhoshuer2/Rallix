@@ -3,12 +3,12 @@ import Link from "next/link";
 import { Badge, Empty, PageHead } from "../../../components/ui";
 import { NewSubscriptionForm, RunButton } from "../../../components/Forms";
 import { date, naira } from "../../../lib/format";
-import { clubsWithoutSubscription, listSubscriptions } from "../../../lib/queries";
+import { clubsWithoutSubscription, listPlans, listSubscriptions } from "../../../lib/queries";
 import { generateInvoices, setSubscriptionStatus } from "../../../lib/actions";
 
 export default async function Billing() {
   await requireAdmin("billing");
-  const [subs, without] = await Promise.all([listSubscriptions(), clubsWithoutSubscription()]);
+  const [subs, without, plans] = await Promise.all([listSubscriptions(), clubsWithoutSubscription(), listPlans()]);
   const mrr = subs.filter((s) => s.status === "active").reduce((a, s) => a + (s.period === "monthly" ? s.amount_kobo : s.amount_kobo / 12), 0);
   return (
     <>
@@ -33,7 +33,7 @@ export default async function Billing() {
         </table></div>
       )}
       <h2 className="cs-h2">Add a subscription</h2>
-      <div className="cs-card"><NewSubscriptionForm clubs={without} /></div>
+      <div className="cs-card"><NewSubscriptionForm clubs={without} plans={plans.filter((p) => p.active)} /></div>
       <p className="cs-hint" style={{ marginTop: 12 }}>Paystack collection is not connected yet, so payments are recorded by hand when you mark an invoice as paid.</p>
     </>
   );

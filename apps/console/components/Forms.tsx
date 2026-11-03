@@ -61,18 +61,79 @@ export function ClubStatusForm({ clubId, status }: { clubId: string; status: str
   );
 }
 
-export function NewSubscriptionForm({ clubs }: { clubs: Array<{ id: string; name: string }> }) {
+export function NewSubscriptionForm({ clubs, plans = [] }: { clubs: Array<{ id: string; name: string }>; plans?: Array<{ id: string; name: string; monthly_kobo: number; yearly_kobo: number; member_limit: number | null }> }) {
   const { run, pending, note } = useRun();
   const [clubId, setClubId] = useState(clubs[0]?.id ?? "");
   const [period, setPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [planId, setPlanId] = useState("");
   const [amount, setAmount] = useState("");
   if (!clubs.length) return <p className="cs-muted">Every active club already has a subscription.</p>;
+  const plan = plans.find((p) => p.id === planId);
+  const price = plan ? (period === "monthly" ? plan.monthly_kobo : plan.yearly_kobo) / 100 : null;
   return (
-    <form onSubmit={(e) => { e.preventDefault(); run(() => A.createSubscription({ clubId, period, naira: Number(amount) }), "Subscription created.", () => setAmount("")); }} className="cs-filters">
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.createSubscription({ clubId, period, naira: Number(amount || 0), planId: planId || null }), "Subscription created.", () => setAmount("")); }} className="cs-filters">
       <Field label="Club"><select value={clubId} onChange={(e) => setClubId(e.target.value)}>{clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
       <Field label="Billing"><select value={period} onChange={(e) => setPeriod(e.target.value as "monthly" | "yearly")}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></Field>
-      <Field label="Amount (₦)"><input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} required /></Field>
-      <button className="cs-btn" disabled={pending || !amount}>Add subscription</button>{note}
+      {plans.length ? <Field label="Plan" hint={plan ? `${plan.member_limit ? `Up to ${plan.member_limit} members` : "No member limit"}. The price comes from the plan.` : "Pick a plan, or none for a custom amount."}><select value={planId} onChange={(e) => setPlanId(e.target.value)}><option value="">No plan, custom amount</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field> : null}
+      {plan ? <Field label="Amount (₦)"><input value={String(price)} readOnly aria-readonly="true" /></Field> : <Field label="Amount (₦)"><input inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} required /></Field>}
+      <button className="cs-btn" disabled={pending || (!plan && !amount)}>Add subscription</button>{note}
+    </form>
+  );
+}
+
+/** Switch club approval on or off. New clubs wait for staff when it is on. */
+export function ClubApprovalForm({ on }: { on: boolean }) {
+  const { run, pending, note } = useRun();
+  return (
+    <div className="cs-card" style={{ marginBottom: 20 }}>
+      <label style={{ display: "flex", gap: 10, alignItems: "center", minHeight: 44 }}>
+        <input type="checkbox" checked={on} disabled={pending} onChange={(e) => run(() => A.setClubApproval(e.target.checked), e.target.checked ? "New clubs now wait for approval." : "New clubs go live straight away.")} />
+        <span><strong>New clubs need approval</strong><br /><span className="cs-hint">When on, a club created from now on can’t be used until you approve it here. Existing clubs are not affected.</span></span>
+      </label>{note}
+    </div>
+  );
+}
+
+/** One club waiting for approval: approve, or decline with a reason the owner is told. */
+export function PendingClubActions({ clubId, name }: { clubId: string; name: string }) {
+  const { run, pending, note } = useRun();
+  const [reason, setReason] = useState("");
+  const [declining, setDeclining] = useState(false);
+  return (
+    <div>
+      {declining ? (
+        <form onSubmit={(e) => { e.preventDefault(); run(() => A.declineClub(clubId, reason), "Declined. The owner has been emailed."); }} className="cs-filters">
+          <Field label={`Why is ${name} declined?`} hint="The owner reads this."><input value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} /></Field>
+          <button className="cs-btn cs-btn--danger" disabled={pending}>Decline</button>
+          <button type="button" className="cs-btn cs-btn--ghost" onClick={() => setDeclining(false)}>Cancel</button>
+        </form>
+      ) : (
+        <span className="cs-actions">
+          <button type="button" className="cs-btn cs-btn--small" disabled={pending} onClick={() => run(() => A.approveClub(clubId), "Approved. The owner has been emailed.")}>Approve</button>
+          <button type="button" className="cs-btn cs-btn--small cs-btn--ghost" disabled={pending} onClick={() => setDeclining(true)}>Decline</button>
+        </span>
+      )}
+      {note}
+    </div>
+  );
+}
+
+/** Add or edit a plan. */
+export function PlanForm({ plan, onDone }: { plan?: { id: string; name: string; monthly_kobo: number; yearly_kobo: number; member_limit: number | null; active: boolean }; onDone?: () => void }) {
+  const { run, pending, note } = useRun();
+  const [name, setName] = useState(plan?.name ?? "");
+  const [monthly, setMonthly] = useState(plan ? String(plan.monthly_kobo / 100) : "");
+  const [yearly, setYearly] = useState(plan ? String(plan.yearly_kobo / 100) : "");
+  const [limit, setLimit] = useState(plan?.member_limit ? String(plan.member_limit) : "");
+  const [active, setActive] = useState(plan?.active ?? true);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); run(() => A.savePlan({ id: plan?.id ?? null, name, monthlyNaira: Number(monthly), yearlyNaira: Number(yearly), memberLimit: limit === "" ? null : Number(limit), active }), plan ? "Plan saved." : "Plan added.", () => { if (!plan) { setName(""); setMonthly(""); setYearly(""); setLimit(""); } onDone?.(); }); }} className="cs-filters">
+      <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} required maxLength={60} placeholder="Club of 50" /></Field>
+      <Field label="Monthly (₦)"><input inputMode="numeric" value={monthly} onChange={(e) => setMonthly(e.target.value.replace(/\D/g, ""))} required /></Field>
+      <Field label="Yearly (₦)"><input inputMode="numeric" value={yearly} onChange={(e) => setYearly(e.target.value.replace(/\D/g, ""))} required /></Field>
+      <Field label="Member limit" hint="Empty means no limit."><input inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, ""))} /></Field>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", minHeight: 44 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Offered to clubs</label>
+      <button className="cs-btn" disabled={pending}>{plan ? "Save plan" : "Add plan"}</button>{note}
     </form>
   );
 }

@@ -8,7 +8,7 @@ const g = globalThis as unknown as { __consoleMail?: Mailer };
 export const mailer = (): Mailer => (g.__consoleMail ??= createMailer(process.env));
 
 /** Record that we tried to send. Never stores the message or any code. Logging must never break sending. */
-export async function logEmail(e: { to: string; kind: "otp" | "invoice" | "reminder" | "broadcast" | "support"; ok: boolean; error?: string; templateKey?: string; relatedId?: string }) {
+export async function logEmail(e: { to: string; kind: "otp" | "invoice" | "reminder" | "broadcast" | "support" | "club_review"; ok: boolean; error?: string; templateKey?: string; relatedId?: string }) {
   try { await db().insert(emailLog).values({ toEmail: e.to.toLowerCase(), kind: e.kind, status: e.ok ? "sent" : "failed", error: e.error?.slice(0, 300), templateKey: e.templateKey, relatedId: e.relatedId }); } catch { /* ignore */ }
 }
 

@@ -129,3 +129,21 @@ export async function sendSupportReply(issueId: string, reply: string): Promise<
     return { ok: false, error: "The email could not be sent. Try again." };
   }
 }
+
+/** Tell a club's owner that Rallix approved or declined their new club. Best effort: the decision stands even if the email fails. */
+export async function sendClubReview(clubId: string, outcome: "approved" | "declined", note?: string): Promise<void> {
+  const [c] = await rows<{ name: string; email: string | null; owner: string }>(sql`select c.name, u.email, u.name as owner from clubs c join users u on u.id = c.owner_id where c.id = ${clubId}`);
+  if (!c?.email) return;
+  const one = (v: string) => v.replace(/[\r\n]+/g, " ").trim();
+  const subject = outcome === "approved" ? "{{club}} is approved on Rallix" : "About your Rallix club {{club}}";
+  const body = outcome === "approved"
+    ? "Hello {{owner}},\n\nGood news: {{club}} is approved. You can sign in and start inviting players now: {{link}}\n\nRallix"
+    : "Hello {{owner}},\n\nWe couldn’t approve {{club}} this time.{{note}}\n\nIf you think this is a mistake, reply to this email.\n\nRallix";
+  try {
+    const m = compose({ subject, body, vars: { club: one(c.name), owner: one(c.owner), link: clubAppUrl(), note: note ? ` Reason: ${one(note)}.` : "" }, footer: "You are receiving this because you created a club on Rallix." });
+    const r = await mailer().send({ to: c.email, subject: m.subject, text: m.text, html: m.html });
+    await logEmail({ to: c.email, kind: "club_review", ok: r.ok, error: r.ok ? undefined : r.error, relatedId: clubId });
+  } catch (e) {
+    await logEmail({ to: c.email, kind: "club_review", ok: false, error: (e as Error).message, relatedId: clubId });
+  }
+}

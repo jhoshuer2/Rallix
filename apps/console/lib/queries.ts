@@ -34,12 +34,12 @@ export async function overview() {
 }
 
 export type ClubRow = {
-  id: string; slug: string; name: string; location: string | null; status: "active" | "suspended" | "closed"; created_at: Date;
+  id: string; slug: string; name: string; location: string | null; status: "active" | "suspended" | "closed" | "pending"; created_at: Date;
   owner_name: string; owner_phone: string | null; members: number; matches_30d: number; last_activity: Date | null; sub_status: string | null;
 };
 export async function listClubs(f: { q?: string; status?: string }) {
   const term = f.q?.trim() ? `%${f.q.trim()}%` : null;
-  const status = ["active", "suspended", "closed"].includes(f.status ?? "") ? f.status! : null;
+  const status = ["active", "suspended", "closed", "pending"].includes(f.status ?? "") ? f.status! : null;
   return q<ClubRow>(sql`select c.id, c.slug, c.name, c.location, c.status, c.created_at, u.name as owner_name, u.phone_number as owner_phone,
       (select count(*)::int from memberships m where m.club_id = c.id and m.status = 'active') as members,
       (select count(*)::int from matches mt where mt.club_id = c.id and mt.confirmed_at > now() - interval '30 days') as matches_30d,
@@ -53,6 +53,7 @@ export async function listClubs(f: { q?: string; status?: string }) {
 
 /** Plain-language health for a club. Order matters: the first matching rule wins. */
 export function health(c: Pick<ClubRow, "status" | "members" | "matches_30d" | "sub_status" | "created_at">): { label: string; tone: "ok" | "warn" | "bad" | undefined } {
+  if (c.status === "pending") return { label: "Waiting for approval", tone: "warn" };
   if (c.status !== "active") return { label: c.status === "suspended" ? "Suspended" : "Closed", tone: "bad" };
   if (c.sub_status === "past_due") return { label: "Payment overdue", tone: "bad" };
   const ageDays = (Date.now() - new Date(c.created_at).getTime()) / 86400000;
@@ -61,13 +62,25 @@ export function health(c: Pick<ClubRow, "status" | "members" | "matches_30d" | "
   return { label: c.members > 1 ? "Quiet (no matches in 30 days)" : "Inactive", tone: "warn" };
 }
 
+export type PendingClub = { id: string; name: string; slug: string; location: string | null; created_at: Date; owner_name: string; owner_email: string | null };
+/** New clubs waiting for approval, oldest first. */
+export const pendingClubs = () => q<PendingClub>(sql`select c.id, c.name, c.slug, c.location, c.created_at, u.name as owner_name, u.email as owner_email from clubs c join users u on u.id = c.owner_id where c.status = 'pending' order by c.created_at`);
+
+export type PlanRow = { id: string; name: string; monthly_kobo: number; yearly_kobo: number; member_limit: number | null; active: boolean; clubs: number };
+export const listPlans = () => q<PlanRow>(sql`select p.id, p.name, p.monthly_kobo, p.yearly_kobo, p.member_limit, p.active,
+  (select count(*)::int from club_subscriptions s where s.plan_id = p.id and s.status in ('trialing','active','past_due')) as clubs from platform_plans p order by p.active desc, p.monthly_kobo, p.name`);
+
+export const clubApprovalOn = async () => Boolean((await one<{ on: boolean }>(sql`select club_approval as on from platform_settings where id = 1`))?.on);
+
 export async function getClub(id: string) {
-  const club = await one<ClubRow & { timezone: string; owner_id: string; owner_email: string | null; payout_bank: string | null; payout_last4: string | null; payouts_enabled_at: Date | null }>(sql`select c.payout_bank_name as payout_bank, c.payout_account_last4 as payout_last4, c.payouts_enabled_at, c.id, c.slug, c.name, c.location, c.status, c.created_at, c.timezone, c.owner_id,
+  const club = await one<ClubRow & { timezone: string; owner_id: string; owner_email: string | null; payout_bank: string | null; payout_last4: string | null; payouts_enabled_at: Date | null; plan_name: string | null; member_limit: number | null; players: number }>(sql`select c.payout_bank_name as payout_bank, c.payout_account_last4 as payout_last4, c.payouts_enabled_at, c.id, c.slug, c.name, c.location, c.status, c.created_at, c.timezone, c.owner_id,
       u.name as owner_name, u.phone_number as owner_phone, u.email as owner_email,
       (select count(*)::int from memberships m where m.club_id = c.id and m.status = 'active') as members,
       (select count(*)::int from matches mt where mt.club_id = c.id and mt.confirmed_at > now() - interval '30 days') as matches_30d,
       (select max(mt.updated_at) from matches mt where mt.club_id = c.id) as last_activity,
-      (select s.status from club_subscriptions s where s.club_id = c.id order by s.created_at desc limit 1) as sub_status
+      (select s.status from club_subscriptions s where s.club_id = c.id order by s.created_at desc limit 1) as sub_status,
+      (select p.name from club_subscriptions s join platform_plans p on p.id = s.plan_id where s.club_id = c.id and s.status in ('trialing','active','past_due') order by s.created_at desc limit 1) as plan_name,
+      app.club_member_limit(c.id) as member_limit, app.active_players(c.id) as players
     from clubs c join users u on u.id = c.owner_id where c.id = ${id}`);
   if (!club) return null;
   const [totals, subs, invoices, issues, roles] = await Promise.all([

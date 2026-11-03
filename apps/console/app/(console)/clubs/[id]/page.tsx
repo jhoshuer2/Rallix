@@ -35,8 +35,9 @@ export default async function ClubDetail({ params }: { params: Promise<{ id: str
         </section>
         <section className="cs-card">
           <h2 className="cs-h2" style={{ marginTop: 0 }}>Access</h2>
-          <p className="cs-muted">Status: <Badge tone={c.status === "active" ? "ok" : "bad"}>{c.status}</Badge></p>
-          {staffCan(staff.role, "clubs_manage") ? <ClubStatusForm clubId={c.id} status={c.status} /> : <p className="cs-muted">Your role can look at this club but not change its status.</p>}
+          <p className="cs-muted">Status: <Badge tone={c.status === "active" ? "ok" : c.status === "pending" ? "warn" : "bad"}>{c.status}</Badge></p>
+          <p className="cs-muted">Plan: {c.plan_name ?? "None"}{c.member_limit ? ` · ${c.players} of ${c.member_limit} players` : ` · ${c.players} players`}</p>
+          {c.status === "pending" ? <p className="cs-muted">This club is waiting for approval. Approve or decline it from the <Link href="/clubs">Clubs</Link> page.</p> : staffCan(staff.role, "clubs_manage") ? <ClubStatusForm clubId={c.id} status={c.status} /> : <p className="cs-muted">Your role can look at this club but not change its status.</p>}
         </section>
       </div>
       <h2 className="cs-h2">Subscription</h2>

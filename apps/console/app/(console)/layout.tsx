@@ -19,6 +19,7 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
           { href: "/", label: "Overview", area: null },
           { href: "/clubs", label: "Clubs", area: "clubs" },
           { href: "/billing", label: "Billing", area: "billing" },
+          { href: "/plans", label: "Plans", area: "billing" },
           { href: "/invoices", label: "Invoices", area: "billing" },
           { href: "/payments", label: "Payments", count: attention, area: "billing" },
           { href: "/notifications", label: "Notifications", area: "notifications" },

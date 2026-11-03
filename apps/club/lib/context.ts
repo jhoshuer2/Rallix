@@ -10,7 +10,7 @@ import { myPendingApplications } from "./applications";
 
 export type Role = "admin" | "scorer" | "coach" | "player";
 export type MyClub = { clubId: string; membershipId: string; name: string; slug: string; logoUrl: string | null; coverUrl: string | null; roles: Role[]; permissions: Permission[]; isOwner: boolean };
-export type BlockedClub = { name: string; status: "suspended" | "closed" };
+export type BlockedClub = { name: string; status: "suspended" | "closed" | "pending" };
 export type Ctx = { user: { id: string; name: string; email: string; image: string | null }; needsName: boolean; clubs: MyClub[]; club: MyClub | null; blocked: BlockedClub[] };
 
 export const CLUB_COOKIE = "rallix_club";

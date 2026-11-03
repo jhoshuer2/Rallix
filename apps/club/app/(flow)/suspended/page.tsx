@@ -6,6 +6,15 @@ export default async function Suspended() {
   const ctx = await getCtx();
   if (!ctx) redirect("/sign-in");
   if (ctx.club) redirect("/");
+  const waiting = ctx.blocked.length > 0 && ctx.blocked.every((b) => b.status === "pending");
+  if (waiting) {
+    return (
+      <EntryShell title="We’re reviewing your club">
+        <p style={{ marginTop: 0 }}>{ctx.blocked.map((b) => b.name).join(", ")} {ctx.blocked.length === 1 ? "is" : "are"} waiting for approval from Rallix. We’ll email you as soon as {ctx.blocked.length === 1 ? "it’s" : "they’re"} ready. This usually takes a short while.</p>
+        <a className="rx-btn rx-btn--ghost rx-btn--block" href="/sign-out">Sign out</a>
+      </EntryShell>
+    );
+  }
   return (
     <EntryShell title="Club unavailable">
       {ctx.blocked.length === 0 ? <p style={{ marginTop: 0 }}>You’re not part of any club yet.</p> : (
