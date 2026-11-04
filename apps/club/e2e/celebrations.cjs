@@ -50,11 +50,11 @@ const overlaps=p=>p.evaluate(()=>{const t=[...document.querySelectorAll('.rx-cel
   }
   // Admin activity: one grouped row, payments and results still visible
   const A=await who(b,'admin@example.com');await A.goto(B+'/');
-  const home=await A.locator('body').innerText();
+  await A.locator('.rx-skel').first().waitFor({state:'detached',timeout:20000}).catch(()=>{});const home=await A.locator('body').innerText();
   ok(/40 players joined|\d+ players joined/i.test(home),'admin home shows one grouped "players joined" row');
   ok((home.match(/ joined/gi)||[]).length<=3,'admin home is not flooded with individual joins');
   ok(/paid ₦/i.test(home),'payments are still visible next to the registrations');
-  await A.goto(B+'/activity');const act=await A.locator('body').innerText();
+  await A.goto(B+'/activity');await A.locator('.rx-skel').first().waitFor({state:'detached',timeout:20000}).catch(()=>{});const act=await A.locator('body').innerText();
   ok(/players joined/i.test(act)&&(act.match(/ joined/gi)||[]).length<=4,'the activity page groups joins too');
   ok(/paid ₦/i.test(act),'and still lists payments');
   ok(A.errs.length===0,'no admin page errors');

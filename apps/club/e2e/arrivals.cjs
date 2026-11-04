@@ -8,6 +8,7 @@
 const {chromium}=require('playwright');const fs=require('fs');const {execSync}=require('child_process');
 const SC=process.env.OUT||'/tmp', LOG=process.env.DEV_LOG, B=process.env.BASE||'http://localhost:3000';
 const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_service -d ${process.env.PGDB||'rallix_dev'} -Atc "${q.replace(/"/g,'\\"')}"`).toString().trim();
+const vis=async l=>{try{await l.first().waitFor({state:'visible',timeout:15000});return true}catch{return false}};
 let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAIL',m)};
 function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...log.matchAll(re)];return a.length?a[a.length-1][1]:null}
 const pushLines=()=>fs.readFileSync(LOG).toString().split('\n').filter(l=>l.includes('[push:dev]'));
@@ -49,8 +50,8 @@ for(const n of ['jide','pastor','ade']) sql(`insert into push_subscriptions (use
 // Player ade: sharing is off, so check-in explains why
 const P=await ctx(b,'ade@example.com');
 await P.p.goto(B+'/play');
-ok(await P.p.getByText('At the court').first().isVisible(),'player home shows the At the court section once the club has a court');
-ok(await P.p.getByText(/turn on “Share when I arrive”/).isVisible(),'with sharing off, the home explains how to check in');
+ok(await vis(P.p.getByText('At the court').first()),'player home shows the At the court section once the club has a court');
+ok(await vis(P.p.getByText(/turn on “Share when I arrive”/)),'with sharing off, the home explains how to check in');
 // Turn sharing on from the Me page
 await P.p.goto(B+'/play/me');await P.p.getByRole('switch',{name:'Share when I arrive'}).click();await P.p.waitForTimeout(1200);
 ok(sql(`select share_arrival from player_profiles where membership_id='${pid('ade')}'`)==='t','the Share switch saves');
@@ -66,8 +67,8 @@ ok(await P.p.getByText(/isn’t accurate enough/).waitFor({timeout:10000}).then(
 const before=pushLines().length;
 await P.c.setGeolocation({...metresNorth(40),accuracy:15});await P.p.getByRole('button',{name:"I’ve arrived"}).click();
 await P.p.getByRole('button',{name:"I’ve left"}).waitFor({timeout:15000}).catch(()=>{});
-ok(await P.p.getByRole('button',{name:"I’ve left"}).isVisible(),'checking in at the court works and the button becomes I’ve left');
-ok(await P.p.getByText(/Here since/).isVisible(),'the player appears in Here now');
+ok(await vis(P.p.getByRole('button',{name:"I’ve left"})),'checking in at the court works and the button becomes I’ve left');
+ok(await vis(P.p.getByText(/Here since/)),'the player appears in Here now');
 const lines=pushLines().slice(before);
 ok(lines.length===2&&lines.every(l=>/Ade just arrived \| Paris Arena · 1 player here/.test(l)),'two lock-screen alerts were sent with the arriver’s first name and the club: '+lines.length);
 ok(lines.some(l=>l.includes(`to ${uid('jide')} `))&&lines.some(l=>l.includes(`to ${uid('pastor')} `)),'the alerts went to the players with alerts on and a device');
@@ -76,8 +77,8 @@ ok(sql(`select count(*) from arrivals where alerted_at is not null`)==='1','the 
 ok(sql(`select string_agg(column_name,',') from information_schema.columns where table_name='arrivals'`).split(',').every(c=>!/lat|lng|long|position|coord/i.test(c)),'no location columns exist on arrivals: position is never stored');
 // A second player sees them
 const J=await ctx(b,'jide@example.com');await J.p.goto(B+'/play');
-ok(await J.p.getByText('Ade Taiwo').or(J.p.getByText(/Ade\b/).first()).first().isVisible().catch(()=>false)&&await J.p.getByText(/Here since/).isVisible(),'another club member sees who is at the court');
-ok(await J.p.getByText(/turn on “Share when I arrive”/).isVisible(),'a member who has not turned sharing on is told how, and gets no check-in button');
+ok(await vis(J.p.getByText('Ade Taiwo').or(J.p.getByText(/Ade\b/).first()).first()).catch(()=>false)&&await vis(J.p.getByText(/Here since/)),'another club member sees who is at the court');
+ok(await vis(J.p.getByText(/turn on “Share when I arrive”/)),'a member who has not turned sharing on is told how, and gets no check-in button');
 // Leave, return within 2 hours: no second alert
 await P.p.getByRole('button',{name:"I’ve left"}).click();await P.p.getByRole('button',{name:"I’ve arrived"}).waitFor({timeout:15000}).catch(()=>{});
 ok(sql(`select count(*) from arrivals where left_at is not null`)==='1','I’ve left closes the arrival');
@@ -87,7 +88,7 @@ ok(pushLines().length===mid,'arriving again within two hours does not alert ever
 ok(sql(`select count(*) from arrivals where left_at is null`)==='1','the second arrival is recorded');
 // A stale open arrival (never checked out) does not block a new day
 sql(`update arrivals set arrived_at=now()-interval '9 hours' where left_at is null`);
-await P.p.reload();ok(await P.p.getByRole('button',{name:"I’ve arrived"}).isVisible(),'after six hours the arrival no longer counts as here');
+await P.p.reload();ok(await vis(P.p.getByRole('button',{name:"I’ve arrived"})),'after six hours the arrival no longer counts as here');
 await P.p.getByRole('button',{name:"I’ve arrived"}).click();await P.p.getByRole('button',{name:"I’ve left"}).waitFor({timeout:15000}).catch(()=>{});
 ok(sql(`select count(*) from arrivals where left_at is null`)==='1','a new arrival works after a stale one');
 // Layout and errors

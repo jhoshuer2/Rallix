@@ -56,7 +56,7 @@ const stateOf=id=>sql(`select status||','||open_registration||','||coalesce(max_
   await ade.goto(B+'/play/compete');await ade.getByRole('radio',{name:'Upcoming'}).click();
   ok(await ade.getByText('Spring Open').isVisible()&&await ade.getByText(/0 of 2 spots/).isVisible(),'the open competition is listed for a player who is not in it');
   ok(await ade.getByText('Open',{exact:true}).first().isVisible(),'it is tagged Open');
-  await ade.goto(B+'/play');ok(await ade.getByText('Spring Open').first().isVisible(),'it also appears on the player home');
+  await ade.goto(B+'/play');await ade.getByText('Spring Open').first().waitFor({timeout:20000}).catch(()=>{});ok(await ade.getByText('Spring Open').first().isVisible(),'it also appears on the player home');
   await ade.goto(B+'/play/compete');await ade.getByRole('radio',{name:'Upcoming'}).click();await ade.getByText('Spring Open').first().click();await ade.waitForURL(/play\/compete\/[0-9a-f-]{36}/);
   let t=await text(ade);
   ok(/Spring Open/i.test(t)&&/Our season opener/.test(t),'preview hero shows the name and the one-line summary');
