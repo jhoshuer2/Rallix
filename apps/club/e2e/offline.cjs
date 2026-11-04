@@ -91,12 +91,16 @@ await p.evaluate(()=>window.dispatchEvent(new Event('online')));
 ok(await until(()=>sql(`select status from matches where id='${m1}'`)==='completed',60000),'when the signal returns the result is sent and the match is completed');
 ok(sql(`select count(*) from games where match_id='${m1}'`)==='2','two games were saved');
 ok(sql(`select game_no||':'||p1_points||'-'||p2_points||':'||stopped from games where match_id='${m1}' and game_no=1`)==='1:3-0:true','game 1 keeps its umpire stop (3–0)');
-ok(sql(`select winner_id='${mid('ade')}' from matches where id='${m1}'`)==='true','Ade is the winner');
+ok(sql(`select winner_id='${mid('ade')}' from matches where id='${m1}'`)==='t','Ade is the winner');
 ok(sql(`select count(*) from rating_events where match_id='${m1}'`)==='2','ratings moved once');
 ok(await until(async()=>/The recorded result stays/.test(await text()),30000),'the second result is shown as a conflict and says the recorded result stays');
-ok(sql(`select winner_id='${mid('ade')}' from matches where id='${m2}'`)==='true'&&sql(`select count(*) from games where match_id='${m2}'`)==='0','the recorded result of match 2 was not changed');
+ok(sql(`select winner_id='${mid('ade')}' from matches where id='${m2}'`)==='t'&&sql(`select count(*) from games where match_id='${m2}'`)==='0','the recorded result of match 2 was not changed');
 ok(!/waiting to send/.test(await text()),'nothing is left waiting');
 
+// Discard the conflict first so the next check starts clean.
+const disc=p.getByRole('button',{name:'Discard'});
+if(await disc.count())await disc.first().click();
+ok(await until(async()=>!/need.? your attention/.test(await text())),'a conflict can be discarded');
 // 8. A retry of the same result (reply lost) is a no-op, not a conflict. Put the already-sent item back in the outbox.
 const ref=sql(`select client_ref from matches where id='${m1}'`);
 ok(/^[\w-]{8,64}$/.test(ref),'the match remembers the reference from the phone');
@@ -105,10 +109,5 @@ await p.getByRole('button',{name:'Send now'}).click({timeout:5000}).catch(()=>{}
 await p.waitForTimeout(6000);
 ok(sql(`select count(*) from games where match_id='${m1}'`)==='2'&&sql(`select count(*) from rating_events where match_id='${m1}'`)==='2','sending the same result again changes nothing');
 ok(!/need.? your attention/.test(await text().catch(()=>'')),'and it is not reported as a conflict');
-// 9. Discard the conflict.
-await p.goto(B+'/score-offline?match='+m2,{waitUntil:'networkidle'}).catch(()=>{});
-const disc=p.getByRole('button',{name:'Discard'});
-if(await disc.count())await disc.first().click();
-ok(await until(async()=>!/need.? your attention/.test(await text())),'a conflict can be discarded');
 ok(errs.filter(e=>!/Failed to fetch|NetworkError|Load failed/i.test(e)).length===0,'no console errors '+errs.join('|'));
 console.log(`\n${pass} passed, ${fail} failed`);await c.close();fs.rmSync(dir,{recursive:true,force:true});process.exit(fail?1:0)})().catch(e=>{console.error('CRASH',e.message);process.exit(2)});
