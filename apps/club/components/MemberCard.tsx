@@ -8,10 +8,15 @@ export function MemberCard({ initialToken }: { initialToken: string }) {
   const [token, setToken] = useState(initialToken);
   const [stale, setStale] = useState(false);
   useEffect(() => {
-    const t = setInterval(async () => {
+    // Refresh just after each clock minute starts: the token is tied to the minute, so this is when it changes.
+    let timer: ReturnType<typeof setTimeout>;
+    const next = () => { timer = setTimeout(run, (60 - new Date().getSeconds()) * 1000 + 1000 - new Date().getMilliseconds()); };
+    const run = async () => {
       try { const r = await newCardToken(); if (r.ok) { setToken(r.token); setStale(false); } else setStale(true); } catch { setStale(true); }
-    }, 45_000);
-    return () => clearInterval(t);
+      next();
+    };
+    next();
+    return () => clearTimeout(timer);
   }, []);
   const cells = useMemo(() => {
     const q = qrcode(0, "M"); q.addData(token); q.make();
