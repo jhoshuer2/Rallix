@@ -12,7 +12,7 @@ function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'')
 async function who(b,email){const c=await b.newContext({viewport:{width:390,height:900}});const p=await c.newPage();p.setDefaultTimeout(60000);p.errs=[];p.on('pageerror',e=>p.errs.push(e.message));p.on('console',m=>{if(m.type()==='error'&&!/DeprecationWarning|Failed to load resource/.test(m.text()))p.errs.push(m.text().slice(0,200))});
  await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor();await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()));
  await p.goto(B+'/switch/'+sql(`select id from clubs where name='Paris Arena'`));return p}
-const text=p=>p.locator('body').innerText();
+const text=async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
 const closed=p=>p.waitForFunction(()=>!document.querySelector('dialog[open]'),null,{timeout:20000}).then(()=>p.waitForLoadState('networkidle'));
 const at=async p=>{await p.waitForLoadState('networkidle');await p.waitForTimeout(500);return new URL(p.url()).pathname}; /* redirects after streaming start are client-side, so let the page settle */
 const tabs=p=>p.locator('.rx-nav__item').allInnerTexts().then(a=>a.map(x=>x.trim()));

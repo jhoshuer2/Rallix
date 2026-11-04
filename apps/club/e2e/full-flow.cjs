@@ -30,7 +30,7 @@ async function signIn(page, who, next = '/') {
 }
 (async()=>{const b=await chromium.launch();
 const mk=async()=>{const c=await b.newContext({viewport:{width:440,height:956}});c.setDefaultTimeout(90000);c.setDefaultNavigationTimeout(90000);const p=await c.newPage();p._errs=[];p.on('pageerror',e=>p._errs.push(e.message.slice(0,120)));return p};
-const text=p=>p.locator('body').innerText();
+const text=async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
 // ===== A. admin =====
 console.log('A. club admin (Innocent Amos)');
 const A=await mk();await signIn(A,'+2348030000100','/');

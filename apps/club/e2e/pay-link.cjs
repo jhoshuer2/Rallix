@@ -34,7 +34,7 @@ const tokenOf = id => sql(`select coalesce(pay_token,'') from platform_invoices 
 (async () => {
   const b = await chromium.launch();
   const mk = async (w = 440, h = 956) => { const c = await b.newContext({ viewport: { width: w, height: h } }); const p = await c.newPage(); p._errs = []; p.on('pageerror', e => p._errs.push(e.message.slice(0, 120))); return p; };
-  const text = p => p.locator('body').innerText();
+  const text = async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
   const LAGOS = clubId('lagos-spin'), PARIS = clubId('paris-arena');
   const lagosInv = sql(`select id from platform_invoices where club_id='${LAGOS}' and status='issued'`);
 

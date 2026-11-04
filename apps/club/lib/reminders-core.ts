@@ -1,3 +1,4 @@
+import { appEnv, isProduction } from "@rallix/config/env";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { auditLog, clubs, dues, memberships, reminderLog, reminderSettings, users } from "@rallix/db";
 import { compose, placeholdersIn, TEMPLATE_PLACEHOLDERS } from "@rallix/mailer";
@@ -44,7 +45,7 @@ export function buildReminderMessage(t: Template, v: { userId: string; to: strin
  */
 export async function runDueReminders(opts: { clubId?: string; today?: string; maxEmails?: number } = {}): Promise<RunSummary> {
   const db = serviceDb();
-  const production = process.env.NODE_ENV === "production";
+  const production = isProduction();
   const override = !production && opts.today && /^\d{4}-\d{2}-\d{2}$/.test(opts.today) ? opts.today : null;
   const tpl = await loadTemplate();
   if ("error" in tpl) return { ok: false, error: tpl.error };

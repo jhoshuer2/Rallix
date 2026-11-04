@@ -30,7 +30,7 @@ const userId = email => sql(`select id from users where email='${email}'`);
 (async () => {
   const b = await chromium.launch();
   const mk = async (w = 440, h = 956) => { const c = await b.newContext({ viewport: { width: w, height: h } }); const p = await c.newPage(); p._errs = []; p.on('pageerror', e => p._errs.push(e.message.slice(0, 120))); return p; };
-  const text = p => p.locator('body').innerText();
+  const text = async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
 
   console.log('1. the job is protected, and reminders are OFF by default');
   let r = await fetch(`${CLUB}/api/jobs/dues-reminders`, { method: 'POST' }); ok(r.status === 401, 'no secret: 401');

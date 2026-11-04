@@ -1,3 +1,4 @@
+import { appEnv, isProduction } from "@rallix/config/env";
 import { and, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
 import { emailLog } from "@rallix/db";
 import { createMailer, otpMessage, type Mailer } from "@rallix/mailer";
@@ -5,7 +6,7 @@ import { db } from "./db";
 
 const g = globalThis as unknown as { __consoleMail?: Mailer };
 /** The configured mailer. Throws at first use in production if SMTP is not configured. */
-export const mailer = (): Mailer => (g.__consoleMail ??= createMailer(process.env));
+export const mailer = (): Mailer => (g.__consoleMail ??= createMailer(appEnv()));
 
 /** Record that we tried to send. Never stores the message or any code. Logging must never break sending. */
 export async function logEmail(e: { to: string; kind: "otp" | "invoice" | "reminder" | "broadcast" | "support" | "club_review"; ok: boolean; error?: string; templateKey?: string; relatedId?: string }) {

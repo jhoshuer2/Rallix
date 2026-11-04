@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /** Better Auth's session cookie; production over HTTPS adds the __Secure- prefix. Presence only: the server validates it. */
 const hasSession = (req: NextRequest) => !!(req.cookies.get("better-auth.session_token") ?? req.cookies.get("__Secure-better-auth.session_token"));
 
-const open = [/^\/sign-in/, /^\/api\/auth/, /^\/api\/webhooks\//, /^\/api\/jobs\//, /^\/api\/unsubscribe\//, /^\/unsubscribe\//, /^\/pay\/invoice\//, /^\/pay\/fake/, /^\/welcome/, /^\/join\//, /^\/kit/, /^\/_next/, /^\/favicon/, /^\/players\//, /^\/club\//];
+const open = [/^\/api\/health$/, /^\/sign-in/, /^\/api\/auth/, /^\/api\/webhooks\//, /^\/api\/jobs\//, /^\/api\/unsubscribe\//, /^\/unsubscribe\//, /^\/pay\/invoice\//, /^\/pay\/fake/, /^\/welcome/, /^\/join\//, /^\/kit/, /^\/_next/, /^\/favicon/, /^\/players\//, /^\/club\//];
 
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;

@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *" # nightly full run
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # psql connects over TCP in CI (locally the scripts use the postgres system user).
+  RALLIX_PG_ADMIN: postgres://postgres:postgres@localhost:5432/postgres
+
+jobs:
+  checks:
+    name: Typecheck and unit and database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - name: Unit tests
+        run: |
+          for p in ui stats media mailer config payments; do pnpm --filter @rallix/$p test; done
+      - name: Database tests (row-level security)
+        run: pnpm --filter @rallix/db test
+
+  e2e:
+    name: Browser tests (${{ matrix.group }})
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: core
+            suites: "full-flow screens home admin-home"
+          - group: money
+            suites: "payments pay-link reminders uploads email"
+          - group: club-a
+            suites: "arrivals friendlies schedule facilities attendance rsvp"
+          - group: club-b
+            suites: "knockout seasons waitlist scoring competition-preview celebrations"
+          - group: admin
+            suites: "applications team support approval console"
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run the suites against the production build
+        run: scripts/e2e-run.sh prod ${{ matrix.suites }}
+        env:
+          E2E_LOGS: ${{ runner.temp }}/e2e
+      - name: Keep the logs when something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ matrix.group }}
+          path: ${{ runner.temp }}/e2e
+          retention-days: 7

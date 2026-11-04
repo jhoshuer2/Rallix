@@ -16,7 +16,7 @@ async function ctxFor(b,email,w=390){const c=await b.newContext({viewport:{width
  if(email){await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor();await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()))}
  return p}
 const small=async p=>p.evaluate(()=>[...document.querySelectorAll('button,a,[role=switch]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.height<44&&getComputedStyle(e).visibility!=='hidden'&&!e.classList.contains('rx-btn--small')&&!e.closest('dialog:not([open])')}).map(e=>(e.getAttribute('aria-label')||e.textContent||'').trim().slice(0,28)));
-const text=p=>p.locator('body').innerText();
+const text=async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
 
 (async()=>{
   const b=await chromium.launch();

@@ -34,7 +34,7 @@ const refFor = who => sql(`select p.provider_ref from payments p join membership
 (async () => {
   const b = await chromium.launch();
   const mk = async (w = 440, h = 956) => { const c = await b.newContext({ viewport: { width: w, height: h } }); const p = await c.newPage(); p._errs = []; p.on('pageerror', e => p._errs.push(e.message.slice(0, 120))); return p; };
-  const text = p => p.locator('body').innerText();
+  const text = async p => { await p.locator('.rx-skel').first().waitFor({ state: 'detached', timeout: 20000 }).catch(() => {}); return p.locator('body').innerText(); };
   const SULE = '+2348030000002', NURU = '+2348030000003', NATH = '+2348030000005', ADE = '+2348030000006', JIDE = '+2348030000000', ADMIN = '+2348030000100';
 
   console.log('1. before the club has set up payouts');

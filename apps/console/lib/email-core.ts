@@ -1,3 +1,4 @@
+import { appEnv, isProduction } from "@rallix/config/env";
 import { sql } from "drizzle-orm";
 import { assertHeaderSafe, compose, layout, renderHtml, sendBatch, signUnsubscribeToken } from "@rallix/mailer";
 import { date, naira } from "./format";
@@ -9,7 +10,7 @@ import { clubAppUrl, newPayToken, payLinkUrl } from "./pay-link";
 function unsubscribeSecret(): string {
   const s = process.env.UNSUBSCRIBE_SECRET;
   if (s && s.length >= 16) return s;
-  if (process.env.NODE_ENV === "production") throw new Error("UNSUBSCRIBE_SECRET is not set");
+  if (isProduction()) throw new Error("UNSUBSCRIBE_SECRET is not set");
   return "dev-only-unsubscribe-secret-not-for-production";
 }
 

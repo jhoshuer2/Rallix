@@ -1,3 +1,4 @@
+import { appEnv, isProduction } from "@rallix/config/env";
 import { inArray, sql } from "drizzle-orm";
 import webpush from "web-push";
 import { pushSubscriptions } from "@rallix/db";
@@ -33,7 +34,7 @@ export function createPushSender(env: Record<string, string | undefined>): PushS
 }
 
 const g = globalThis as unknown as { __rallixPush?: PushSender };
-export const pusher = (): PushSender => (g.__rallixPush ??= createPushSender(process.env));
+export const pusher = (): PushSender => (g.__rallixPush ??= createPushSender(appEnv()));
 
 /** Send to every device of these users. NEVER throws: a failed alert must not fail the action that caused it. Dead subscriptions are removed. */
 export async function sendToUsers(userIds: string[], payload: PushPayload): Promise<{ sent: number; failed: number }> {

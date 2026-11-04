@@ -1,3 +1,4 @@
+import { appEnv, isProduction } from "@rallix/config/env";
 import { signUnsubscribeToken, verifyUnsubscribeToken } from "@rallix/mailer";
 import { appUrl } from "./payments";
 
@@ -5,7 +6,7 @@ import { appUrl } from "./payments";
 export function unsubscribeSecret(): string {
   const s = process.env.UNSUBSCRIBE_SECRET;
   if (s && s.length >= 16) return s;
-  if (process.env.NODE_ENV === "production") throw new Error("UNSUBSCRIBE_SECRET is not set (at least 16 characters, identical in the club app and console)");
+  if (isProduction()) throw new Error("UNSUBSCRIBE_SECRET is not set (at least 16 characters, identical in the club app and console)");
   return "dev-only-unsubscribe-secret-not-for-production";
 }
 export const unsubscribeToken = (userId: string) => signUnsubscribeToken(unsubscribeSecret(), userId);
