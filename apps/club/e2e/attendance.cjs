@@ -31,9 +31,9 @@ const t1=await decodeQr(ade.p);
 ok(!!t1&&t1.startsWith('rx1.'),'the QR decodes to a card token');
 ok(t1&&t1.includes(sql(`select id from clubs where name='Paris Arena'`))&&t1.includes(mid('ade')),'the token names this club and this member');
 ok(await ade.p.getByText('Show this at the door. It refreshes every minute.').isVisible(),'honest caption about refreshing');
-await ade.p.waitForTimeout(48000);
+await ade.p.waitForTimeout((60-new Date().getSeconds())*1000+10000); // cross the next minute boundary: the token is tied to the clock minute
 const t2=await decodeQr(ade.p);
-ok(!!t2&&t2!==t1&&t2.startsWith('rx1.'),'the QR changed after about 45 seconds');
+ok(!!t2&&t2!==t1&&t2.startsWith('rx1.'),'the QR changed once the minute changed');
 
 // Admin: attendance
 await admin.p.goto(B+'/members',{waitUntil:'networkidle'});
