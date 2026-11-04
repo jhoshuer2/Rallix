@@ -1,6 +1,7 @@
 import type { Viewport } from "next";
 import type { ReactNode } from "react";
 import { RegisterSW } from "../components/RegisterSW";
+import { SyncBanner } from "../components/SyncBanner";
 import "@rallix/ui/fonts.css";
 import "@rallix/ui/tokens.css";
 import "@rallix/ui/components.css";
@@ -18,7 +19,7 @@ export const viewport: Viewport = { themeColor: "#1b6fe0", width: "device-width"
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}<RegisterSW /></body>
+      <body><SyncBanner />{children}<RegisterSW /></body>
     </html>
   );
 }

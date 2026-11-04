@@ -164,10 +164,13 @@ export const matches = pgTable("matches", {
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   feedsMatchId: uuid("feeds_match_id"),
   feedsSlot: smallint("feeds_slot"),
+  /** Made on the scorer's phone. Lets a retried offline send be recognised as the same result. */
+  clientRef: text("client_ref"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   unique("matches_id_club_uq").on(t.id, t.clubId),
+  uniqueIndex("matches_client_ref_uq").on(t.clientRef).where(sql`${t.clientRef} IS NOT NULL`),
   foreignKey({ columns: [t.competitionId, t.clubId], foreignColumns: [competitions.id, competitions.clubId], name: "matches_competition_fk" }).onDelete("cascade"),
   foreignKey({ columns: [t.player1Id, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_p1_fk" }),
   foreignKey({ columns: [t.player2Id, t.clubId], foreignColumns: [memberships.id, memberships.clubId], name: "matches_p2_fk" }),
@@ -176,6 +179,7 @@ export const matches = pgTable("matches", {
   index("matches_competition_idx").on(t.competitionId, t.roundOrder, t.slot),
   index("matches_p1_idx").on(t.player1Id),
   index("matches_p2_idx").on(t.player2Id),
+  check("matches_client_ref_len", sql`${t.clientRef} IS NULL OR char_length(${t.clientRef}) BETWEEN 8 AND 64`),
   check("matches_distinct_players", sql`${t.player1Id} IS NULL OR ${t.player2Id} IS NULL OR ${t.player1Id} <> ${t.player2Id}`),
   check("matches_winner_is_player", sql`${t.winnerId} IS NULL OR ${t.winnerId} = ${t.player1Id} OR ${t.winnerId} = ${t.player2Id}`),
   check("matches_best_of_odd", sql`${t.bestOf} > 0 AND ${t.bestOf} % 2 = 1`),

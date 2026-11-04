@@ -1,23 +1,35 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, PlayerSlot, ScoreTile } from "@rallix/ui";
-import { gamePointFor, isDeuce, isValidGame, resolveMatch, type GameScore } from "@rallix/stats";
-import { saveResult } from "../../../../../lib/actions";
+import { enqueue, gamePointFor, isDeuce, isValidGame, newItem, resolveMatch, type GameScore } from "@rallix/stats";
+import { announceOutbox, deleteDraft, getDraft, listOutbox, newClientRef, putOutbox, saveDraft, saveMatchContext } from "../../../../../lib/offline-store";
+import { syncNow } from "../../../../../lib/offline-sync";
 
 type P = { id: string; name: string; photo: string | null; rank: number };
 /** `last`: the game that just ended, so the umpire sees it finish and the next one start. */
 type Last = { n: number; p1: number; p2: number; stopped: boolean };
 type Snap = { done: GameScore[]; cur: [number, number]; last: Last | null };
 
-export function ScoreSheet({ competitionId, matchId, bestOf, p1, p2 }: { competitionId: string; matchId: string; bestOf: number; p1: P; p2: P }) {
+export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: { competitionId: string; clubId: string; matchId: string; bestOf: number; p1: P; p2: P }) {
   const router = useRouter();
   const [s, setS] = useState<Snap>({ done: [], cur: [0, 0], last: null });
   const [history, setHistory] = useState<Snap[]>([]);
   const [saving, setSaving] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [error, setError] = useState<string>();
+  const [queued, setQueued] = useState(false);
+
+  // Keep what this phone needs to score this match with no signal: the names and the half-played score.
+  useEffect(() => {
+    void saveMatchContext({ matchId, competitionId, clubId, bestOf, savedAt: Date.now(), p1, p2 });
+    void getDraft(matchId).then((d) => { if (d && (d.done.length || d.cur[0] || d.cur[1])) setS({ done: d.done, cur: d.cur, last: null }); });
+    // Warm the offline copy of the scoring screen while there is a signal.
+    try { navigator.serviceWorker?.controller?.postMessage({ type: "prepare-offline" }); } catch { /* ignore */ }
+    
+  }, []);
+  useEffect(() => { if (!queued && (s.done.length || s.cur[0] || s.cur[1])) void saveDraft({ matchId, done: s.done, cur: s.cur, savedAt: Date.now() }); }, [s, matchId, queued]);
   const outcome = resolveMatch(s.done, bestOf);
   const finished = outcome.valid;
   const players = [p1, p2];
@@ -41,12 +53,24 @@ export function ScoreSheet({ competitionId, matchId, bestOf, p1, p2 }: { competi
     push({ done: [...s.done, game], cur: [0, 0], last: { n: s.done.length + 1, p1: game.p1, p2: game.p2, stopped: true } });
   }
   function undo() { const prev = history[history.length - 1]; if (prev) { setS(prev); setHistory(history.slice(0, -1)); setConfirmEnd(false); } }
+  /** The result is always put in the phone's outbox first, then sent. Online it goes at once; offline it waits, and nothing is lost. */
   async function save() {
     setSaving(true); setError(undefined);
-    const r = await saveResult({ matchId, games: s.done });
-    if (!r.ok) { setSaving(false); return setError(r.error); }
-    router.push(`/competition/${competitionId}/groups`);
-    router.refresh();
+    const clientRef = newClientRef();
+    const label = `${p1.name} v ${p2.name}`;
+    const queue = await listOutbox();
+    const q = enqueue(queue, newItem({ clientRef, matchId, competitionId, clubId, label, games: s.done }, Date.now()));
+    if (q === queue) { setSaving(false); return setError("This result is already waiting to send."); }
+    const item = q[q.length - 1]!;
+    await putOutbox(item);
+    await deleteDraft(matchId);
+    announceOutbox();
+    await syncNow({ force: true });
+    const after = (await listOutbox()).find((i) => i.clientRef === clientRef);
+    if (!after || after.state === "synced") { router.push(`/competition/${competitionId}/groups`); router.refresh(); return; }
+    setSaving(false);
+    if (after.state === "waiting" || after.state === "syncing") { setQueued(true); return; }
+    setError(after.message ?? "Could not save the result.");
   }
   const wins = [s.done.filter((g) => g.p1 > g.p2).length, s.done.filter((g) => g.p2 > g.p1).length];
   const winner = outcome.valid ? (outcome.winnerSide === 1 ? p1 : p2) : null;
@@ -85,7 +109,13 @@ export function ScoreSheet({ competitionId, matchId, bestOf, p1, p2 }: { competi
           </div>
         ) : <Button variant="ghost" block onClick={() => setConfirmEnd(true)}>End game {gameNo}</Button>
       ) : null}
-      {finished ? <Button block disabled={saving} onClick={save}>{saving ? "Saving…" : "Save result"}</Button> : null}
+      {finished && !queued ? <Button block disabled={saving} onClick={save}>{saving ? "Saving…" : "Save result"}</Button> : null}
+      {queued ? (
+        <div role="status" style={{ display: "grid", gap: 8, textAlign: "center" }}>
+          <p style={{ margin: 0 }}><strong>Saved on this phone.</strong> It will be sent when you have a signal.</p>
+          <Link className="rx-btn rx-btn--surface" href={`/competition/${competitionId}/groups`}>Back to matches</Link>
+        </div>
+      ) : null}
       {error ? <p className="rx-error" role="alert">{error}</p> : null}
     </div>
   );

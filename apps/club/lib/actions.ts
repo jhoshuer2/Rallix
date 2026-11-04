@@ -162,26 +162,32 @@ export async function createCompetition(input: {
   }
 }
 
-type Outcome = { error: string } | { error: null; m: typeof matches.$inferSelect; winnerId: string; loserId: string };
+type Outcome = { error: string; conflict?: boolean } | { error: null; already: true } | { error: null; already?: false; m: typeof matches.$inferSelect; winnerId: string; loserId: string };
+type Recorded = { ok: true; winnerName: string; already?: boolean } | { ok: false; error: string; conflict?: boolean };
 
-/** Record a finished match, then update Elo (club and global). Idempotent per match. */
-export async function saveResult(input: { matchId: string; games: GameScore[] }): Promise<Result<{ winnerName: string }>> {
-  const ctx = await requireClub();
-  if (!canScore(ctx.club)) return fail("Only scorers and admins can record results.");
+/**
+ * Record a finished match, then update Elo (club and global). Idempotent per match.
+ * `clientRef` comes from an offline send: the same ref coming back means "this is ours, already saved", not a conflict.
+ */
+async function recordResult(ctx: Awaited<ReturnType<typeof requireClub>>, input: { matchId: string; games: GameScore[] }, clientRef?: string): Promise<Recorded> {
+  if (!canScore(ctx.club)) return { ok: false, error: "Only scorers and admins can record results." };
   try {
     const out = await inClub<Outcome>(ctx, async (tx) => {
       const [m] = await tx.select().from(matches).where(eq(matches.id, input.matchId));
       if (!m) return { error: "Match not found." };
-      if (m.status === "completed" || m.status === "walkover") return { error: "This match has already been recorded." };
+      if (m.status === "completed" || m.status === "walkover") {
+        if (clientRef && m.clientRef === clientRef) return { error: null, already: true as const };
+        return { error: "This match has already been recorded.", conflict: true };
+      }
       if (!m.player1Id || !m.player2Id) return { error: "Both players must be set before scoring." };
       const r = resolveMatch(input.games, m.bestOf);
       if (!r.valid) return { error: r.reason };
       const p1 = m.player1Id, p2 = m.player2Id;
       const winnerId = r.winnerSide === 1 ? p1 : p2;
       const loserId = r.winnerSide === 1 ? p2 : p1;
-      const upd = await tx.update(matches).set({ status: "completed", winnerId, gamesP1: r.gamesP1, gamesP2: r.gamesP2, scorerId: ctx.club.membershipId, confirmedAt: new Date() })
+      const upd = await tx.update(matches).set({ status: "completed", winnerId, gamesP1: r.gamesP1, gamesP2: r.gamesP2, scorerId: ctx.club.membershipId, confirmedAt: new Date(), ...(clientRef ? { clientRef } : {}) })
         .where(and(eq(matches.id, m.id), sql`${matches.status} NOT IN ('completed','walkover')`)).returning({ id: matches.id });
-      if (!upd.length) return { error: "This match has already been recorded." };
+      if (!upd.length) return { error: "This match has already been recorded.", conflict: true };
       await tx.insert(games).values(input.games.map((g, i) => ({ clubId: ctx.club.clubId, matchId: m.id, gameNo: i + 1, p1Points: g.p1, p2Points: g.p2, stopped: g.stopped === true })));
       // Knockout: the winner moves into the next match; deciding the final completes the competition. Same transaction as the result.
       if (m.feedsMatchId) {
@@ -192,15 +198,43 @@ export async function saveResult(input: { matchId: string; games: GameScore[] })
       }
       return { error: null, m, winnerId, loserId };
     });
-    if (out.error !== null) return fail(out.error);
+    if (out.error !== null) return { ok: false, error: out.error, conflict: "conflict" in out ? out.conflict : undefined };
+    if (out.already) return { ok: true, winnerName: "", already: true };
     await updateRatings(ctx.club.clubId, out.m.id, out.m.competitionId, out.winnerId, out.loserId);
     await finishIfDone(ctx.club.clubId, out.m.competitionId); // completes the competition and records the podium when every match is decided
     revalidatePath("/", "layout");
     const [w] = await inClub(ctx, (tx) => tx.select({ name: users.name }).from(memberships).innerJoin(users, eq(users.id, memberships.userId)).where(eq(memberships.id, out.winnerId)));
     return { ok: true, winnerName: w?.name ?? "Winner" };
   } catch {
-    return fail("Could not save the result. Please try again.");
+    return { ok: false, error: "Could not save the result. Please try again." };
   }
+}
+
+export async function saveResult(input: { matchId: string; games: GameScore[] }): Promise<Result<{ winnerName: string }>> {
+  const ctx = await requireClub();
+  const r = await recordResult(ctx, input);
+  return r.ok ? { ok: true, winnerName: r.winnerName } : fail(r.error);
+}
+
+/** What the phone's outbox needs to know. `auth` = sign in again (never redirects: a redirect would break the background sync). */
+export type SyncReply = { ok: true; already: boolean } | { ok: false; kind: "conflict" | "rejected" | "auth"; error: string };
+
+/**
+ * Send a result that was scored without a signal. Same checks as saveResult (scorer or admin, valid score, once per match);
+ * `clientRef` makes a retry after a lost reply safe. The match's own club is used, whichever club is active in the app now.
+ */
+export async function syncOfflineResult(input: { clubId: string; matchId: string; games: GameScore[]; clientRef: string }): Promise<SyncReply> {
+  if (!/^[0-9a-f-]{36}$/i.test(String(input.clubId)) || !/^[0-9a-f-]{36}$/i.test(String(input.matchId))) return { ok: false, kind: "rejected", error: "This result cannot be sent." };
+  if (!/^[\w-]{8,64}$/.test(String(input.clientRef))) return { ok: false, kind: "rejected", error: "This result cannot be sent." };
+  if (!Array.isArray(input.games) || input.games.length > 9) return { ok: false, kind: "rejected", error: "This result cannot be sent." };
+  const ctx = await getCtx();
+  if (!ctx) return { ok: false, kind: "auth", error: "Sign in again to send this result." };
+  const club = ctx.clubs.find((c) => c.clubId === input.clubId);
+  if (!club) return { ok: false, kind: "rejected", error: "You are no longer in the club this match belongs to." };
+  const games: GameScore[] = input.games.map((g) => ({ p1: Number(g.p1), p2: Number(g.p2), stopped: g.stopped === true }));
+  const r = await recordResult({ ...ctx, club }, { matchId: input.matchId, games }, input.clientRef);
+  if (r.ok) return { ok: true, already: r.already === true };
+  return { ok: false, kind: r.conflict ? "conflict" : "rejected", error: r.error };
 }
 
 /** Service role: ratings tables are not writable by the app role. Called only after saveResult's checks pass. */

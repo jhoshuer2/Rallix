@@ -1444,3 +1444,20 @@ describe("stopped games", () => {
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`insert into games (club_id, match_id, game_no, stopped) values (${ids.A}, ${m}, 3, true)`)))).toBe("42501"); // a player cannot score
   });
 });
+
+describe("offline result reference", () => {
+  const mk = async (name: string) => ((await svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id) values (${ids.A}, ${ids.compA}, ${name}, ${ids.mP1}, ${ids.mP2}) returning id`)).rows[0] as { id: string }).id;
+  it("a scorer can store a reference, and it must be unique and a sensible length", async () => {
+    const a = await mk("Ref A"), b = await mk("Ref B");
+    const o = { userId: "adminA", clubId: ids.A };
+    await withTenant(app, o, (tx) => tx.execute(sql`update matches set client_ref = 'ref-abcdef12' where id = ${a}`));
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`update matches set client_ref = 'ref-abcdef12' where id = ${b}`)))).toBe("23505");
+    expect(await denied(withTenant(app, o, (tx) => tx.execute(sql`update matches set client_ref = 'short' where id = ${b}`)))).toBe("23514");
+    await withTenant(app, o, (tx) => tx.execute(sql`update matches set client_ref = null where id = ${b}`)); // many matches may have no reference
+  });
+  it("a player cannot set a reference", async () => {
+    const m = await mk("Ref C");
+    const r = await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update matches set client_ref = 'ref-player-1' where id = ${m} returning id`));
+    expect(r.rows).toHaveLength(0);
+  });
+});

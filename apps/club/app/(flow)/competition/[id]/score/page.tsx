@@ -18,5 +18,5 @@ export default async function Score({ params, searchParams }: { params: Promise<
   const rank = new Map(members.map((x) => [x.id, x.rank]));
   if (!m || !m.p1 || !m.p2) notFound();
   if (m.status === "completed") return <Screen className="rx-darkscreen"><p>This match has already been recorded. <Link className="rx-btn" href={`/competition/${id}/groups`}>Back</Link></p></Screen>;
-  return <Screen className="rx-darkscreen"><ScoreSheet competitionId={id} matchId={m.id} bestOf={m.bestOf} p1={{ ...m.p1, rank: rank.get(m.p1.id) ?? 0 }} p2={{ ...m.p2, rank: rank.get(m.p2.id) ?? 0 }} /></Screen>;
+  return <Screen className="rx-darkscreen"><ScoreSheet competitionId={id} clubId={ctx.club.clubId} matchId={m.id} bestOf={m.bestOf} p1={{ ...m.p1, rank: rank.get(m.p1.id) ?? 0 }} p2={{ ...m.p2, rank: rank.get(m.p2.id) ?? 0 }} /></Screen>;
 }
