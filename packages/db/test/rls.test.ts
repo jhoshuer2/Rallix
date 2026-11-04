@@ -1461,3 +1461,14 @@ describe("offline result reference", () => {
     expect(r.rows).toHaveLength(0);
   });
 });
+
+describe("security definer functions", () => {
+  it("every one pins its search_path (no hijacking through a user schema)", async () => {
+    const r = (await svc.execute(sql`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.prosecdef and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')`)).rows as Array<{ proname: string }>;
+    expect(r.map((x) => x.proname)).toEqual([]);
+  });
+  it("none can be called by PUBLIC (only named roles)", async () => {
+    const r = (await svc.execute(sql`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.prosecdef and has_function_privilege('public', p.oid, 'execute')`)).rows as Array<{ proname: string }>;
+    expect(r.map((x) => x.proname)).toEqual([]);
+  });
+});

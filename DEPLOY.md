@@ -73,3 +73,46 @@ A web app cannot track location in the background: arrival is a tap on "I've arr
 
 ### Applying migrations without URL encoding
 `packages/db/scripts/supabase-migrate.sh` also accepts `SUPABASE_DB_PASSWORD` (your database password, any characters) together with `SUPABASE_POOLER_HOST` and `SUPABASE_PROJECT_REF`. Use it when the password contains symbols such as `@` that would break a connection URL.
+
+## 8. Migrations: what each release needs, and how to check
+Every push to the branch deploys by itself, so **apply the migrations first, then push**. If an app shows "Application error" after a deploy, the usual cause is a migration that was not applied: promote the previous deployment in Vercel (instant rollback), apply the migration, then redeploy.
+
+| Release | Migrations | Count after |
+|---|---|---|
+| Court location, arrivals, push | 0017 to 0018 | 19 |
+| Competition preview and sign-up | 0019 to 0020 | 21 |
+| Club page, applications, admin team | 0021 to 0025 | 26 |
+| Schedule, facilities, attendance | 0026 to 0028 | 29 |
+| Knockout, points, seasons | 0029 to 0030 | 31 |
+| Staff roles, support inbox | 0031 | 32 |
+| Waitlist, doors open, I'm coming | 0032 to 0033 | 34 |
+| Club approval, plans, member limit | 0034 | 35 |
+| Game stopped by the umpire | 0035 | 36 |
+| Offline scoring (match reference) | 0036 | 37 |
+
+Check in the Supabase SQL editor (the migration count is the first number; the rest must read `true`):
+```sql
+select (select count(*) from drizzle.__drizzle_migrations) as migrations_applied,
+  exists (select 1 from information_schema.columns where table_name = 'games' and column_name = 'stopped') as has_games_stopped,
+  exists (select 1 from information_schema.columns where table_name = 'matches' and column_name = 'client_ref') as has_match_client_ref,
+  to_regclass('public.platform_plans') is not null as has_platform_plans,
+  exists (select 1 from pg_proc where proname = 'my_club_plan') as has_my_club_plan;
+```
+
+## 9. Environment variables, both apps
+| Variable | Club app | Console | Notes |
+|---|---|---|---|
+| `DATABASE_URL_APP` | yes | no | Transaction pooler (6543), role `rallix_app` |
+| `DATABASE_URL_SERVICE` | yes | yes | Transaction pooler, role `rallix_service`. Server only |
+| `DATABASE_SSL` | `no-verify` | `no-verify` | Supabase |
+| `BETTER_AUTH_SECRET` | yes | yes | 32+ random characters. Also signs the member-card QR in the club app |
+| `BETTER_AUTH_URL` / `APP_URL` / `CLUB_APP_URL` | yes | yes | Full `https://` addresses, no trailing slash |
+| `UNSUBSCRIBE_SECRET` | yes | yes | The SAME value in both apps |
+| `CRON_SECRET` | yes | no | 16+ characters; the daily reminders job sends it as a Bearer token |
+| `MAIL_PROVIDER=smtp`, `SMTP_URL`, `MAIL_FROM` | yes | yes | `MAIL_FROM` without quotes. Never `console` in production |
+| `PAYMENTS_PROVIDER=paystack`, `PAYSTACK_SECRET_KEY` | yes | yes | TEST key first, live later |
+| `STORAGE_PROVIDER=supabase`, `S3_*`, `MEDIA_PUBLIC_BASE` | yes | no | Section 6 |
+| `PUSH_PROVIDER=web`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | yes | no | Section 7 |
+| `RALLIX_CI_E2E` | never | never | Test machines only. It is ignored on Vercel and with any non-local database |
+
+Health check for monitors: `GET /api/health` on each app (no data, returns `ok`).

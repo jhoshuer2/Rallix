@@ -16,7 +16,7 @@ export class SmtpMailer implements Mailer {
     this.from = assertHeaderSafe(opts.from, "MAIL_FROM");
     this.replyTo = opts.replyTo ? assertHeaderSafe(opts.replyTo, "MAIL_REPLY_TO") : undefined;
     if (!opts.transport && !/^smtps?:\/\//.test(opts.url)) throw new MailError("SMTP_URL must start with smtp:// or smtps://", "config");
-    this.t = opts.transport ?? nodemailer.createTransport(opts.url, { connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 });
+    this.t = opts.transport ?? nodemailer.createTransport({ url: opts.url, connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 } as Parameters<typeof nodemailer.createTransport>[0]);
   }
 
   async send(m: Message): Promise<SendResult> {

@@ -122,6 +122,22 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Barlow Condensed 600/700 (he
 - Waitlist: `competition_waitlist`, written only by `app.join_waitlist` / `leave_waitlist`. A trigger on `competition_entries` promotes the oldest eligible waiter whenever a spot opens (leave, admin removal) and `app.promote_waitlist` is called after the admin raises the limit. `registrationState` has `waitlist` and `waiting`. The competition preview's one main action is a sticky bottom bar (`StickyBar`).
 - Tests: `knockout.cjs`, `seasons.cjs`, `waitlist.cjs`.
 
+## Scoring, offline scoring, shuffle
+- Scoring screen (`competition/[id]/score/ScoreSheet.tsx`): no score cap (deuce goes on until a 2-point lead); it announces game point and deuce, shows "Game N of M", and the umpire can "End game" (whoever leads wins; a tie cannot be ended; `games.stopped`). Shuffle needs 4 or more players (a knockout only by raffle); otherwise the button reads "Create competition".
+- Offline scoring: the result is ALWAYS put in the phone's outbox first (`lib/offline-store.ts`, IndexedDB `rallix-offline`: `matches` context, `outbox`, `drafts`), then sent by `lib/offline-sync.ts` (on `online`, tab visible, every 60 s, "Send now"; one run at a time). Pure rules in `packages/stats/src/outbox.ts` (states, backoff, dedupe, summary). The server action is `syncOfflineResult` (never redirects; returns `auth` when signed out): same checks as `saveResult` through the shared `recordResult`, uses the match's own club, and `matches.client_ref` (unique, migration 0036) makes a retried send "already ours" (success) while another result for a recorded match is a `conflict` (the recorded result stays; the scorer discards the queued one).
+- Service worker (`public/sw.js`): push always; registered as `/sw.js?offline=1` only in production builds, where it keeps exactly `/_next/static/*` (cache-first) and one data-free shell `/score-offline` (network-first). A score page that fails to load redirects to `/score-offline?match=`. Nothing else is cached, so the app is never stale. `SyncBanner` (root layout) shows "N results waiting to send".
+- Test: `apps/club/e2e/offline.cjs` (needs a production build: `scripts/e2e-run.sh prod offline`).
+
+## CI and the production-build test runner
+- `.github/workflows/ci.yml`: typecheck, unit tests, DB tests (Postgres 16 service), then browser suites in five groups against a PRODUCTION build; nightly too. `scripts/e2e-up.sh [prod|dev]` and `scripts/e2e-run.sh <mode> suite...` do the same locally (fresh DB per suite).
+- `RALLIX_CI_E2E=1` lets dev adapters (console mailer, fake payments, local store) run in a production build, but ONLY off Vercel and with every `DATABASE_URL_*` on localhost (`ciE2eAllowed`, `isProduction`, `appEnv` in `@rallix/config/env`). Never set it on a real deployment.
+- Test helpers must wait for `.rx-skel` to detach before reading text (production builds show the skeleton longer); `isVisible()` does not wait.
+
+## Security checks that run in CI
+- `packages/config/src/actions-guard.test.ts`: every exported function in a `"use server"` file must call a guard (`requireClub`, `requireRole`, `requirePermission`, `getCtx`, `requireAdmin`...) before it touches data. A deliberately public action must be added to its `PUBLIC` list with the reason.
+- DB tests assert every `SECURITY DEFINER` function in schema `app` pins its `search_path` and is not executable by PUBLIC.
+- Both apps send `X-Content-Type-Options`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Permissions-Policy` (club: camera and location for itself only; console: none) and HSTS; the pay link keeps its own no-store and no-referrer headers. Go-live steps: `docs/GO-LIVE.md`; migrations and env matrix: `DEPLOY.md` sections 8 and 9.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.

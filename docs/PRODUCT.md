@@ -50,4 +50,6 @@ Runs the multi-club product: clubs and their health, subscriptions and invoices,
 ## Status
 Built: clubs, invites, players, dues and payments, competitions with open sign-up and preview, scoring, ratings, check-in with alerts, reminders, pictures, console.
 Rounds 1 to 3 done: calm type scale and hide-until-data homes, club page with apply-to-join, admin team responsibilities, friendly challenges (rated only when both players agree).
-Next: club schedule and holidays, facilities, admin attendance, more competition formats, console club approval.
+Rounds 4 to 10 done: club schedule and holidays, facilities, attendance and member card, knockout and raffle draw, points, awards and seasons, waitlist, calendar chips and "I'm coming", staff roles and support inbox, club approval and plan limits.
+Round 11 (go-live hardening): offline scoring (a scorer with no signal keeps working; results send when the signal returns), automated checks on every push, a security review (guard tests, security headers, dependency updates), and the go-live guide in `docs/GO-LIVE.md`.
+Next: real-device testing with a first club, then Paystack live keys.
