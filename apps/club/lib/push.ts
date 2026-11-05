@@ -1,3 +1,4 @@
+import { isPushEndpoint } from "@rallix/config/safe-input";
 import { appEnv, isProduction } from "@rallix/config/env";
 import { inArray, sql } from "drizzle-orm";
 import webpush from "web-push";
@@ -22,6 +23,8 @@ export function createPushSender(env: Record<string, string | undefined>): PushS
   return {
     name: "web",
     async send(_userId, s, p) {
+      // Never call an address that is not a real push service (older rows were only checked for https). Treated as dead, so it is removed.
+      if (!isPushEndpoint(s.endpoint)) return { ok: false, gone: true };
       try {
         await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(p), { TTL: 3600, urgency: "high" });
         return { ok: true };

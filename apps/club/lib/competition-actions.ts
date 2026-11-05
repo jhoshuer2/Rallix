@@ -130,6 +130,8 @@ export async function addEntrants(id: string, memberIds: string[]): Promise<Resu
   const added = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
     if (!c || c.status !== "draft") return -1;
+    // Same row lock as app.join_competition, so a player joining at the same moment cannot push the competition past its spot limit.
+    await tx.execute(sql`select 1 from competitions where id = ${id} for update`);
     const have = await tx.select({ m: competitionEntries.membershipId }).from(competitionEntries).where(eq(competitionEntries.competitionId, id));
     const valid = (await listMembers(tx, ctx.club.clubId)).filter((m) => memberIds.includes(m.id) && !have.some((h) => h.m === m.id));
     if (c.maxPlayers !== null && have.length + valid.length > c.maxPlayers) return -2;

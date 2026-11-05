@@ -1,8 +1,9 @@
 "use server";
-import { and, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { arrivals, clubs, memberships, playerProfiles, pushSubscriptions, users } from "@rallix/db";
 import { arrivalMessage, shouldAlert, withinVenue } from "@rallix/stats";
+import { isPushEndpoint } from "@rallix/config/safe-input";
 import { can, getCtx, inClub, requireClub } from "./context";
 import { serviceDb } from "./db";
 import { getVenue, HERE_HOURS } from "./arrival-queries";
@@ -18,9 +19,12 @@ export async function savePushSubscription(input: { endpoint: string; p256dh: st
   const ctx = await getCtx();
   if (!ctx) return fail("Please sign in again.");
   const { endpoint, p256dh, auth } = input ?? ({} as typeof input);
-  if (typeof endpoint !== "string" || !/^https:\/\/[^\s]{8,1000}$/.test(endpoint)) return fail("This device can’t receive alerts.");
+  if (!isPushEndpoint(endpoint)) return fail("This device can’t receive alerts.");
   if (typeof p256dh !== "string" || typeof auth !== "string" || p256dh.length < 20 || p256dh.length > 200 || auth.length < 8 || auth.length > 100) return fail("This device can’t receive alerts.");
   const userAgent = typeof input.userAgent === "string" ? input.userAgent.slice(0, 200) : null;
+  // A person has a few devices, not hundreds: keep the newest 10 so the table cannot be filled from one account.
+  const mine = await serviceDb().select({ id: pushSubscriptions.id }).from(pushSubscriptions).where(eq(pushSubscriptions.userId, ctx.user.id)).orderBy(desc(pushSubscriptions.createdAt));
+  for (const old of mine.slice(9)) await serviceDb().delete(pushSubscriptions).where(eq(pushSubscriptions.id, old.id));
   await serviceDb().insert(pushSubscriptions).values({ userId: ctx.user.id, endpoint, p256dh, auth, userAgent })
     .onConflictDoUpdate({ target: pushSubscriptions.endpoint, set: { userId: ctx.user.id, p256dh, auth, userAgent } });
   return { ok: true };
