@@ -1429,7 +1429,7 @@ describe("club approval, plans and the member limit", () => {
     const player = ((await svc.execute(sql`select user_id from memberships where club_id = ${club} and 'player' = ANY(roles) limit 1`)).rows[0] as { user_id: string }).user_id;
     expect(await rows(app, { userId: player, clubId: club }, sql`select * from app.my_club_plan()`)).toHaveLength(0);
     expect(await rows(app, { userId: "adminB", clubId: ids.B }, sql`select * from app.my_club_plan()`)).toHaveLength(0);
-    expect(String((await rows(app, { userId: owner, clubId: club }, sql`select app.club_room(${club}) as r`))[0]!.r)).toBe("8");
+    expect(String((await svc.execute(sql`select app.club_room(${club}) as r`)).rows[0]!.r)).toBe("8"); // the service role still can; the app role cannot (see the hardening tests)
   });
 });
 
@@ -1501,5 +1501,31 @@ describe("show birthday", () => {
     const other = await withTenant(app, { userId: "playerA2", clubId: ids.A }, (tx) => tx.execute(sql`update player_profiles set show_birthday = true where membership_id = ${ids.mP1} returning 1`));
     expect(other.rows).toHaveLength(0);
     await withTenant(app, p1, (tx) => tx.execute(sql`update player_profiles set show_birthday = true, date_of_birth = null where membership_id = ${ids.mP1}`));
+  });
+});
+
+describe("hardening from the security review", () => {
+  let n = 0;
+  const mkUser = async () => { const u = `hard${++n}`; await svc.execute(sql`insert into users (id, name, email) values (${u}, ${u}, ${`${u}@x.com`})`); return u; };
+  const club = async () => { const o = await mkUser(); const c = (await svc.execute(sql`insert into clubs (slug, name, owner_id) values (${`hard-club-${n}`}, ${`Hard Club ${n}`}, ${o}) returning id`)).rows[0] as { id: string }; return { id: c.id, owner: o }; };
+  const plan = async (limit: number) => (await svc.execute(sql`insert into platform_plans (name, monthly_kobo, yearly_kobo, member_limit) values (${`Hard plan ${++n}`}, 1, 1, ${limit}) returning id`)).rows[0] as { id: string };
+  const subscribe = (c: string, p: string) => svc.execute(sql`insert into club_subscriptions (club_id, period, status, amount_kobo, plan_id) values (${c}, 'monthly', 'active', 1, ${p})`);
+  const add = async (c: string, roles: string) => { const u = await mkUser(); return svc.execute(sql.raw(`insert into memberships (club_id, user_id, roles) values ('${c}', '${u}', ARRAY['${roles}']::member_role[])`)); };
+
+  it("coaches and scorers take a seat, so an admin cannot get round the plan limit with another role", async () => {
+    const c = await club(); await subscribe(c.id, (await plan(2)).id);
+    await add(c.id, "player"); await add(c.id, "coach");
+    expect(await denied(add(c.id, "scorer"))).toBe("P0001"); // third seat: full
+    expect(await denied(add(c.id, "player"))).toBe("P0001");
+    await add(c.id, "admin"); // someone who only runs the club does not need a seat
+    expect(String((await svc.execute(sql`select app.active_players(${c.id}) as n`)).rows[0]!.n)).toBe("2");
+  });
+  it("club_room is no longer readable by the app role (it leaked another club's seats)", async () => {
+    const c = await club();
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select app.club_room(${c.id})`)))).toBe("42501");
+  });
+  it("the last-owner guard takes a lock, so two owners cannot remove each other at once", async () => {
+    const def = String((await svc.execute(sql`select pg_get_functiondef('public.keep_one_owner'::regproc) as d`)).rows[0]!.d);
+    expect(def).toMatch(/pg_advisory_xact_lock/);
   });
 });

@@ -89,6 +89,9 @@ Every push to the branch deploys by itself, so **apply the migrations first, the
 | Club approval, plans, member limit | 0034 | 35 |
 | Game stopped by the umpire | 0035 | 36 |
 | Offline scoring (match reference) | 0036 | 37 |
+| Username sign-in | 0037 | 38 |
+| Birthday visibility | 0038 | 39 |
+| Security hardening (seats, `club_room`, owner lock) | 0039 | 40 |
 
 Check in the Supabase SQL editor (the migration count is the first number; the rest must read `true`):
 ```sql
