@@ -815,10 +815,10 @@ fieldset { min-width: 0; }
 .rx-canvas .rx-eye:focus-visible { outline-color: var(--rx-blue); }
 
 /* Toasts: at the TOP so the keyboard never hides them. Success is dark with a green check, failure is red; both are read aloud. */
-.rx-toasts { position: fixed; inset: calc(env(safe-area-inset-top, 0px) + 12px) 0 auto 0; z-index: 90; width: auto; height: auto; margin: 0; border: 0; background: transparent; overflow: visible; display: grid; gap: 8px; padding: 0 16px; pointer-events: none; color: inherit; }
+.rx-toasts { position: fixed; inset: calc(env(safe-area-inset-top, 0px) + 68px) 0 auto 0; z-index: 90; width: auto; height: auto; margin: 0; border: 0; background: transparent; overflow: visible; display: grid; gap: 8px; padding: 0 16px; pointer-events: none; color: inherit; }
 .rx-toasts:not(:popover-open) { display: none; }
 .rx-toasts > div { display: grid; gap: 8px; }
-.rx-toast { pointer-events: auto; margin: 0 auto; width: 100%; max-width: 408px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; min-height: 56px; border-radius: 14px; background: var(--rx-night); color: #fff; font-size: 15px; line-height: 1.35; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: rx-toast-in .2s ease-out; }
+.rx-toast { box-sizing: border-box; pointer-events: auto; margin: 0 auto; width: 100%; max-width: 408px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; min-height: 56px; border-radius: 14px; background: var(--rx-night); color: #fff; font-size: 15px; line-height: 1.35; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: rx-toast-in .2s ease-out; }
 .rx-toast--error { background: #8a1c1c; }
 .rx-toast__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #1f9d55; }
 .rx-toast--error .rx-toast__icon { background: #fff; color: #8a1c1c; }

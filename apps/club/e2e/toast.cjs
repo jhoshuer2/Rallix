@@ -25,12 +25,13 @@ await p.getByLabel(/Phone or WhatsApp/).fill('0803 555 0142');
 await p.getByRole('button',{name:'Save contact details'}).click();
 ok(await visible(p,/Phone number saved/),'saving the phone number shows a toast saying so');
 const r1=await rect(p);
-ok(r1&&r1.y<120&&r1.y>=0&&r1.x>=0&&r1.x+r1.width<=440,'it is at the top of the screen and inside the viewport');
+ok(r1&&r1.y<=100&&r1.y>=48&&r1.x>=0&&r1.x+r1.width<=440,'it is at the top, just under the app bar, and inside the viewport');
 ok(await p.locator('[role="status"] .rx-toast--success').count()>=1,'a success toast sits in a polite live region (read aloud)');
 ok((await p.getByRole('button',{name:'Dismiss message'}).first().boundingBox()).height>=44,'its OK button is at least 44px tall');
 ok(await p.evaluate(()=>{const el=document.querySelector('.rx-toast');const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.x+r.width/2,r.y+10);return !!top&&el.contains(top)}),'nothing is drawn on top of it');
 const fg=await p.evaluate(()=>getComputedStyle(document.querySelector('.rx-toast--success')).color);const bg=await p.evaluate(()=>getComputedStyle(document.querySelector('.rx-toast--success')).backgroundColor);
-ok(fg==='rgb(255, 255, 255)'&&/rgb\(15, 32, 56\)/.test(bg),'white text on the dark panel (high contrast)');
+const lum=(c)=>{const m=c.match(/\d+/g).map(Number).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*m[0]+0.7152*m[1]+0.0722*m[2]};
+ok(fg==='rgb(255, 255, 255)'&&(1.05)/(lum(bg)+0.05)>=7,'white text on a dark panel (contrast at least 7:1)');
 
 // 2. Dismiss
 await p.getByRole('button',{name:'Dismiss message'}).first().click();
@@ -68,8 +69,10 @@ await p.getByRole('button',{name:'Save birthday'}).click();
 await p.waitForTimeout(500);
 ok(await p.locator('.rx-toast').count()<=3,'toasts never pile up beyond three');
 
-// 7. A toast survives moving to another screen
-await p.getByRole('link',{name:/Back/}).first().click().catch(async()=>{await p.goto(B+'/play/me')});
+// 7. The Back button stays tappable while a toast shows, and the toast survives moving to another screen
+const bt=Date.now();
+await p.getByRole('link',{name:/Back/}).first().click({timeout:3000}).catch(()=>{});
+ok(Date.now()-bt<3500,'Back can be tapped at once (the toast does not cover it)');
 await p.waitForURL(/\/play\/me$/,{timeout:20000}).catch(()=>{});
 ok(await p.locator('.rx-toast').count()>=1,'the toast is still on screen after going back to Me');
 await p.goto(B+'/play/me/account',{waitUntil:'networkidle'});
@@ -94,6 +97,9 @@ const save=q.locator('dialog[open]').getByRole('button',{name:/^Save/}).first();
 await save.click();
 const t=q.locator('.rx-toast').first();
 ok(await t.waitFor({state:'visible',timeout:15000}).then(()=>true).catch(()=>false),'a failed save inside a sheet shows a toast');
-ok(await q.evaluate(()=>{const el=document.querySelector('.rx-toast');if(!el)return false;const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.x+r.width/2,r.y+10);return !!top&&el.contains(top)}),'the toast is drawn above the open sheet, not behind it');
+const tb=await q.locator('.rx-toast').first().boundingBox();
+const shot=await q.screenshot({clip:{x:tb.x+6,y:tb.y+6,width:8,height:8}});
+const px=await q.evaluate(async(b64)=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return [...x.getImageData(2,2,1,1).data]},shot.toString('base64'));
+ok(px[0]<60&&px[1]<60&&px[2]<110,'the toast is drawn above the open sheet (its dark colour shows, not the sheet\'s white): '+px.join(','));
 ok(errs.length===0,'no console errors '+errs.join('|'));
 console.log(`\n${pass} passed, ${fail} failed`);await b.close();process.exit(fail?1:0)})().catch(e=>{console.error('CRASH',e.message);process.exit(2)});

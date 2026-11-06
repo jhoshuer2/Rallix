@@ -8,7 +8,7 @@ const Ctx = createContext<Api | null>(null);
 
 /**
  * One place for "that worked" and "that failed". Mount ONCE near the root so a toast survives moving to another screen.
- * It sits at the TOP (the keyboard is usually still open after tapping Save and would hide a bottom message), is read aloud
+ * It sits at the TOP, just under the app bar so Back stays tappable (the keyboard is usually still open after tapping Save and would hide a bottom message), is read aloud
  * (success politely, failure assertively), has a 44px OK button, pauses while hovered or focused, and does not animate under reduced motion.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
