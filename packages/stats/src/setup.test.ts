@@ -25,8 +25,8 @@ describe("setupProgress", () => {
 });
 describe("playerStart", () => {
   it("marks finished steps", () => {
-    const s = playerStart({ hasPhoto: true, levelSet: true, playedMatch: false, alertsOn: false, hasPassword: false });
-    expect(s.map((x) => x.done)).toEqual([true, false, false, false]);
+    const s = playerStart({ hasPhoto: true, levelSet: true, playedMatch: false, alertsOn: false, hasPassword: false, hasBirthday: false });
+    expect(s.map((x) => x.done)).toEqual([true, false, false, false, false]);
   });
 });
 
@@ -34,6 +34,9 @@ describe("account step", () => {
   it("is the last step for admins and players, and done once a password is set", () => {
     expect(setupSteps(none).at(-1)).toMatchObject({ key: "account", title: "Set a username and password", href: "/profile/account", done: false });
     expect(setupSteps({ ...none, hasPassword: true }).at(-1)?.done).toBe(true);
-    expect(playerStart({ hasPhoto: false, levelSet: true, playedMatch: false, alertsOn: false, hasPassword: false }).at(-1)).toMatchObject({ key: "account", href: "/play/me/account", done: false });
+    const ps = playerStart({ hasPhoto: false, levelSet: true, playedMatch: false, alertsOn: false, hasPassword: false, hasBirthday: false });
+    expect(ps.find((x) => x.key === "account")).toMatchObject({ href: "/play/me/account", done: false });
+    expect(ps.find((x) => x.key === "birthday")).toMatchObject({ title: "Add your birthday", href: "/play/me/account", done: false });
+    expect(playerStart({ hasPhoto: false, levelSet: true, playedMatch: false, alertsOn: false, hasPassword: true, hasBirthday: true }).filter((x) => x.done).map((x) => x.key)).toEqual(["account", "birthday"]);
   });
 });

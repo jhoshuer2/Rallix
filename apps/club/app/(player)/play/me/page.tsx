@@ -23,7 +23,7 @@ export default async function Me() {
       <Panel title="Your picture"><PhotoUploader kind="me" name={ctx.user.name} current={mine?.photo ?? null} label="Profile picture" shape="person" /></Panel>
       <ListGroup label="Membership">
         <ListRow media={<IconBadge icon="card" />} title="Member card" subtitle="Show it at the door" href="/play/card" linkAs={Link} />
-        <ListRow media={<IconBadge icon="settings" />} title="Password sign-in" href="/play/me/account" linkAs={Link} />
+        <ListRow media={<IconBadge icon="settings" />} title="Your account" href="/play/me/account" linkAs={Link} />
       </ListGroup>
       <ListGroup label="Support"><ListRow media={<IconBadge icon="chat" />} title="Help" subtitle="Ask Rallix support" href="/play/help" linkAs={Link} /></ListGroup>
       <ListGroup label="Payments">

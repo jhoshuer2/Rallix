@@ -19,7 +19,7 @@ export default async function Club() {
         {can(c, "facilities") ? <ListRow media={<IconBadge icon="calendar" />} title="Schedule" subtitle="Playing times, events and closures" href="/profile/schedule" linkAs={Link} /> : null}
         <ListRow media={<IconBadge icon="members" />} title="Admin team" subtitle={c.isOwner ? "Choose what each admin looks after" : "Who runs the club"} href="/profile/team" linkAs={Link} />
       </ListGroup>
-      <ListGroup label="Your account"><ListRow media={<IconBadge icon="settings" />} title="Username and password" subtitle="Optional, sign in faster" href="/profile/account" linkAs={Link} /></ListGroup>
+      <ListGroup label="Your account"><ListRow media={<IconBadge icon="settings" />} title="Your account" subtitle="Password and birthday" href="/profile/account" linkAs={Link} /></ListGroup>
       <ListGroup label="Support"><ListRow media={<IconBadge icon="chat" />} title="Help" subtitle="Ask Rallix support" href="/profile/help" linkAs={Link} /></ListGroup>
       <a className="rx-btn rx-btn--ghost rx-btn--block" style={{ marginTop: 24, boxSizing: "border-box" }} href="/sign-out">Sign out</a>
     </PageShell>

@@ -3,7 +3,7 @@ import { BackButton, EmptyState, ListGroup, ListRow, PageShell, Photo, SectionTi
 import { celebrations, type Celebration } from "@rallix/stats";
 import { inClub, requireClub } from "../../../../lib/context";
 import { todayInClub } from "../../../../lib/highlights";
-import { listMembers } from "../../../../lib/queries";
+import { clubForCelebration, listCelebrants } from "../../../../lib/birthday-queries";
 
 export const dynamic = "force-dynamic";
 const CAP = 200;
@@ -11,8 +11,8 @@ const CAP = 200;
 /** Everyone behind the Club updates strip: birthdays, anniversaries and new members. A plain list, so it stays usable at any club size. */
 export default async function Updates() {
   const ctx = await requireClub();
-  const members = await inClub(ctx, (tx) => listMembers(tx, ctx.club.clubId));
-  const all = celebrations(members.map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
+  const { members, club } = await inClub(ctx, async (tx) => ({ members: await listCelebrants(tx, ctx.club.clubId), club: await clubForCelebration(tx, ctx.club.clubId) }));
+  const all = celebrations(members, todayInClub(), 7, club ?? undefined);
   const shown = all.slice(0, CAP);
   const groups: Array<[string, Celebration[]]> = [
     ["Today", shown.filter((c) => c.offsetDays === 0)],

@@ -16,6 +16,8 @@ export const playerProfiles = pgTable("player_profiles", {
   clubId: clubId(),
   level: level("level").notNull().default("junior"),
   dateOfBirth: date("date_of_birth"),
+  /** Show my birthday (month and day only) in the club's celebrations. On by default; the person can switch it off. */
+  showBirthday: boolean("show_birthday").notNull().default(true),
   heightCm: smallint("height_cm"),
   country: text("country").notNull().default("NGR"),
   bio: text("bio"),

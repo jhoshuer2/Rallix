@@ -1489,3 +1489,17 @@ describe("username", () => {
     expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select username from users limit 1`)))).toBe("42501");
   });
 });
+
+describe("show birthday", () => {
+  it("defaults to on, and the person can switch it off for themselves only", async () => {
+    const p1 = { userId: "playerA1", clubId: ids.A };
+    const before = await rows(app, p1, sql`select show_birthday from player_profiles where membership_id = ${ids.mP1}`);
+    expect(before[0]!.show_birthday).toBe(true);
+    await withTenant(app, p1, (tx) => tx.execute(sql`update player_profiles set show_birthday = false, date_of_birth = '1904-03-09' where membership_id = ${ids.mP1}`));
+    expect((await rows(app, p1, sql`select show_birthday, date_of_birth::text as d from player_profiles where membership_id = ${ids.mP1}`))[0]).toEqual({ show_birthday: false, d: "1904-03-09" });
+    // another player cannot change it
+    const other = await withTenant(app, { userId: "playerA2", clubId: ids.A }, (tx) => tx.execute(sql`update player_profiles set show_birthday = true where membership_id = ${ids.mP1} returning 1`));
+    expect(other.rows).toHaveLength(0);
+    await withTenant(app, p1, (tx) => tx.execute(sql`update player_profiles set show_birthday = true, date_of_birth = null where membership_id = ${ids.mP1}`));
+  });
+});

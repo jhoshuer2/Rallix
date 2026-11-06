@@ -26,7 +26,7 @@ ok(await link.isVisible(),'Welcome shows "Returning member? Sign in with passwor
 ok((await link.getAttribute('href'))==='/sign-in?method=password','it is a link to the password sign-in');
 ok((await link.boundingBox()).height>=44,'the link is at least 44px tall');
 await link.click();await p.waitForURL(/sign-in/);
-ok(await p.getByLabel('Username or email').isVisible()&&await p.getByLabel('Password').isVisible(),'the link opens one field for username or email, and a password');
+ok(await p.getByLabel('Username or email').isVisible()&&await p.getByLabel('Password',{exact:true}).isVisible(),'the link opens one field for username or email, and a password');
 ok(await p.getByRole('button',{name:'Show password'}).isVisible(),'the sign-in password field has the eye too');
 ok(await p.getByRole('button',{name:'Email me a code instead'}).isVisible(),'with a way back to the emailed code');
 await p.getByRole('button',{name:'Email me a code instead'}).click();

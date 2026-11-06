@@ -34,12 +34,13 @@ export function setupProgress(f: SetupFacts): { done: number; total: number; com
 }
 
 /** The same idea for a new player: only things they can actually do. */
-export type PlayerStartFacts = { hasPhoto: boolean; levelSet: boolean; playedMatch: boolean; alertsOn: boolean; hasPassword: boolean };
+export type PlayerStartFacts = { hasPhoto: boolean; levelSet: boolean; playedMatch: boolean; alertsOn: boolean; hasPassword: boolean; hasBirthday: boolean };
 export function playerStart(f: PlayerStartFacts): { key: string; title: string; href: string; done: boolean }[] {
   return [
     { key: "photo", title: "Add your photo", href: "/play/me", done: f.hasPhoto },
     { key: "alerts", title: "Turn on arrival alerts", href: "/play/me", done: f.alertsOn },
     { key: "compete", title: "See what you can join", href: "/play/compete", done: f.playedMatch },
     { key: "account", title: "Set a username and password", href: "/play/me/account", done: f.hasPassword },
+    { key: "birthday", title: "Add your birthday", href: "/play/me/account", done: f.hasBirthday },
   ];
 }

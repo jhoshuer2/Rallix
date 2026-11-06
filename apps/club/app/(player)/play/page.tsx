@@ -1,3 +1,4 @@
+import { clubForCelebration, listCelebrants, myBirthday } from "../../../lib/birthday-queries";
 import { accountStatus } from "../../../lib/account-queries";
 import Link from "next/link";
 import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, ResultCard, SectionTitle, SpotsFaces, Stories } from "@rallix/ui";
@@ -31,6 +32,9 @@ export default async function PlayerHome() {
     arrival: await getArrivalSettings(tx, me),
     friendlies: await listMyChallenges(tx, ctx.club.clubId, me),
     schedule: await listScheduleEvents(tx, ctx.club.clubId),
+    celebrants: await listCelebrants(tx, ctx.club.clubId),
+    clubInfo: await clubForCelebration(tx, ctx.club.clubId),
+    birthday: await myBirthday(tx, me),
   }));
   const closed = closureNotice(d.schedule, todayInClub());
   const session = occurrences(d.schedule, todayInClub(), todayInClub()).find((o) => o.kind === "play");
@@ -38,7 +42,7 @@ export default async function PlayerHome() {
   const asks = needsMe(d.friendlies, me);
   const payOn = await payoutsEnabled(ctx);
   const mineAll = d.clubMatches.filter((m) => m.p1?.id === me || m.p2?.id === me);
-  const celebs = celebrations(d.members.filter((x) => x.id !== me).map((x) => ({ id: x.id, name: x.name, photo: x.photo, dob: x.dob, joinedAt: x.joinedAt })), todayInClub());
+  const celebs = celebrations(d.celebrants.filter((x) => x.id !== me), todayInClub(), 7, d.clubInfo ?? undefined);
   const done = d.clubMatches.filter(isDone).sort(byRecent).slice(0, 8);
   const stories = buildStories(d.clubMatches, (m) => `/play/compete/${m.competitionId}`, "See the draw");
   const due = d.dues.find((x) => x.status === "due" || x.status === "overdue");
@@ -58,7 +62,7 @@ export default async function PlayerHome() {
   const hero = next[0];
   const comingMatches = next.slice(1);
   const hasComing = comingMatches.length > 0 || upcoming.length > 0;
-  const start = playerStart({ hasPhoto: !!mine?.photo, levelSet: true, playedMatch: r.played > 0, alertsOn: d.arrival.notify, hasPassword: (await accountStatus(ctx.user.id)).hasPassword });
+  const start = playerStart({ hasPhoto: !!mine?.photo, levelSet: true, playedMatch: r.played > 0, alertsOn: d.arrival.notify, hasBirthday: d.birthday.month !== null, hasPassword: (await accountStatus(ctx.user.id)).hasPassword });
 
   // Blocks in priority order; each shows only when it has something to say. At most four below the hero (see docs/PRODUCT.md).
   const blocks: Array<{ key: string; show: boolean; node: React.ReactNode }> = [

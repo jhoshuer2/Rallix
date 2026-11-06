@@ -267,6 +267,13 @@
       "when": 1793853989562,
       "tag": "0037_username",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793940389562,
+      "tag": "0038_show_birthday",
+      "breakpoints": true
     }
   ]
 }
