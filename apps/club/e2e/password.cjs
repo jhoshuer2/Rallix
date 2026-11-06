@@ -39,7 +39,7 @@ await p.goto(B+'/play',{waitUntil:'networkidle'});
 const home=await body(p);
 if(fresh)ok(/Set a username and password/.test(home),'a new player\'s Getting started list includes "Set a username and password"');
 await p.goto(B+'/play/me',{waitUntil:'networkidle'});
-ok(/Username and password/.test(await body(p)),'Me has a Username and password row');
+ok(/Password sign-in/.test(await body(p)),'Me has a Password sign-in row');
 await p.goto(B+'/play/me/account',{waitUntil:'networkidle'});
 
 // Validation
