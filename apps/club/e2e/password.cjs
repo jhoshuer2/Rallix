@@ -96,7 +96,7 @@ await signInCode(p,'jide@example.com');
 await p.goto(B+'/play/me/account',{waitUntil:'networkidle'});
 await p.getByLabel('Username').fill('PAT_PLAYER');await p.getByLabel('Password',{exact:true}).fill('Another-Pass9');await p.getByLabel('Type the password again').fill('Another-Pass9');
 await p.getByRole('button',{name:'Save username and password'}).click();
-ok(await p.getByText(/username is taken/i).isVisible({timeout:20000}).catch(()=>false),'a username someone else has is refused, whatever the capitals');
+ok(await p.getByText(/username is taken/i).waitFor({timeout:20000}).then(()=>true).catch(()=>false),'a username someone else has is refused, whatever the capitals');
 ok(sql(`select username from users where email='jide@example.com'`)==='','and nothing was saved for the second person');
 
 // Admin checklist
