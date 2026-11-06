@@ -1472,3 +1472,20 @@ describe("security definer functions", () => {
     expect(r.map((x) => x.proname)).toEqual([]);
   });
 });
+
+describe("username", () => {
+  const mkUser = async (id: string, username: string | null) => svc.execute(sql`insert into users (id, name, email, username) values (${id}, 'U', ${id + "@example.com"}, ${username})`);
+  it("accepts a plain lowercase name, and many accounts may have none", async () => {
+    await mkUser("un1", "ade_99"); await mkUser("un2", null); await mkUser("un3", null);
+  });
+  it("is unique", async () => {
+    await mkUser("un4", "taken_name");
+    expect(await denied(mkUser("un5", "taken_name"))).toBe("23505");
+  });
+  it("must be 3 to 20 lowercase letters, digits or underscores", async () => {
+    for (const bad of ["ab", "a".repeat(21), "Upper", "has space", "dash-ed", "émile", "x@y"]) expect(await denied(mkUser("un6", bad)), bad).toBe("23514");
+  });
+  it("the app role cannot read it", async () => {
+    expect(await denied(withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`select username from users limit 1`)))).toBe("42501");
+  });
+});

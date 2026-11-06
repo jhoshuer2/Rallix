@@ -15,6 +15,21 @@ export function normalizeBaseUrl(v: string | undefined | null): string | undefin
   return `https://${t.replace(/^\/+/, "")}`;
 }
 
+/**
+ * Origins that may call the sign-in API: the app's own addresses (BETTER_AUTH_URL, APP_URL, CLUB_APP_URL) and the addresses Vercel
+ * gives this deployment. Better Auth refuses a sign-in request from any other origin, so an invite link opened on a second address
+ * of the same app ("couldn't send a code") works while a foreign website still cannot post to it.
+ */
+export function trustedOriginsFrom(env: Record<string, string | undefined>): string[] {
+  const out = new Set<string>();
+  for (const v of [env.BETTER_AUTH_URL, env.APP_URL, env.CLUB_APP_URL, env.VERCEL_URL, env.VERCEL_BRANCH_URL, env.VERCEL_PROJECT_PRODUCTION_URL]) {
+    const base = normalizeBaseUrl(v);
+    if (!base) continue;
+    try { const u = new URL(base); if (u.protocol === "https:" || /^(localhost|127\.0\.0\.1)$/.test(u.hostname)) out.add(u.origin); } catch { /* ignore a bad value */ }
+  }
+  return [...out];
+}
+
 /** A sender such as `Rallix <no-reply@rallix.ng>` without the quote marks that some dashboards keep as part of the value. */
 export function normalizeMailFrom(v: string | undefined | null): string {
   return v ? unquote(v) : "";

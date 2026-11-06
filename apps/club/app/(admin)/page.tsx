@@ -3,6 +3,7 @@ import Link from "next/link";
 import { invites } from "@rallix/db";
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { Carousel, Checklist, ClubBanner, EmptyState, IconBadge, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, SectionTitle } from "@rallix/ui";
+import { accountStatus } from "../../lib/account-queries";
 import { groupRegistrations, limitLabel, memberLimitState, mergeActivity, setupProgress, type Activity } from "@rallix/stats";
 import { ClubHeader } from "../../components/ClubHeader";
 import { can, inClub, requireRole } from "../../lib/context";
@@ -46,7 +47,7 @@ export default async function Home() {
   const canFac = can(ctx.club, "facilities");
   const canM = can(ctx.club, "members"), canC = can(ctx.club, "competitions"), canF = can(ctx.club, "finance");
 
-  const setup = setupProgress({ hasLogo: !!ctx.club.logoUrl, hasCover: !!ctx.club.coverUrl, hasCourt: !!d.venue, hasPlans: d.plans.length > 0, hasPayouts: payouts, hasInvited: !!d.invite || others > 0, hasCompetition: d.comps.length > 0, hasClubPage: d.clubPage });
+  const setup = setupProgress({ hasLogo: !!ctx.club.logoUrl, hasCover: !!ctx.club.coverUrl, hasCourt: !!d.venue, hasPlans: d.plans.length > 0, hasPayouts: payouts, hasInvited: !!d.invite || others > 0, hasCompetition: d.comps.length > 0, hasClubPage: d.clubPage, hasPassword: (await accountStatus(ctx.user.id)).hasPassword });
 
   const feed = mergeActivity([ // each kind only for the admin who looks after it
     (canM ? groupRegistrations(d.members.filter((m) => m.joinedAt.getTime() > Date.now() - 30 * 86400000).map((m) => ({ id: m.id, name: m.name, at: m.joinedAt })), { hrefOne: (id) => `/members/${id}`, hrefGroup: "/members" }).slice(0, 5) : []),

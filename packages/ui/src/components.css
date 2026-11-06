@@ -803,3 +803,8 @@ fieldset { min-width: 0; }
 .rx-syncbar__item { border-top: 1px solid rgba(255, 255, 255, 0.2); padding: 8px 0; display: grid; gap: 4px; }
 .rx-syncbar__item p { margin: 0; }
 .rx-syncbar .rx-btn--ghost { color: #fff; border-color: rgba(255, 255, 255, 0.5); }
+
+/* Welcome: a quiet link for people who already have an account. White on table blue, 44px tap target. */
+.rx-splash__link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; color: #fff; font-size: 15px; text-decoration: none; }
+.rx-splash__link span { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.rx-splash__link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }

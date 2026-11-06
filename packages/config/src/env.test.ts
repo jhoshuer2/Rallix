@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeBaseUrl, normalizeMailFrom } from "./env";
+import { normalizeBaseUrl, normalizeMailFrom, trustedOriginsFrom } from "./env";
 
 describe("normalizeBaseUrl", () => {
   it("adds https:// when the scheme is missing", () => expect(normalizeBaseUrl("console.rallix.ng")).toBe("https://console.rallix.ng"));
@@ -61,5 +61,15 @@ describe("production safety and the CI exception", () => {
   it("leaves a development environment untouched", () => {
     const e = { NODE_ENV: "development", RALLIX_CI_E2E: "1", ...local };
     expect(appEnv(e).NODE_ENV).toBe("development");
+  });
+});
+
+describe("trustedOriginsFrom", () => {
+  it("collects the app's own addresses and Vercel's, as origins", () => {
+    expect(trustedOriginsFrom({ BETTER_AUTH_URL: "https://app.rallix.ng/", APP_URL: "app.rallix.ng", VERCEL_URL: "rallix-club-abc.vercel.app", VERCEL_PROJECT_PRODUCTION_URL: "rallix-club.vercel.app" }).sort())
+      .toEqual(["https://app.rallix.ng", "https://rallix-club-abc.vercel.app", "https://rallix-club.vercel.app"]);
+  });
+  it("ignores empty, plain-http and invalid values (except localhost)", () => {
+    expect(trustedOriginsFrom({ APP_URL: "", CLUB_APP_URL: "http://evil.example", VERCEL_URL: "not a url", BETTER_AUTH_URL: "http://localhost:3000" })).toEqual(["http://localhost:3000"]);
   });
 });

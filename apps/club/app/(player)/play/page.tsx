@@ -1,3 +1,4 @@
+import { accountStatus } from "../../../lib/account-queries";
 import Link from "next/link";
 import { Carousel, Celebrations, Checklist, EmptyState, HeroMatch, ListGroup, ListRow, MediaCard, MetricCard, MetricGrid, PageShell, Photo, ResultCard, SectionTitle, SpotsFaces, Stories } from "@rallix/ui";
 import { streakLabel } from "@rallix/stats";
@@ -57,7 +58,7 @@ export default async function PlayerHome() {
   const hero = next[0];
   const comingMatches = next.slice(1);
   const hasComing = comingMatches.length > 0 || upcoming.length > 0;
-  const start = playerStart({ hasPhoto: !!mine?.photo, levelSet: true, playedMatch: r.played > 0, alertsOn: d.arrival.notify });
+  const start = playerStart({ hasPhoto: !!mine?.photo, levelSet: true, playedMatch: r.played > 0, alertsOn: d.arrival.notify, hasPassword: (await accountStatus(ctx.user.id)).hasPassword });
 
   // Blocks in priority order; each shows only when it has something to say. At most four below the hero (see docs/PRODUCT.md).
   const blocks: Array<{ key: string; show: boolean; node: React.ReactNode }> = [

@@ -1,4 +1,5 @@
-import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, check, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * Better Auth tables (global, not tenant-scoped). Column names follow Better Auth's
@@ -16,9 +17,14 @@ export const users = pgTable("users", {
   phoneNumberVerified: boolean("phone_number_verified").notNull().default(false),
   /** Player turned off optional email (dues reminders, announcements). Sign-in codes and admin invoices are never affected. Service-only. */
   emailOptOut: boolean("email_opt_out").notNull().default(false),
+  /** Optional sign-in name (lowercase letters, digits, underscore; 3 to 20). Private: the app role cannot read it. */
+  username: text("username").unique(),
+  displayUsername: text("display_username"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  check("users_username_shape", sql`${t.username} IS NULL OR ${t.username} ~ '^[a-z0-9_]{3,20}$'`),
+]);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
