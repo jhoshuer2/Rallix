@@ -11,7 +11,7 @@ const sql=q=>execSync(`PGPASSWORD=service_dev psql -h localhost -U rallix_servic
 let pass=0,fail=0;const ok=(c,m)=>{c?pass++:fail++;console.log(c?'  ok  ':'  FAIL',m)};
 function code(email){const log=fs.readFileSync(LOG).toString().replace(/\0/g,'');const re=new RegExp('\\[mail:dev\\] to '+email.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+' \\|[^\\n]*\\n\\s+Your (?:Rallix|Rallix Console) sign-in code is (\\d{6})','g');const a=[...log.matchAll(re)];return a.length?a[a.length-1][1]:null}
 async function signInCode(p,email){await p.goto(B+'/sign-in?next=/');await p.getByLabel('Email address').fill(email);await p.getByRole('button',{name:'Email me a code'}).click();await p.getByLabel('6-digit code').waitFor({timeout:60000});await p.waitForTimeout(600);await p.getByLabel('6-digit code').fill(code(email));await p.getByRole('button',{name:'Sign in'}).click();await p.waitForURL(u=>!/sign-in/.test(u.toString()),{timeout:60000});const id=sql(`select id from clubs where name='Paris Arena'`);await p.goto(B+'/switch/'+id,{waitUntil:'networkidle'})}
-async function signInPassword(p,who,pw){await p.goto(B+'/sign-in?method=password');await p.getByLabel('Username or email').fill(who);await p.getByLabel('Password').fill(pw);await p.getByRole('button',{name:'Sign in'}).click()}
+async function signInPassword(p,who,pw){await p.goto(B+'/sign-in?method=password');await p.getByLabel('Username or email').fill(who);await p.getByLabel('Password',{exact:true}).fill(pw);await p.getByRole('button',{name:'Sign in'}).click()}
 const body=async p=>{await p.locator('.rx-skel').first().waitFor({state:'detached',timeout:20000}).catch(()=>{});return p.locator('body').innerText()};
 const left=async p=>p.waitForURL(u=>!/sign-in/.test(u.toString()),{timeout:30000}).then(()=>true).catch(()=>false);
 
@@ -27,6 +27,7 @@ ok((await link.getAttribute('href'))==='/sign-in?method=password','it is a link 
 ok((await link.boundingBox()).height>=44,'the link is at least 44px tall');
 await link.click();await p.waitForURL(/sign-in/);
 ok(await p.getByLabel('Username or email').isVisible()&&await p.getByLabel('Password').isVisible(),'the link opens one field for username or email, and a password');
+ok(await p.getByRole('button',{name:'Show password'}).isVisible(),'the sign-in password field has the eye too');
 ok(await p.getByRole('button',{name:'Email me a code instead'}).isVisible(),'with a way back to the emailed code');
 await p.getByRole('button',{name:'Email me a code instead'}).click();
 ok(await p.getByRole('button',{name:'Sign in with a password'}).isVisible()&&await p.getByRole('button',{name:'Email me a code'}).isVisible(),'the code page offers "Sign in with a password"');
@@ -56,10 +57,20 @@ await p.getByRole('button',{name:'Save username and password'}).click();
 ok(/don.t match/.test(await body(p)),'two different passwords are refused');
 ok(sql(`select count(*) from users where username='pat_player'`)==='0','nothing was saved by the refused attempts');
 
+// The eye shows and hides the password
+const pwBox=p.getByLabel('Password',{exact:true});
+ok((await pwBox.getAttribute('type'))==='password','the password is hidden by default');
+await p.getByRole('button',{name:'Show password'}).first().click();
+ok((await pwBox.getAttribute('type'))==='text'&&await p.getByRole('button',{name:'Hide password'}).first().isVisible(),'the eye shows the password, and its label changes to Hide password');
+ok((await p.getByRole('button',{name:'Hide password'}).first().boundingBox()).height>=44,'the eye is at least 44px');
+await p.getByRole('button',{name:'Hide password'}).first().click();
+ok((await pwBox.getAttribute('type'))==='password','and it hides it again');
 // Save
 await p.getByLabel('Type the password again').fill('T4bleTennis!');
 await p.getByRole('button',{name:'Save username and password'}).click();
-await p.getByText(/^Saved\./).waitFor();
+await p.getByRole('status').filter({hasText:/Password set/}).waitFor({timeout:20000});
+ok(await p.getByRole('status').filter({hasText:/Carry on with what you were doing/}).isVisible(),'a message says the password is set and to carry on');
+ok(await p.getByRole('button',{name:'Dismiss message'}).isVisible(),'the message can be dismissed');
 ok(sql(`select username from users where email='${player}'`)==='pat_player','the username is saved (lowercase)');
 const hash=sql(`select password from accounts a join users u on u.id=a.user_id where u.email='${player}' and a.provider_id='credential'`);
 ok(!!hash&&!hash.includes('T4bleTennis!'),'the password is stored hashed, not as typed');

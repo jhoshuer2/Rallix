@@ -808,3 +808,15 @@ fieldset { min-width: 0; }
 .rx-splash__link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; color: #fff; font-size: 15px; text-decoration: none; }
 .rx-splash__link span { text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
 .rx-splash__link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* Show/hide password eye: a 44px button at the end of the field */
+.rx-eye { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -8px; border: 0; background: transparent; color: inherit; border-radius: 10px; cursor: pointer; flex: none; }
+.rx-eye:focus-visible { outline: 3px solid var(--rx-focus); outline-offset: -3px; }
+.rx-canvas .rx-eye:focus-visible { outline-color: var(--rx-blue); }
+
+/* Toast: a confirmation above the tab bar, read aloud, closes itself */
+.rx-toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); z-index: 80; margin: 0 auto; max-width: 408px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 16px; min-height: 56px; border-radius: 14px; background: var(--rx-night); color: #fff; font-size: 15px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); animation: rx-toast-in .2s ease-out; }
+.rx-toast__close { min-width: 44px; min-height: 44px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; background: transparent; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.rx-toast__close:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+@keyframes rx-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rx-toast { animation: none; } }

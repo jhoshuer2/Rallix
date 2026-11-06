@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { Button, TextField } from "@rallix/ui";
+import { useCallback, useState } from "react";
+import { Button, PasswordField, TextField, Toast } from "@rallix/ui";
 import { checkPassword, checkUsername } from "@rallix/config/safe-input";
 import { saveCredentials } from "../lib/account-actions";
 
@@ -12,6 +12,8 @@ export function AccountForm({ email, username, hasPassword }: { email: string; u
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const closeToast = useCallback(() => setToast(null), []);
   const [saved, setSaved] = useState({ username, hasPassword });
 
   async function submit(e: React.FormEvent) {
@@ -28,20 +30,22 @@ export function AccountForm({ email, username, hasPassword }: { email: string; u
     const r = await saveCredentials({ username: n.username, password: pw || undefined, currentPassword: current || undefined });
     setBusy(false);
     if (!r.ok) return setMsg({ ok: false, text: r.error });
+    const first = !saved.hasPassword && !!pw;
     setSaved({ username: n.username, hasPassword: saved.hasPassword || !!pw });
     setName(n.username); setCurrent(""); setPw(""); setAgain("");
-    setMsg({ ok: true, text: "Saved. You can now sign in with your username or email and this password." });
+    setToast(first ? "Password set. You can now sign in with it. Carry on with what you were doing." : pw ? "Password changed. Carry on with what you were doing." : "Username saved. Carry on with what you were doing.");
   }
 
   return (
     <form noValidate onSubmit={submit}>
       <p className="rx-muted" style={{ margin: "0 0 12px" }}>Optional. You can always sign in with an emailed code instead. Forgot your password? Sign in with a code, then set a new one here. Usernames are 3 to 20 letters, numbers or underscores; passwords are at least 8 characters.</p>
       <TextField label="Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="ade_player" value={name} onChange={(e) => setName(e.target.value)} />
-      {saved.hasPassword ? <TextField label="Current password" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /> : null}
-      <TextField label={saved.hasPassword ? "New password (leave empty to keep it)" : "Password"} type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
-      {pw || !saved.hasPassword ? <TextField label="Type the password again" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /> : null}
+      {saved.hasPassword ? <PasswordField label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /> : null}
+      <PasswordField label={saved.hasPassword ? "New password (leave empty to keep it)" : "Password"} autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+      {pw || !saved.hasPassword ? <PasswordField label="Type the password again" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /> : null}
       {msg ? <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "rx-muted" : "rx-error"} style={{ marginBottom: 12 }}>{msg.text}</p> : null}
       <Button type="submit" block disabled={busy}>{busy ? "Saving…" : saved.hasPassword ? "Save changes" : "Save username and password"}</Button>
+      {toast ? <Toast message={toast} onClose={closeToast} /> : null}
     </form>
   );
 }

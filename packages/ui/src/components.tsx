@@ -32,7 +32,7 @@ export function IconButton({ icon, label, className, type = "button", ...rest }:
 }
 
 /* ---------- Forms ---------- */
-export function TextField({ label, icon, error, id, ...rest }: { label: string; icon?: IconName; error?: string } & InputHTMLAttributes<HTMLInputElement>) {
+export function TextField({ label, icon, error, id, trailing, ...rest }: { label: string; icon?: IconName; error?: string; /** Something at the end of the field, such as the show-password button. */ trailing?: ReactNode } & InputHTMLAttributes<HTMLInputElement>) {
   const inputId = id ?? `rx-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   const errId = `${inputId}-error`;
   return (
@@ -41,6 +41,7 @@ export function TextField({ label, icon, error, id, ...rest }: { label: string; 
       <div className="rx-input" data-invalid={error ? "true" : undefined}>
         {icon ? <Icon name={icon} size={20} /> : null}
         <input id={inputId} aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined} {...rest} />
+        {trailing}
       </div>
       {error ? <p id={errId} className="rx-error" role="alert">{error}</p> : null}
     </div>

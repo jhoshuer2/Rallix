@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, EntryShell, TextField } from "@rallix/ui";
+import { Button, EntryShell, PasswordField, TextField } from "@rallix/ui";
 import { isEmail } from "@rallix/mailer/validate";
 import { authClient } from "../../../lib/auth-client";
 
@@ -52,7 +52,7 @@ export function SignInForm({ next, initialMethod = "code" }: { next: string; ini
       <EntryShell title="Sign in to Rallix" subtitle="Use your username or email and your password.">
         <form noValidate onSubmit={signInWithPassword}>
           <TextField label="Username or email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={login} onChange={(e) => setLogin(e.target.value)} />
-          <TextField label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={error} />
+          <PasswordField label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={error} />
           <Button type="submit" block disabled={busy}>{busy ? "Please wait…" : "Sign in"}</Button>
           <div style={{ display: "grid", gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" block onClick={() => { setMethod("code"); setError(undefined); }}>Email me a code instead</Button>
