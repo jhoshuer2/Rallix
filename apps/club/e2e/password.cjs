@@ -70,7 +70,7 @@ await p.getByLabel('Type the password again').fill('T4bleTennis!');
 await p.getByRole('button',{name:'Save username and password'}).click();
 await p.getByRole('status').filter({hasText:/Password set/}).waitFor({timeout:20000});
 ok(await p.getByRole('status').filter({hasText:/Carry on with what you were doing/}).isVisible(),'a message says the password is set and to carry on');
-ok(await p.getByRole('button',{name:'Dismiss message'}).isVisible(),'the message can be dismissed');
+ok(await p.getByRole('button',{name:'Close notification'}).first().isVisible(),'the message can be dismissed');
 ok(sql(`select username from users where email='${player}'`)==='pat_player','the username is saved (lowercase)');
 const hash=sql(`select password from accounts a join users u on u.id=a.user_id where u.email='${player}' and a.provider_id='credential'`);
 ok(!!hash&&!hash.includes('T4bleTennis!'),'the password is stored hashed, not as typed');

@@ -47,7 +47,7 @@ function ToastCard({ item, onClose }: { item: ToastItem; onClose: (id: number) =
     <div className={`rx-toast rx-toast--${item.tone}`} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
       <span className="rx-toast__icon" aria-hidden="true"><Icon name={item.tone === "error" ? "close" : "check"} size={18} /></span>
       <span className="rx-toast__text">{item.message}</span>
-      <button type="button" className="rx-toast__close" onClick={() => onClose(item.id)} aria-label="Dismiss message">OK</button>
+      <button type="button" className="rx-toast__close" onClick={() => onClose(item.id)} aria-label="Close notification">OK</button>
     </div>
   );
 }

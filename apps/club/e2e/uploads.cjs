@@ -79,9 +79,9 @@ async function pick(p,file){await p.locator('dialog[open] input[type=file]:not([
   await q.goto(B+'/profile/pictures');await q.waitForLoadState('networkidle');
   ok(await q.getByText('Club pictures').first().isVisible(),'admin sees the Club pictures screen');
   const logoBtn=q.locator('.rx-uploader').filter({hasText:'Club logo'}).getByRole('button',{name:/Add a picture|Change picture/});
-  await logoBtn.click();await pick(q,jpg1);await q.getByRole('button',{name:'Use picture'}).click();await q.locator('.rx-uploader').filter({hasText:'Club logo'}).getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
+  await logoBtn.click();await pick(q,jpg1);await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
   const coverBtn=q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByRole('button',{name:/Add a picture|Change picture/});
-  await coverBtn.click();await pick(q,jpg2);await q.screenshot({path:`${SC}/upload_cover_crop.png`});await q.getByRole('button',{name:'Use picture'}).click();await q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
+  await coverBtn.click();await pick(q,jpg2);await q.screenshot({path:`${SC}/upload_cover_crop.png`});await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
   const logo=sql("select logo_url from clubs where name='Paris Arena'"),cover=sql("select cover_url from clubs where name='Paris Arena'");
   ok(/\/logo\/[0-9a-f-]{36}\.webp$/.test(logo)&&/\/cover\/[0-9a-f-]{36}\.webp$/.test(cover),'club logo and cover addresses saved');
   const sizes=await Promise.all(files().map(async f=>{const m=await sharp(f).metadata();return `${m.width}x${m.height}`}));ok(sizes.includes('512x512')&&sizes.includes('1600x1000'),'logo is 512x512 and cover 1600x1000: '+sizes.join(', '));
@@ -99,7 +99,7 @@ async function pick(p,file){await p.locator('dialog[open] input[type=file]:not([
   await q.getByRole('button',{name:/Change picture/}).click();await q.getByRole('button',{name:'Remove picture'}).click();await q.getByText('Picture removed.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
   ok(sql(`select photo_url from player_profiles where membership_id='${sule}'`)==='','admin removed it again (Sule shows initials)');
   await q.goto(B+'/profile/pictures');await q.waitForLoadState('networkidle');
-  await q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByRole('button',{name:/Change picture/}).click();await q.getByRole('button',{name:'Remove picture'}).click();await q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByText('Picture removed.').waitFor({timeout:20000});
+  await q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByRole('button',{name:/Change picture/}).click();await q.getByRole('button',{name:'Remove picture'}).click();await q.getByText('Picture removed.').waitFor({timeout:20000});
   ok(sql("select coalesce(cover_url,'') from clubs where name='Paris Arena'")==='','admin removed the cover');ok(files().length===1,'only the logo file remains on disk');
   ok(aerrs.length===0,'admin: no console errors '+JSON.stringify(aerrs.slice(0,2)));
   console.log(`\n${pass} passed, ${fail} failed`);await b.close();fs.rmSync(tmp,{recursive:true,force:true});

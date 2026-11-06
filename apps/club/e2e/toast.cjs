@@ -27,14 +27,14 @@ ok(await visible(p,/Phone number saved/),'saving the phone number shows a toast 
 const r1=await rect(p);
 ok(r1&&r1.y<=100&&r1.y>=48&&r1.x>=0&&r1.x+r1.width<=440,'it is at the top, just under the app bar, and inside the viewport');
 ok(await p.locator('[role="status"] .rx-toast--success').count()>=1,'a success toast sits in a polite live region (read aloud)');
-ok((await p.getByRole('button',{name:'Dismiss message'}).first().boundingBox()).height>=44,'its OK button is at least 44px tall');
+ok((await p.getByRole('button',{name:'Close notification'}).first().boundingBox()).height>=44,'its OK button is at least 44px tall');
 ok(await p.evaluate(()=>{const el=document.querySelector('.rx-toast');const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.x+r.width/2,r.y+10);return !!top&&el.contains(top)}),'nothing is drawn on top of it');
 const fg=await p.evaluate(()=>getComputedStyle(document.querySelector('.rx-toast--success')).color);const bg=await p.evaluate(()=>getComputedStyle(document.querySelector('.rx-toast--success')).backgroundColor);
 const lum=(c)=>{const m=c.match(/\d+/g).map(Number).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*m[0]+0.7152*m[1]+0.0722*m[2]};
 ok(fg==='rgb(255, 255, 255)'&&(1.05)/(lum(bg)+0.05)>=7,'white text on a dark panel (contrast at least 7:1)');
 
 // 2. Dismiss
-await p.getByRole('button',{name:'Dismiss message'}).first().click();
+await p.getByRole('button',{name:'Close notification'}).first().click();
 ok(await p.locator('.rx-toast').count()===0,'OK closes it');
 
 // 3. It closes by itself after about 6 s
@@ -49,7 +49,7 @@ await p.getByRole('button',{name:'Save contact details'}).click();
 ok(await visible(p,/./),'a failed save shows a toast too');
 ok(await p.locator('[role="alert"] .rx-toast--error').count()>=1,'the error is in an assertive live region');
 await sleep(7500);ok(await p.locator('.rx-toast--error').count()===1,'an error is still there after 7 s (it stays about 10 s)');
-await p.getByRole('button',{name:'Dismiss message'}).first().click();
+await p.getByRole('button',{name:'Close notification'}).first().click();
 
 // 5. The on-screen keyboard shrinks the viewport: a top toast is still visible
 await p.setViewportSize({width:440,height:420});
@@ -60,7 +60,7 @@ const r2=await rect(p);ok(r2&&r2.y>=0&&r2.y+r2.height<=420,'and it is inside the
 await p.setViewportSize({width:440,height:956});
 
 // 6. Two different results stack
-await p.getByRole('button',{name:'Dismiss message'}).first().click().catch(()=>{});
+await p.getByRole('button',{name:'Close notification'}).first().click().catch(()=>{});
 await p.goto(B+'/play/me/account',{waitUntil:'networkidle'});
 await p.getByLabel('Month',{exact:true}).selectOption('6');await p.getByLabel('Day',{exact:true}).selectOption('15');
 await p.getByRole('button',{name:'Save birthday'}).click();
@@ -98,7 +98,7 @@ await save.click();
 const t=q.locator('.rx-toast').first();
 ok(await t.waitFor({state:'visible',timeout:15000}).then(()=>true).catch(()=>false),'a failed save inside a sheet shows a toast');
 const tb=await q.locator('.rx-toast').first().boundingBox();
-const shot=await q.screenshot({clip:{x:tb.x+tb.width*0.5,y:tb.y+5,width:8,height:8}});
+const shot=await q.screenshot({clip:{x:tb.x+3,y:tb.y+tb.height/2-4,width:8,height:8}});
 const px=await q.evaluate(async(b64)=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return [...x.getImageData(2,2,1,1).data]},shot.toString('base64'));
 ok(px[0]>100&&px[1]<60&&px[2]<60,'the red error toast is drawn above the open sheet (not hidden behind its white): '+px.join(','));
 ok(errs.length===0,'no console errors '+errs.join('|'));
