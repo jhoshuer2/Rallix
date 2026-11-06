@@ -97,6 +97,7 @@ const save=q.locator('dialog[open]').getByRole('button',{name:/^Save/}).first();
 await save.click();
 const t=q.locator('.rx-toast').first();
 ok(await t.waitFor({state:'visible',timeout:15000}).then(()=>true).catch(()=>false),'a failed save inside a sheet shows a toast');
+await q.waitForTimeout(700); // the toast slides in for 0.2 s
 const tb=await q.locator('.rx-toast').first().boundingBox();
 const shot=await q.screenshot({clip:{x:tb.x+3,y:tb.y+tb.height/2-4,width:8,height:8}});
 const px=await q.evaluate(async(b64)=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return [...x.getImageData(2,2,1,1).data]},shot.toString('base64'));

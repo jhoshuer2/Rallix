@@ -10,10 +10,12 @@ describe("toast queue", () => {
     expect(l.map((t) => t.message)).toEqual(["b", "c", "d"]);
     expect(l).toHaveLength(MAX_TOASTS);
   });
-  it("does not add the same message twice, but does for a different tone", () => {
+  it("shows the same message once: a repeat replaces the old one with a fresh toast (new id, full time again)", () => {
     const l = pushToast([], { tone: "success", message: "Saved." }, 1);
-    expect(pushToast(l, { tone: "success", message: "Saved." }, 2)).toBe(l);
-    expect(pushToast(l, { tone: "error", message: "Saved." }, 3)).toHaveLength(2);
+    const again = pushToast(l, { tone: "success", message: "Saved." }, 2);
+    expect(again).toHaveLength(1);
+    expect(again[0]!.id).toBe(2);
+    expect(pushToast(l, { tone: "error", message: "Saved." }, 3)).toHaveLength(2); // a different tone is a different message
   });
   it("dismisses one by id", () => {
     const l = pushToast(pushToast([], { tone: "success", message: "a" }, 1), { tone: "success", message: "b" }, 2);

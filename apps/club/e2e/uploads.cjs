@@ -79,9 +79,9 @@ async function pick(p,file){await p.locator('dialog[open] input[type=file]:not([
   await q.goto(B+'/profile/pictures');await q.waitForLoadState('networkidle');
   ok(await q.getByText('Club pictures').first().isVisible(),'admin sees the Club pictures screen');
   const logoBtn=q.locator('.rx-uploader').filter({hasText:'Club logo'}).getByRole('button',{name:/Add a picture|Change picture/});
-  await logoBtn.click();await pick(q,jpg1);await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
+  await logoBtn.click();await pick(q,jpg1);await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').first().waitFor({timeout:20000});await q.getByRole('button',{name:'Close notification'}).first().click().catch(()=>{});await q.waitForLoadState('networkidle');
   const coverBtn=q.locator('.rx-uploader').filter({hasText:'Club cover'}).getByRole('button',{name:/Add a picture|Change picture/});
-  await coverBtn.click();await pick(q,jpg2);await q.screenshot({path:`${SC}/upload_cover_crop.png`});await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
+  await coverBtn.click();await pick(q,jpg2);await q.screenshot({path:`${SC}/upload_cover_crop.png`});await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').first().waitFor({timeout:20000});await q.getByRole('button',{name:'Close notification'}).first().click().catch(()=>{});await q.waitForLoadState('networkidle');
   const logo=sql("select logo_url from clubs where name='Paris Arena'"),cover=sql("select cover_url from clubs where name='Paris Arena'");
   ok(/\/logo\/[0-9a-f-]{36}\.webp$/.test(logo)&&/\/cover\/[0-9a-f-]{36}\.webp$/.test(cover),'club logo and cover addresses saved');
   const sizes=await Promise.all(files().map(async f=>{const m=await sharp(f).metadata();return `${m.width}x${m.height}`}));ok(sizes.includes('512x512')&&sizes.includes('1600x1000'),'logo is 512x512 and cover 1600x1000: '+sizes.join(', '));
@@ -93,7 +93,7 @@ async function pick(p,file){await p.locator('dialog[open] input[type=file]:not([
   const sule=sql("select m.id from memberships m join users u on u.id=m.user_id where u.email='sule@example.com' and m.club_id=(select id from clubs where name='Paris Arena')");
   await q.goto(B+'/members/'+sule);await q.waitForLoadState('networkidle');
   const before=sql(`select photo_url from player_profiles where membership_id='${sule}'`);
-  await q.getByRole('button',{name:/Change picture/}).click();await pick(q,jpg2);await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
+  await q.getByRole('button',{name:/Change picture/}).click();await pick(q,jpg2);await q.getByRole('button',{name:'Use picture'}).click();await q.getByText('Picture updated.').first().waitFor({timeout:20000});await q.getByRole('button',{name:'Close notification'}).first().click().catch(()=>{});await q.waitForLoadState('networkidle');
   const after=sql(`select photo_url from player_profiles where membership_id='${sule}'`);ok(/^\/media\//.test(after)&&after!==before,"admin replaced Sule's photo");
   ok(sql("select count(*) from player_profiles where photo_url like '/media/%'")==='1','only that one member photo changed');
   await q.getByRole('button',{name:/Change picture/}).click();await q.getByRole('button',{name:'Remove picture'}).click();await q.getByText('Picture removed.').waitFor({timeout:20000});await q.waitForLoadState('networkidle');
