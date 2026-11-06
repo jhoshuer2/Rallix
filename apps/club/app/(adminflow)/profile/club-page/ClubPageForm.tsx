@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Panel, Switch } from "@rallix/ui";
+import { Button, Panel, Switch, useToast } from "@rallix/ui";
 import { saveClubPage } from "../../../../lib/application-actions";
 
 type V = { about: string; schedule: string; dressCode: string; equipment: string; rules: string; contact: string; joinMode: "review" | "open"; published: boolean };
@@ -19,14 +19,14 @@ export function ClubPageForm({ slug, initial }: { slug: string; initial: V }) {
   const router = useRouter();
   const [v, setV] = useState(initial);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string }>();
+  const toast = useToast();
   const set = <K extends keyof V>(k: K, val: V[K]) => setV((p) => ({ ...p, [k]: val }));
   async function save(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setMsg(undefined);
+    e.preventDefault(); setBusy(true);
     const r = await saveClubPage(v);
     setBusy(false);
-    if (!r.ok) return setMsg({ ok: false, text: r.error });
-    setMsg({ ok: true, text: "Saved." }); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Saved."); router.refresh();
   }
   return (
     <form noValidate onSubmit={save}>
@@ -49,7 +49,6 @@ export function ClubPageForm({ slug, initial }: { slug: string; initial: V }) {
           <Switch label="Public club page" checked={v.published} onChange={(on) => set("published", on)} />
         </div>
       </Panel>
-      {msg ? <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "rx-muted" : "rx-error"}>{msg.text}</p> : null}
       <Button type="submit" block disabled={busy}>{busy ? "Saving…" : "Save club page"}</Button>
     </form>
   );

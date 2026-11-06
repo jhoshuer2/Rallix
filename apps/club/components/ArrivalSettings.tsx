@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Switch } from "@rallix/ui";
+import { Switch, useToast } from "@rallix/ui";
 import { saveArrivalSettings, savePushSubscription } from "../lib/arrival-actions";
 import { enablePush, isIOS, isStandalone } from "../lib/client-geo";
 
@@ -9,15 +9,15 @@ type S = { share: boolean; notify: boolean; auto: boolean };
 /** Your three arrival switches. Everything is off until you turn it on, per club. */
 export function ArrivalSettings({ initial, vapidKey }: { initial: S; vapidKey: string | null }) {
   const [s, setS] = useState(initial);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [install, setInstall] = useState(false);
   useEffect(() => { setInstall(isIOS() && !isStandalone()); }, []);
 
   async function update(next: S, before: S) {
-    setS(next); setMsg(undefined);
+    setS(next);
     const r = await saveArrivalSettings(next);
-    if (!r.ok) { setS(before); setMsg(r.error); }
+    if (!r.ok) { setS(before); toast.error(r.error); } else toast.success("Saved.");
   }
   async function toggleNotify(on: boolean) {
     if (busy) return;
@@ -25,7 +25,7 @@ export function ArrivalSettings({ initial, vapidKey }: { initial: S; vapidKey: s
     setBusy(true);
     const err = await enablePush(vapidKey, savePushSubscription);
     setBusy(false);
-    if (err) return setMsg(err);
+    if (err) return toast.error(err);
     await update({ ...s, notify: true }, s);
   }
   const row = (label: string, hint: string, checked: boolean, onChange: (v: boolean) => void, disabled = false) => (
@@ -41,7 +41,6 @@ export function ArrivalSettings({ initial, vapidKey }: { initial: S; vapidKey: s
       {row("Check in automatically", "When Rallix is open and you are at the court. Needs location allowed.", s.auto, (v) => update({ ...s, auto: v }, s), !s.share)}
       {install ? <p className="rx-muted" style={{ fontSize: 13, margin: 0 }}>On iPhone, alerts only work after you add Rallix to your Home Screen: tap Share, then Add to Home Screen, and open Rallix from there.</p> : null}
       <p className="rx-muted" style={{ fontSize: 13, margin: 0 }}>Rallix only knows you are at the court when you tap “I’ve arrived”, or when it is open and you have turned on automatic check-in. It does not track you in the background, and your position is never stored.</p>
-      {msg ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg}</p> : null}
     </div>
   );
 }

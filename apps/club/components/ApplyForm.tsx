@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button, ChoiceToggle, Panel, TextField } from "@rallix/ui";
+import { Button, ChoiceToggle, Panel, TextField, useToast } from "@rallix/ui";
 import { applyToClub, withdrawApplication } from "../lib/application-actions";
 
 type Level = "junior" | "intermediate" | "senior";
@@ -47,12 +47,11 @@ export function ApplyForm({ code, defaultName, open }: { code: string; defaultNa
 export function ApplicationSent({ id, clubName }: { id: string; clubName: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   return (
     <Panel title="Application sent">
       <p style={{ margin: "0 0 12px" }}>{clubName} will review your application. You will get an email when they decide.</p>
-      <Button variant="ghost" block disabled={busy} onClick={async () => { setBusy(true); const r = await withdrawApplication(id); setBusy(false); if (!r.ok) setMsg(r.error); else router.refresh(); }}>Withdraw application</Button>
-      {msg ? <p role="alert" className="rx-error">{msg}</p> : null}
+      <Button variant="ghost" block disabled={busy} onClick={async () => { setBusy(true); const r = await withdrawApplication(id); setBusy(false); if (!r.ok) toast.error(r.error); else { toast.success("Application withdrawn."); router.refresh(); } }}>Withdraw application</Button>
     </Panel>
   );
 }

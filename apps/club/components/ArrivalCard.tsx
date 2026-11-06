@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, ListGroup, ListRow, Photo, SectionTitle } from "@rallix/ui";
+import { Button, ListGroup, ListRow, Photo, SectionTitle, useToast } from "@rallix/ui";
 import { checkIn, checkOut } from "../lib/arrival-actions";
 import { getFix, locationGranted } from "../lib/client-geo";
 
@@ -14,7 +14,7 @@ const GUARD = "rallix:arrival-try";
 export function ArrivalCard({ venueLabel, here, iAmHere, share, auto, today }: { venueLabel: string | null; here: HereItem[]; iAmHere: boolean; share: boolean; auto: boolean; /** Today's session, when the club has one: "Tuesday night · Doors open 17:45". */ today?: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
 
   // Automatic check-in only while the app is open, only if location is already allowed, and at most once every 20 minutes.
   useEffect(() => {
@@ -32,15 +32,15 @@ export function ArrivalCard({ venueLabel, here, iAmHere, share, auto, today }: {
   }, [auto, share, iAmHere, router]);
 
   async function arrive() {
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     try {
       const f = await getFix();
       const r = await checkIn({ ...f, method: "manual" });
-      if (!r.ok) setMsg(r.error); else router.refresh();
-    } catch (e) { setMsg((e as Error).message); }
+      if (!r.ok) toast.error(r.error); else { toast.success("You’re checked in. Others who asked to be told have been alerted."); router.refresh(); }
+    } catch (e) { toast.error((e as Error).message); }
     setBusy(false);
   }
-  async function leave() { setBusy(true); setMsg(undefined); const r = await checkOut(); if (!r.ok) setMsg(r.error); else router.refresh(); setBusy(false); }
+  async function leave() { setBusy(true); const r = await checkOut(); if (!r.ok) toast.error(r.error); else { toast.success("You’ve left. See you next time."); router.refresh(); } setBusy(false); }
 
   return (
     <>
@@ -56,7 +56,6 @@ export function ArrivalCard({ venueLabel, here, iAmHere, share, auto, today }: {
           iAmHere ? <Button variant="ghost" block disabled={busy} onClick={leave}>{busy ? "Please wait…" : "I’ve left"}</Button>
             : <Button block disabled={busy} onClick={arrive}>{busy ? "Finding you…" : "I’ve arrived"}</Button>
         ) : <p className="rx-muted" style={{ margin: 0 }}>To check in, turn on “Share when I arrive” on your <Link href="/play/me" style={{ textDecoration: "underline" }}>Me page</Link>.</p>}
-        {msg ? <p role="alert" className="rx-error" style={{ marginTop: 8 }}>{msg}</p> : null}
       </div>
     </>
   );

@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, EmptyState, ListGroup, ListRow, Photo, Pill, Sheet, TextField } from "@rallix/ui";
+import { Button, EmptyState, ListGroup, ListRow, Photo, Pill, Sheet, TextField, useToast } from "@rallix/ui";
 import type { DayCount, MemberVisits } from "@rallix/stats";
 import { CardScanner } from "../../../../components/CardScanner";
 import { doorCheckIn, doorCheckOut, lookupCard, type Scanned } from "../../../../lib/attendance-actions";
@@ -17,23 +17,23 @@ export function AttendanceManager({ today, here, people, days, regulars, expecte
   const [sheet, setSheet] = useState<null | "pick" | "scan">(null);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const [scanned, setScanned] = useState<Scanned | null>(null);
   const hereIds = new Set(here.map((h) => h.id));
-  const close = () => { setSheet(null); setScanned(null); setMsg(undefined); setQ(""); };
+  const close = () => { setSheet(null); setScanned(null); setQ(""); };
   const shown = people.filter((p) => p.name.toLowerCase().includes(q.trim().toLowerCase()));
   const maxVisits = Math.max(1, ...days.map((d) => d.people));
 
-  async function act(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>, done?: () => void) {
-    setBusy(true); setMsg(undefined);
+  async function act(fn: () => Promise<{ ok: boolean; error?: string; message?: string }>, done?: () => void, said = "Saved.") {
+    setBusy(true);
     const r = await fn();
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    done?.(); router.refresh();
+    if (!r.ok) return toast.error(r.error ?? "Something went wrong. Please try again.");
+    toast.success(said); done?.(); router.refresh();
   }
   const onToken = useCallback(async (token: string) => {
     const r = await lookupCard(token);
-    if (r.ok) { setScanned(r.person); setMsg(undefined); } else { setScanned(null); setMsg(r.error); }
+    if (r.ok) { setScanned(r.person); } else { setScanned(null); toast.error(r.error); }
   }, []);
 
   return (
@@ -58,7 +58,7 @@ export function AttendanceManager({ today, here, people, days, regulars, expecte
         {here.length === 0 ? <EmptyState compact title="Nobody checked in" hint="People who check in on their phone or at the door show up here." /> : (
           <ListGroup label="Here now">
             {here.map((h) => <ListRow key={h.id} media={<Photo src={h.photo} name={h.name} alt="" />} title={h.name} subtitle={`Since ${hm(h.since)}${h.method === "door" ? " · at the door" : ""}`}
-              trailing={<button type="button" className="rx-linkbtn" disabled={busy} aria-label={`Check out ${h.name}`} onClick={(e) => { e.stopPropagation(); void act(() => doorCheckOut(h.id)); }}>Check out</button>} />)}
+              trailing={<button type="button" className="rx-linkbtn" disabled={busy} aria-label={`Check out ${h.name}`} onClick={(e) => { e.stopPropagation(); void act(() => doorCheckOut(h.id), undefined, "Checked out."); }}>Check out</button>} />)}
           </ListGroup>
         )}
       </div>
@@ -86,23 +86,20 @@ export function AttendanceManager({ today, here, people, days, regulars, expecte
 
       <Sheet open={sheet === "pick"} onClose={close} title="Check in by name">
         <TextField label="Search members" value={q} onChange={(e) => setQ(e.target.value)} />
-        {msg ? <p role="alert" className="rx-error">{msg}</p> : null}
         <ListGroup bare label="Members">
           {shown.slice(0, 50).map((p) => <ListRow key={p.id} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} subtitle={hereIds.has(p.id) ? "Already here" : undefined}
-            onClick={hereIds.has(p.id) ? undefined : () => void act(() => doorCheckIn(p.id), close)} />)}
+            onClick={hereIds.has(p.id) ? undefined : () => void act(() => doorCheckIn(p.id), close, "Checked in.")} />)}
         </ListGroup>
         {shown.length === 0 ? <p className="rx-muted">No one matches.</p> : null}
       </Sheet>
 
       <Sheet open={sheet === "scan"} onClose={close} title="Scan a member card">
         {sheet === "scan" && !scanned ? <CardScanner onToken={onToken} /> : null}
-        {msg && !scanned ? <p role="alert" className="rx-error">{msg}</p> : null}
         {scanned ? (
           <div style={{ display: "grid", gap: 12 }}>
             <ListGroup label="Scanned member"><ListRow media={<Photo src={scanned.photo} name={scanned.name} alt="" />} title={scanned.name} subtitle={scanned.here ? "Already checked in" : undefined} trailing={<Pill tone={TONE[scanned.standing]}>{scanned.standingLabel}</Pill>} /></ListGroup>
-            {msg ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg}</p> : null}
-            {scanned.here ? <Button block variant="ghost" onClick={close}>Done</Button> : <Button block disabled={busy} onClick={() => void act(() => doorCheckIn(scanned.id), close)}>Let in</Button>}
-            <Button block variant="ghost" onClick={() => { setScanned(null); setMsg(undefined); }}>Scan another</Button>
+            {scanned.here ? <Button block variant="ghost" onClick={close}>Done</Button> : <Button block disabled={busy} onClick={() => void act(() => doorCheckIn(scanned.id), close, "Checked in.")}>Let in</Button>}
+            <Button block variant="ghost" onClick={() => { setScanned(null); }}>Scan another</Button>
           </div>
         ) : null}
       </Sheet>

@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useState } from "react";
-import { Button, Switch, Toast } from "@rallix/ui";
+import { useState } from "react";
+import { Button, Switch, useToast } from "@rallix/ui";
 import { saveBirthday } from "../lib/birthday-actions";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -11,19 +11,16 @@ export function BirthdayForm({ month, day, show }: { month: number | null; day: 
   const [d, setD] = useState<string>(day ? String(day) : "");
   const [visible, setVisible] = useState(show);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const [toast, setToast] = useState<string | null>(null);
-  const closeToast = useCallback(() => setToast(null), []);
+  const toast = useToast();
 
   async function save(clear = false) {
-    setError(undefined);
-    if (!clear && (!m || !d)) return setError("Choose a month and a day.");
+    if (!clear && (!m || !d)) return toast.error("Choose a month and a day.");
     setBusy(true);
     const r = await saveBirthday({ month: clear ? null : Number(m), day: clear ? null : Number(d), show: visible });
     setBusy(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) return toast.error(r.error);
     if (clear) { setM(""); setD(""); }
-    setToast(clear ? "Birthday removed. Carry on with what you were doing." : visible ? "Birthday saved. Your club can see it when it comes up. Carry on with what you were doing." : "Birthday saved, and hidden from the club. Carry on with what you were doing.");
+    toast.success(clear ? "Birthday removed. Carry on with what you were doing." : visible ? "Birthday saved. Your club can see it when it comes up. Carry on with what you were doing." : "Birthday saved, and hidden from the club. Carry on with what you were doing.");
   }
 
   return (
@@ -43,10 +40,8 @@ export function BirthdayForm({ month, day, show }: { month: number | null; day: 
         <span id="birth-show">Show my birthday to the club</span>
         <Switch label="Show my birthday to the club" checked={visible} onChange={setVisible} />
       </div>
-      {error ? <p role="alert" className="rx-error" style={{ marginBottom: 12 }}>{error}</p> : null}
       <Button type="submit" block disabled={busy}>{busy ? "Saving…" : "Save birthday"}</Button>
       {month ? <div style={{ marginTop: 8 }}><Button type="button" variant="ghost" block disabled={busy} onClick={() => void save(true)}>Remove my birthday</Button></div> : null}
-      {toast ? <Toast message={toast} onClose={closeToast} /> : null}
     </form>
   );
 }

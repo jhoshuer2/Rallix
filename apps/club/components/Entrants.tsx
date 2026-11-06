@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, CheckRow, ListGroup, ListRow, Photo, Sheet } from "@rallix/ui";
+import { Button, CheckRow, ListGroup, ListRow, Photo, Sheet, useToast } from "@rallix/ui";
 import { addEntrants, removeEntrant, startCompetition } from "../lib/competition-actions";
 
 type P = { id: string; name: string; photo: string | null };
@@ -10,16 +10,16 @@ type P = { id: string; name: string; photo: string | null };
 export function Entrants({ id, entrants, others, max }: { id: string; entrants: P[]; others: P[]; max: number | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const chosen = Object.keys(picked).filter((k) => picked[k]);
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>, done?: () => void) {
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     const r = await fn();
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    done?.(); router.refresh();
+    if (!r.ok) return toast.error(r.error ?? "Something went wrong. Please try again.");
+    toast.success("Players added."); done?.(); router.refresh();
   }
   return (
     <>
@@ -32,7 +32,6 @@ export function Entrants({ id, entrants, others, max }: { id: string; entrants: 
       <div style={{ height: 12 }} />
       <Button block disabled={busy || entrants.length < 2} onClick={() => run(() => startCompetition(id))}>{busy ? "Please wait…" : "Start competition"}</Button>
       {entrants.length < 2 ? <p className="rx-muted" style={{ margin: "8px 0 0", textAlign: "center", fontSize: 13 }}>You need at least two players to start.</p> : null}
-      {msg ? <p role="alert" className="rx-error">{msg}</p> : null}
       <Sheet open={adding} onClose={() => setAdding(false)} title="Add players">
         <ListGroup bare label="Players not yet registered">
           {others.map((p) => <CheckRow key={p.id} media={<Photo src={p.photo} name={p.name} alt="" />} title={p.name} checked={!!picked[p.id]} onChange={(v) => setPicked({ ...picked, [p.id]: v })} />)}

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Panel, SelectSheet, Switch, TextField } from "@rallix/ui";
+import { Button, Panel, SelectSheet, Switch, TextField, useToast } from "@rallix/ui";
 import { saveCompetitionDetails } from "../../../../../lib/competition-actions";
 
 type Init = { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: string; closesOn: string; pointsWin: string; pointsLoss: string; seasonId: string };
@@ -10,15 +10,15 @@ export function DetailsForm({ id, draft, initial, seasons, league }: { id: strin
   const router = useRouter();
   const [v, setV] = useState(initial);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string }>();
+  const toast = useToast();
   const set = <K extends keyof Init>(k: K, val: Init[K]) => setV((p) => ({ ...p, [k]: val }));
 
   async function save(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setMsg(undefined);
+    e.preventDefault(); setBusy(true);
     const r = await saveCompetitionDetails(id, { summary: v.summary, prize: v.prize, rules: v.rules, openRegistration: v.openRegistration, maxPlayers: v.maxPlayers ? Number(v.maxPlayers) : null, closesOn: v.closesOn || null, pointsWin: Number(v.pointsWin), pointsLoss: Number(v.pointsLoss), seasonId: v.seasonId || null });
     setBusy(false);
-    if (!r.ok) return setMsg({ ok: false, text: r.error });
-    setMsg({ ok: true, text: "Saved." }); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Saved."); router.refresh();
   }
   return (
     <form noValidate onSubmit={save}>
@@ -52,7 +52,6 @@ export function DetailsForm({ id, draft, initial, seasons, league }: { id: strin
           {seasons.length ? <SelectSheet label="Season (optional)" title="Season" value={v.seasonId} onChange={(x) => set("seasonId", x)} options={[{ value: "", label: "No season" }, ...seasons]} /> : null}
         </Panel>
       ) : null}
-      {msg ? <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "rx-muted" : "rx-error"}>{msg.text}</p> : null}
       <Button type="submit" block disabled={busy}>{busy ? "Saving…" : "Save details"}</Button>
     </form>
   );

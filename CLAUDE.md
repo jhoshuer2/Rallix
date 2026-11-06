@@ -138,6 +138,9 @@ Tokens live in `packages/ui/src/tokens.css`. Fonts: Barlow Condensed 600/700 (he
 - DB tests assert every `SECURITY DEFINER` function in schema `app` pins its `search_path` and is not executable by PUBLIC.
 - Both apps send `X-Content-Type-Options`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Permissions-Policy` (club: camera and location for itself only; console: none) and HSTS; the pay link keeps its own no-store and no-referrer headers. Go-live steps: `docs/GO-LIVE.md`; migrations and env matrix: `DEPLOY.md` sections 8 and 9.
 
+## Feedback toasts
+- Results of actions (saved, sent, failed) are toasts: `useToast()` from `@rallix/ui`, provider mounted once in each app's root layout (club `app/layout.tsx`, console `app/layout.tsx`). Pure queue rules in `packages/ui/src/toast-queue.ts`. Top of the screen, read aloud, 6 s (10 s for errors), 44px OK button; it joins the browser top layer (popover) so it shows above modal sheets. Never inline `setMsg({ ok, text })` or a muted status line: `design-system.test.ts` fails on it. Console forms get it through `useRun` in `apps/console/components/Forms.tsx`. Test: `apps/club/e2e/toast.cjs`.
+
 ## Rules
 - Every tenant table has `club_id` and is protected by Postgres row-level security. `users` is global. `memberships(user_id, club_id, role, status)` links them.
 - Roles: club admin, player, scorer/umpire, coach.

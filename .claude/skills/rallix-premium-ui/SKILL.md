@@ -89,6 +89,13 @@ Under about 150 visible words per screen, including the tab bar. Prefer "Sat 3 N
 ## Motion
 Transform and opacity only, 120 to 320 ms (`--rx-dur-*`). Skeleton shimmer, LIVE pulse and story progress stop under `prefers-reduced-motion`.
 
+## Feedback after an action: toasts
+- Every save, send, join, remove or failure shows a toast with `useToast()` from `@rallix/ui` (`toast.success("Saved.")`, `toast.error(message)`). The provider is mounted once in the root layout, so a toast survives a navigation.
+- Never a small muted line under the button, and never `setMsg({ ok, text })`: it is easy to miss and the keyboard can cover it. `design-system.test.ts` fails on both.
+- A toast says what happened and, if it helps, what to do next, in one short sentence: "Court location saved." For first-time steps add "Carry on with what you were doing." Failures say what to do ("Check your connection and try again.").
+- Toasts sit at the TOP, are read aloud (success politely, failure assertively), have a 44px OK button, close after 6 s (10 s for a failure) and do not animate under reduced motion. A field that is wrong keeps its inline `error` text AND may toast.
+- Do not toast things that are not a result of an action (loading, hints). Do not toast every keystroke or autosave tick.
+
 ## Browser-only code
 Never read `window` or `localStorage` while rendering. Do it in an effect so server rendering cannot crash. Active-tab matching is exact or with a trailing slash.
 

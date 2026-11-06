@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, EmptyState, ListGroup, ListRow, Pill, Sheet, TextField } from "@rallix/ui";
+import { Button, EmptyState, ListGroup, ListRow, Pill, Sheet, TextField, useToast } from "@rallix/ui";
 import { saveSeason } from "../../../../lib/season-actions";
 
 type S = { id: string; name: string; startsOn: string; endsOn: string; leader: string | null };
@@ -11,15 +11,15 @@ export function SeasonManager({ seasons, today }: { seasons: S[]; today: string 
   const router = useRouter();
   const [f, setF] = useState<null | { id: string | null; name: string; startsOn: string; endsOn: string }>(null);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
-  const close = () => { setF(null); setMsg(undefined); };
+  const toast = useToast();
+  const close = () => { setF(null); };
   async function save() {
     if (!f) return;
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     const r = await saveSeason(f.id, f);
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    close(); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Season saved."); close(); router.refresh();
   }
   return (
     <>
@@ -42,7 +42,6 @@ export function SeasonManager({ seasons, today }: { seasons: S[]; today: string 
               <TextField label="Starts" type="date" value={f.startsOn} onChange={(e) => setF({ ...f, startsOn: e.target.value })} />
               <TextField label="Ends" type="date" min={f.startsOn} value={f.endsOn} onChange={(e) => setF({ ...f, endsOn: e.target.value })} />
             </div>
-            {msg ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg}</p> : null}
             <Button type="submit" block disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
           </form>
         ) : null}

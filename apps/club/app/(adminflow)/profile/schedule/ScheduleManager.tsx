@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, EmptyState, ListGroup, ListRow, Pill, Segmented, Sheet, Switch, TextField } from "@rallix/ui";
+import { Button, EmptyState, ListGroup, ListRow, Pill, Segmented, Sheet, Switch, TextField, useToast } from "@rallix/ui";
 import { timeLabel, type EventKind, type ScheduleEvent } from "@rallix/stats";
 import { deleteScheduleEvent, saveScheduleEvent } from "../../../../lib/schedule-actions";
 
@@ -15,26 +15,26 @@ export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; to
   const router = useRouter();
   const [f, setF] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => (x ? { ...x, [k]: v } : x));
-  const close = () => { setF(null); setMsg(undefined); };
+  const close = () => { setF(null); };
   const open = (e: ScheduleEvent) => setF({ id: e.id, kind: e.kind, title: e.title, note: e.note ?? "", startsOn: e.startsOn, endsOn: e.endsOn ?? "", startTime: e.startTime ?? "", endTime: e.endTime ?? "", doorsOpen: e.doorsOpen ?? "", repeatsWeekly: !!e.repeatsWeekly, until: e.until ?? "" });
 
   async function save() {
     if (!f) return;
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     const r = await saveScheduleEvent(f.id, f);
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    close(); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Schedule saved."); close(); router.refresh();
   }
   async function remove() {
     if (!f?.id) return;
     setBusy(true);
     const r = await deleteScheduleEvent(f.id);
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    close(); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Removed from the schedule."); close(); router.refresh();
   }
   const when = (e: ScheduleEvent) => {
     const t = `${e.doorsOpen ? `doors ${e.doorsOpen} · ` : ""}${timeLabel({ startTime: e.startTime ?? null, endTime: e.endTime ?? null })}`;
@@ -83,7 +83,6 @@ export function ScheduleManager({ events, today }: { events: ScheduleEvent[]; to
             {f.kind === "play" ? <Switch label="Repeats every week" checked={f.repeatsWeekly} onChange={(v) => set("repeatsWeekly", v)} /> : null}
             {f.kind === "play" && f.repeatsWeekly ? <TextField label="Until (optional)" type="date" min={f.startsOn} value={f.until} onChange={(e) => set("until", e.target.value)} /> : null}
             <TextField label="Note (optional)" maxLength={280} value={f.note} onChange={(e) => set("note", e.target.value)} />
-            {msg ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg}</p> : null}
             <Button type="submit" block disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
             {f.id ? <Button variant="ghost" block disabled={busy} onClick={remove}>Delete</Button> : null}
           </form>

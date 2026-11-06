@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Icon, Photo, Sheet, clampOffset, cropRect, fitWithin } from "@rallix/ui";
+import { Button, Icon, Photo, Sheet, clampOffset, cropRect, fitWithin, useToast } from "@rallix/ui";
 import { removePhoto, uploadPhoto } from "../lib/media-actions";
 
 type Kind = "me" | "member" | "club-logo" | "club-cover" | "competition-cover";
@@ -22,7 +22,7 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
   const [zoom, setZoom] = useState(1);
   const [off, setOff] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const toast = useToast();
   const imgRef = useRef<HTMLImageElement>(null);
   const lib = useRef<HTMLInputElement>(null);
   const cam = useRef<HTMLInputElement>(null);
@@ -37,11 +37,10 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
 
   async function choose(file: File | undefined) {
     if (!file) return;
-    setMsg(null);
     const u = URL.createObjectURL(file);
     const im = new Image();
     im.src = u;
-    try { await im.decode(); } catch { URL.revokeObjectURL(u); return setMsg({ ok: false, text: "We couldn’t open that picture. Please try a JPEG or PNG." }); }
+    try { await im.decode(); } catch { URL.revokeObjectURL(u); return toast.error("We couldn’t open that picture. Please try a JPEG or PNG."); }
     reset();
     setSrc(u); setDims({ w: im.naturalWidth, h: im.naturalHeight });
   }
@@ -49,7 +48,7 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
   async function send() {
     const c = crop(); const im = imgRef.current;
     if (!c || !im) return;
-    setBusy(true); setMsg(null);
+    setBusy(true);
     const r = cropRect(c);
     const out = fitWithin(r.sw, r.sh, shape === "cover" ? 1600 : 1024);
     const canvas = document.createElement("canvas");
@@ -57,22 +56,22 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
     canvas.getContext("2d")!.drawImage(im, r.sx, r.sy, r.sw, r.sh, 0, 0, out.w, out.h);
     let blob: Blob | null = null;
     for (const q of [0.86, 0.72, 0.58]) { blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", q)); if (blob && blob.size <= MAX_BYTES) break; }
-    if (!blob) { setBusy(false); return setMsg({ ok: false, text: "We couldn’t prepare that picture. Please try another." }); }
+    if (!blob) { setBusy(false); return toast.error("We couldn’t prepare that picture. Please try another."); }
     const fd = new FormData();
     fd.set("kind", kind); if (membershipId) fd.set("membershipId", membershipId); if (competitionId) fd.set("competitionId", competitionId);
     fd.set("file", new File([blob], "photo.jpg", { type: "image/jpeg" }));
     const res = await uploadPhoto(fd);
     setBusy(false);
-    if (!res.ok) return setMsg({ ok: false, text: res.error });
-    setUrl(res.url); setMsg({ ok: true, text: "Picture updated." }); setOpen(false); reset(); router.refresh();
+    if (!res.ok) return toast.error(res.error);
+    setUrl(res.url); toast.success("Picture updated."); setOpen(false); reset(); router.refresh();
   }
 
   async function remove() {
-    setBusy(true); setMsg(null);
+    setBusy(true);
     const res = await removePhoto(kind, membershipId, competitionId);
     setBusy(false);
-    if (!res.ok) return setMsg({ ok: false, text: res.error });
-    setUrl(null); setMsg({ ok: true, text: "Picture removed." }); setOpen(false); reset(); router.refresh();
+    if (!res.ok) return toast.error(res.error);
+    setUrl(null); toast.success("Picture removed."); setOpen(false); reset(); router.refresh();
   }
 
   const scale = dims ? Math.max(box.w / dims.w, box.h / dims.h) * Math.max(1, zoom) : 1;
@@ -82,7 +81,6 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
       <div className="rx-uploader__side">
         <p className="rx-uploader__label">{label}</p>
         <Button variant="ghost" onClick={() => setOpen(true)} aria-haspopup="dialog"><Icon name="camera" size={18} /> {url ? "Change picture" : "Add a picture"}</Button>
-        <p role="status" aria-live="polite" className={msg?.ok ? "rx-muted" : "rx-error"} style={{ margin: 0, minHeight: 0 }}>{msg && !open ? msg.text : ""}</p>
       </div>
 
       <Sheet open={open} onClose={close} title={label}>
@@ -108,12 +106,10 @@ export function PhotoUploader({ kind, membershipId, competitionId, name, current
             <label className="rx-crop__zoom"><span>Zoom</span>
               <input type="range" min={1} max={3} step={0.05} value={zoom} onChange={(e) => { const z = Number(e.target.value); setZoom(z); move(z, off); }} aria-label="Zoom" />
             </label>
-            {msg && !msg.ok ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg.text}</p> : null}
             <Button block disabled={busy} onClick={send}>{busy ? "Uploading…" : "Use picture"}</Button>
             <Button block variant="ghost" disabled={busy} onClick={reset}>Choose another</Button>
           </div>
         )}
-        {!src && msg && !msg.ok ? <p role="alert" className="rx-error">{msg.text}</p> : null}
       </Sheet>
     </div>
   );

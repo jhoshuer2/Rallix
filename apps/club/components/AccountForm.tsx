@@ -1,6 +1,6 @@
 "use client";
-import { useCallback, useState } from "react";
-import { Button, PasswordField, TextField, Toast } from "@rallix/ui";
+import { useState } from "react";
+import { Button, PasswordField, TextField, useToast } from "@rallix/ui";
 import { checkPassword, checkUsername } from "@rallix/config/safe-input";
 import { saveCredentials } from "../lib/account-actions";
 
@@ -11,29 +11,26 @@ export function AccountForm({ email, username, hasPassword }: { email: string; u
   const [pw, setPw] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const closeToast = useCallback(() => setToast(null), []);
+  const toast = useToast();
   const [saved, setSaved] = useState({ username, hasPassword });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
     const n = checkUsername(name);
-    if (!n.ok) return setMsg({ ok: false, text: `Username: ${n.error}` });
+    if (!n.ok) return toast.error(`Username: ${n.error}`);
     if (pw || !saved.hasPassword) {
       const p = checkPassword(pw, { username: n.username, email });
-      if (!p.ok) return setMsg({ ok: false, text: `Password: ${p.error}` });
-      if (pw !== again) return setMsg({ ok: false, text: "The two passwords don’t match." });
+      if (!p.ok) return toast.error(`Password: ${p.error}`);
+      if (pw !== again) return toast.error("The two passwords don’t match.");
     }
     setBusy(true);
     const r = await saveCredentials({ username: n.username, password: pw || undefined, currentPassword: current || undefined });
     setBusy(false);
-    if (!r.ok) return setMsg({ ok: false, text: r.error });
+    if (!r.ok) return toast.error(r.error);
     const first = !saved.hasPassword && !!pw;
     setSaved({ username: n.username, hasPassword: saved.hasPassword || !!pw });
     setName(n.username); setCurrent(""); setPw(""); setAgain("");
-    setToast(first ? "Password set. You can now sign in with it. Carry on with what you were doing." : pw ? "Password changed. Carry on with what you were doing." : "Username saved. Carry on with what you were doing.");
+    toast.success(first ? "Password set. You can now sign in with it. Carry on with what you were doing." : pw ? "Password changed. Carry on with what you were doing." : "Username saved. Carry on with what you were doing.");
   }
 
   return (
@@ -43,9 +40,7 @@ export function AccountForm({ email, username, hasPassword }: { email: string; u
       {saved.hasPassword ? <PasswordField label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /> : null}
       <PasswordField label={saved.hasPassword ? "New password (leave empty to keep it)" : "Password"} autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
       {pw || !saved.hasPassword ? <PasswordField label="Type the password again" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /> : null}
-      {msg ? <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "rx-muted" : "rx-error"} style={{ marginBottom: 12 }}>{msg.text}</p> : null}
       <Button type="submit" block disabled={busy}>{busy ? "Saving…" : saved.hasPassword ? "Save changes" : "Save username and password"}</Button>
-      {toast ? <Toast message={toast} onClose={closeToast} /> : null}
     </form>
   );
 }

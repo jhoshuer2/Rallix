@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, CheckRow, EmptyState, ListGroup, ListRow, Photo, Pill, Sheet, Switch } from "@rallix/ui";
+import { Button, CheckRow, EmptyState, ListGroup, ListRow, Photo, Pill, Sheet, Switch, useToast } from "@rallix/ui";
 import { PERMISSIONS, type Permission } from "../../../../lib/permissions";
 import { removeAdmin, saveAdmin } from "../../../../lib/team-actions";
 import type { TeamMember } from "../../../../lib/team";
@@ -14,25 +14,25 @@ export function TeamManager({ admins, others, meId, canEdit }: { admins: TeamMem
   const [who, setWho] = useState<string>("");
   const [perms, setPerms] = useState<Permission[]>([]);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
-  const close = () => { setOpen(null); setWho(""); setPerms([]); setMsg(undefined); };
+  const toast = useToast();
+  const close = () => { setOpen(null); setWho(""); setPerms([]); };
   const toggle = (k: Permission, on: boolean) => setPerms((p) => (on ? [...new Set([...p, k])] : p.filter((x) => x !== k)));
   const target = open?.mode === "edit" ? open.member.id : who;
 
   async function save() {
-    if (!target) return setMsg("Choose who to make an admin.");
-    setBusy(true); setMsg(undefined);
+    if (!target) return toast.error("Choose who to make an admin.");
+    setBusy(true);
     const r = await saveAdmin(target, perms);
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    close(); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Admin saved."); close(); router.refresh();
   }
   async function remove(id: string) {
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     const r = await removeAdmin(id);
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    close(); router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success("Admin removed."); close(); router.refresh();
   }
 
   return (
@@ -70,7 +70,6 @@ export function TeamManager({ admins, others, meId, canEdit }: { admins: TeamMem
             </div>
           ))}
         </div>
-        {msg ? <p role="alert" className="rx-error">{msg}</p> : null}
         <Button block disabled={busy} onClick={save}>{busy ? "Saving…" : open?.mode === "edit" ? "Save" : "Make admin"}</Button>
         {open?.mode === "edit" ? <div style={{ marginTop: 8 }}><Button variant="ghost" block disabled={busy} onClick={() => remove(open.member.id)}>Remove as admin</Button></div> : null}
       </Sheet>

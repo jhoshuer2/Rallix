@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, EmptyState, Icon, Panel, Segmented, Switch, TextField } from "@rallix/ui";
+import { Button, EmptyState, Icon, Panel, Segmented, Switch, TextField, useToast } from "@rallix/ui";
 import { billMembers, savePlan, setPlanActive } from "../../../../lib/actions";
 
 type Plan = { id: string; name: string; priceKobo: number; period: "monthly" | "yearly"; perks: string[]; active: boolean };
@@ -14,10 +14,10 @@ export function Plans({ plans }: { plans: Plan[] }) {
   const [price, setPrice] = useState("");
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const [pending, start] = useTransition();
   const run = (fn: () => Promise<{ ok: boolean; error?: string } & Record<string, unknown>>, ok?: (r: Record<string, unknown>) => string) =>
-    start(async () => { const r = await fn(); setMsg(r.ok ? ok?.(r) : r.error); if (r.ok) router.refresh(); });
+    start(async () => { const r = await fn(); if (r.ok) { const m = ok?.(r); toast.success(m ?? "Saved."); router.refresh(); } else toast.error(r.error ?? "Something went wrong. Please try again."); });
   const shown = plans.filter((p) => p.period === period);
 
   return (
@@ -55,7 +55,6 @@ export function Plans({ plans }: { plans: Plan[] }) {
         </Panel>
       ))}
       {shown.length === 0 && !adding ? <EmptyState compact title={`No ${period} plans yet`} hint="Add a plan so you can bill your members." action={<Button onClick={() => { setAdding(true); setName(""); setPrice(""); }}>Add a {period} plan</Button>} /> : null}
-      <p role="status" aria-live="polite" className="rx-muted">{msg}</p>
     </>
   );
 }

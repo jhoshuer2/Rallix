@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Panel, Pill } from "@rallix/ui";
+import { Button, Panel, Pill, useToast } from "@rallix/ui";
 import { decideApplication } from "../lib/application-actions";
 
 type A = { id: string; name: string; level: string; message: string | null; ago: string };
@@ -10,13 +10,13 @@ type A = { id: string; name: string; level: string; message: string | null; ago:
 export function Applications({ items }: { items: A[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   async function decide(id: string, yes: boolean) {
-    setBusy(id); setMsg(undefined);
+    setBusy(id);
     const r = await decideApplication(id, yes);
     setBusy(null);
-    if (!r.ok) return setMsg(r.error);
-    router.refresh();
+    if (!r.ok) return toast.error(r.error);
+    toast.success(yes ? "Application approved. They are now a member." : "Application declined."); router.refresh();
   }
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -33,7 +33,6 @@ export function Applications({ items }: { items: A[] }) {
           </div>
         </Panel>
       ))}
-      {msg ? <p role="alert" className="rx-error">{msg}</p> : null}
     </div>
   );
 }

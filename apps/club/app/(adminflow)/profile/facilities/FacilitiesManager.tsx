@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, EmptyState, ListGroup, ListRow, Pill, Segmented, Sheet, TextField } from "@rallix/ui";
+import { Button, EmptyState, ListGroup, ListRow, Pill, Segmented, Sheet, TextField, useToast } from "@rallix/ui";
 import { ALERT_LABEL, KIND_LABEL, KIND_ORDER, itemAlert, type ItemKind, type ItemStatus } from "@rallix/stats";
 import { adjustStock, deleteFacilityItem, itemHistory, logMaintenance, saveFacilityItem } from "../../../../lib/facility-actions";
 import type { FacilityItem, LogLine } from "../../../../lib/facility-queries";
@@ -19,19 +19,19 @@ export function FacilitiesManager({ items }: { items: FacilityItem[] }) {
   const [history, setHistory] = useState<LogLine[]>([]);
   const [log, setLog] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string>();
+  const toast = useToast();
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => (x ? { ...x, [k]: v } : x));
-  const close = () => { setF(null); setMsg(undefined); setLog(""); setHistory([]); };
+  const close = () => { setF(null); setLog(""); setHistory([]); };
   const open = async (i: FacilityItem) => {
     setF({ id: i.id, kind: i.kind, name: i.name, quantity: String(i.quantity), minQuantity: i.minQuantity === null ? "" : String(i.minQuantity), status: i.status, note: i.note ?? "" });
     setQty(i.quantity); setHistory(await itemHistory(i.id));
   };
   async function run(fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void | Promise<void>) {
-    setBusy(true); setMsg(undefined);
+    setBusy(true);
     const r = await fn();
     setBusy(false);
-    if (!r.ok) return setMsg(r.error);
-    await after?.(); router.refresh();
+    if (!r.ok) return toast.error(r.error ?? "Something went wrong. Please try again.");
+    toast.success("Saved."); await after?.(); router.refresh();
   }
   const save = () => f && run(() => saveFacilityItem(f.id, { ...f, quantity: Number(f.quantity), minQuantity: f.minQuantity === "" ? null : Number(f.minQuantity) }), close);
   const step = (d: number) => f?.id && run(() => adjustStock(f.id!, d), async () => { setQty((q) => q + d); setHistory(await itemHistory(f.id!)); });
@@ -74,7 +74,6 @@ export function FacilitiesManager({ items }: { items: FacilityItem[] }) {
             <p className="rx-label" style={{ margin: "4px 0 0" }}>Condition</p>
             <Segmented label="Condition" scroll value={f.status} onChange={(v) => set("status", v)} options={CONDITIONS} />
             <TextField label="Note (optional)" maxLength={280} value={f.note} onChange={(e) => set("note", e.target.value)} />
-            {msg ? <p role="alert" className="rx-error" style={{ margin: 0 }}>{msg}</p> : null}
             <Button block disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</Button>
             {f.id ? (
               <>

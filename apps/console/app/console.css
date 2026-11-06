@@ -103,3 +103,17 @@ a { color: inherit; }
 /* A select placed straight in a table cell (the role picker on the Team page) is sized like the other controls: at least 36px tall. */
 .cs-table select { box-sizing: border-box; font: inherit; min-height: 36px; padding: 4px 10px; border: 1px solid #bdb8a8; border-radius: 6px; background: #fff; }
 .cs-table select:focus-visible { outline: 3px solid var(--rx-blue); outline-offset: 2px; }
+
+
+/* Toasts (desktop): top right, read aloud, 36px+ controls. Same behaviour as the club app. */
+.rx-toasts { position: fixed; inset: 16px 16px auto auto; z-index: 90; width: min(380px, calc(100vw - 32px)); height: auto; margin: 0; border: 0; background: transparent; overflow: visible; display: grid; gap: 8px; padding: 0; pointer-events: none; color: inherit; }
+.rx-toasts > div { display: grid; gap: 8px; }
+.rx-toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; min-height: 52px; border-radius: 10px; background: #0f2038; color: #fff; font-size: 14px; line-height: 1.35; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: rx-toast-in .2s ease-out; }
+.rx-toast--error { background: #8a1c1c; }
+.rx-toast__icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #1f9d55; }
+.rx-toast--error .rx-toast__icon { background: #fff; color: #8a1c1c; }
+.rx-toast__text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rx-toast__close { flex: none; min-width: 44px; min-height: 36px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 8px; background: transparent; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.rx-toast__close:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+@keyframes rx-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rx-toast { animation: none; } }

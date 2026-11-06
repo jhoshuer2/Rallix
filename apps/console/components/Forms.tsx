@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useToast } from "@rallix/ui";
 import * as A from "../lib/actions";
 import { ROLE_HINT, ROLE_LABEL, STAFF_ROLES, type StaffRole } from "@rallix/config/staff";
 
@@ -10,16 +11,15 @@ type Res = { ok: boolean; error?: string } & Record<string, unknown>;
 function useRun() {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const toast = useToast();
   const run = (fn: () => Promise<Res>, success: string | ((r: Res) => string), after?: (r: Res) => void) =>
     start(async () => {
       let r: Res;
       try { r = await fn(); } catch { r = { ok: false, error: "Something went wrong. Please try again." }; }
-      setMsg({ ok: r.ok, text: r.ok ? (typeof success === "function" ? success(r) : success) : (r.error ?? "Something went wrong.") });
-      if (r.ok) { router.refresh(); after?.(r); }
+      if (r.ok) { toast.success(typeof success === "function" ? success(r) : success); router.refresh(); after?.(r); }
+      else toast.error(r.error ?? "Something went wrong.");
     });
-  const note = msg ? <p role={msg.ok ? "status" : "alert"} className={msg.ok ? "cs-ok" : "cs-error"}>{msg.text}</p> : <span role="status" />;
-  return { run, pending, note };
+  return { run, pending, note: null };
 }
 
 /** One-click action with an optional confirm prompt. Pass a bound server action. */
@@ -351,6 +351,8 @@ export function PayLinkCard({ invoiceId, url, club, number, amount }: { invoiceI
 type MailRes = { ok: boolean; error?: string; needsConfirm?: boolean; sent?: number; failed?: number; recipients?: number };
 export function InvoiceEmailCard({ invoiceId, history, flash }: { invoiceId: string; history: Array<{ to: string; kind: string; status: string; error: string | null; at: string }>; flash?: string }) {
   const { run, pending, note } = useRun();
+  const toast = useToast();
+  useEffect(() => { if (flash) toast.success(flash); }, [flash]); // eslint-disable-line react-hooks/exhaustive-deps
   const send = (kind: "invoice" | "reminder") => {
     const go = (force: boolean) => run(async () => {
       const r = (await A.emailInvoice(invoiceId, kind, force)) as MailRes;
@@ -363,7 +365,6 @@ export function InvoiceEmailCard({ invoiceId, history, flash }: { invoiceId: str
     <section className="cs-card cs-noprint" style={{ marginBottom: 20 }} aria-label="Email this invoice">
       <h2 className="cs-h2" style={{ marginTop: 0 }}>Email</h2>
       <p className="cs-muted">Sends the invoice and pay link to everyone who is an admin of this club, even if the club is suspended.</p>
-      {flash ? <p role="status" className="cs-ok">{flash}</p> : null}
       <div className="cs-actions">
         <button className="cs-btn" disabled={pending} onClick={() => send("invoice")}>Email invoice to club admins</button>
         <button className="cs-btn cs-btn--ghost" disabled={pending} onClick={() => send("reminder")}>Send past-due reminder</button>

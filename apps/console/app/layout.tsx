@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ToastProvider } from "@rallix/ui";
 import "@rallix/ui/fonts.css";
 import "@rallix/ui/tokens.css";
 import "./console.css";
@@ -11,7 +12,7 @@ export const metadata = { title: "Rallix Console", description: "Rallix platform
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><ToastProvider>{children}</ToastProvider></body>
     </html>
   );
 }
