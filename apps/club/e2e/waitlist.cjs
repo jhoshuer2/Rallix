@@ -39,7 +39,7 @@ ok(await jide.locator('.rx-stickybar').getByText('Full',{exact:true}).first().is
 ok(await jide.getByRole('button',{name:'Join waitlist'}).isVisible()&&!(await jide.getByRole('button',{name:'Join',exact:true}).count()),'the one main button is now "Join waitlist"');
 await jide.getByRole('button',{name:'Join waitlist'}).click();await jide.getByText('You’re 1st in line').waitFor();
 ok(queue()==='jide','Jide is first in line');
-ok(await jide.getByText('On the waitlist').isVisible()&&await jide.getByRole('button',{name:'Leave waitlist'}).isVisible(),'the button shows "On the waitlist" and a quiet Leave waitlist');
+ok(await jide.getByText('On the waitlist',{exact:true}).isVisible()&&await jide.getByRole('button',{name:'Leave waitlist'}).isVisible(),'the button shows "On the waitlist" and a quiet Leave waitlist');
 await open(sule);await sule.getByRole('button',{name:'Join waitlist'}).click();await sule.getByText('You’re 2nd in line').waitFor();
 ok(queue()==='jide,sule','Sule is second');
 await jide.goto(B+'/play/compete',{waitUntil:'networkidle'});await jide.getByRole('radio',{name:'Upcoming'}).click();
