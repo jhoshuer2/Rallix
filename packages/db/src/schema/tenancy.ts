@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, doublePrecision, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, doublePrecision, index, integer, pgTable, smallint, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 import { clubStatus, level, memberRole, memberStatus, suspensionReason } from "./enums";
 
@@ -15,6 +15,11 @@ export const clubs = pgTable("clubs", {
   /** Wide banner picture. Uploaded by a club admin; app-role writes are limited to admins by the clubs_update policy. */
   coverUrl: text("cover_url"),
   location: text("location"),
+  /* The club's usual match rules, pre-filled for new competitions. Admins change them (clubs_update policy). */
+  defaultBestOf: smallint("default_best_of").notNull().default(5),
+  defaultGamePoints: smallint("default_game_points").notNull().default(11),
+  defaultWinBy: smallint("default_win_by").notNull().default(2),
+  defaultPointCap: smallint("default_point_cap"),
   /* Court location for arrival check-in. Set by a club admin (clubs_update policy). Never stores any player's position. */
   venueLabel: text("venue_label"),
   venueLat: doublePrecision("venue_lat"),
@@ -38,6 +43,10 @@ export const clubs = pgTable("clubs", {
 }, (t) => [
   check("clubs_payouts_need_subaccount", sql`${t.payoutsEnabledAt} IS NULL OR ${t.paystackSubaccountCode} IS NOT NULL`),
   // Slug becomes the subdomain, so keep it DNS-safe.
+  check("clubs_default_best_of", sql`${t.defaultBestOf} IN (1,3,5,7,9)`),
+  check("clubs_default_game_points", sql`${t.defaultGamePoints} BETWEEN 5 AND 30`),
+  check("clubs_default_win_by", sql`${t.defaultWinBy} IN (1,2)`),
+  check("clubs_default_point_cap", sql`${t.defaultPointCap} IS NULL OR (${t.defaultWinBy} = 2 AND ${t.defaultPointCap} > ${t.defaultGamePoints} AND ${t.defaultPointCap} <= ${t.defaultGamePoints} + 20)`),
   check("clubs_slug_format", sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$'`),
   check("clubs_logo_url", sql`${t.logoUrl} IS NULL OR ${t.logoUrl} ~ '^(https://[^ ]+|/[^/ ][^ ]*)$'`),
   check("clubs_venue_point", sql`(${t.venueLat} IS NULL) = (${t.venueLng} IS NULL) AND (${t.venueLat} IS NULL OR (${t.venueLat} BETWEEN -90 AND 90 AND ${t.venueLng} BETWEEN -180 AND 180))`),

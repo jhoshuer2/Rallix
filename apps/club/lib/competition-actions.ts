@@ -1,7 +1,9 @@
 "use server";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { competitionEntries, competitions } from "@rallix/db";
+import { competitionEntries, competitions, matches } from "@rallix/db";
+import { validateRules } from "@rallix/stats";
+import { ruleColumns, type RuleSet } from "./match-rules";
 import { sql } from "drizzle-orm";
 import { inClub, can, requireClub } from "./context";
 import { seedAndGenerate } from "./competition-core";
@@ -66,7 +68,7 @@ export async function leaveCompetition(id: string): Promise<Result> {
 }
 
 /** Admin: the preview details and the sign-up settings. Only an admin's session passes row-level security for this update. */
-export async function saveCompetitionDetails(id: string, input: { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: number | null; closesOn: string | null; pointsWin?: number; pointsLoss?: number; seasonId?: string | null }): Promise<Result> {
+export async function saveCompetitionDetails(id: string, input: { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: number | null; closesOn: string | null; pointsWin?: number; pointsLoss?: number; matchRules?: { bestOf: number; points: number; winBy: number; cap: number | null }; seasonId?: string | null }): Promise<Result> {
   const ctx = await requireClub();
   if (!can(ctx.club, "competitions")) return fail("Only club admins can edit competitions.");
   if (!UUID.test(id)) return fail("We couldn’t find that competition.");
@@ -82,6 +84,12 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
   if ((win !== undefined && (!Number.isInteger(win) || win < 0 || win > 10)) || (loss !== undefined && (!Number.isInteger(loss) || loss < 0 || loss > 10))) return fail("Points must be whole numbers from 0 to 10.");
   if (win !== undefined && loss !== undefined && loss > win) return fail("A loss can’t be worth more than a win.");
   if (input.seasonId !== undefined && input.seasonId !== null && !UUID.test(input.seasonId)) return fail("Choose a season from the list.");
+  let ruleSet: RuleSet | null = null;
+  if (input.matchRules) {
+    const v = validateRules(input.matchRules);
+    if (!v.ok) return fail(v.error);
+    ruleSet = { bestOf: v.bestOf, rules: v.rules };
+  }
   const done = await inClub(ctx, async (tx) => {
     const c = await getCompetition(tx, id);
     if (!c) return "missing";
@@ -90,10 +98,18 @@ export async function saveCompetitionDetails(id: string, input: { summary: strin
       if (max < n) return "below";
     }
     await tx.update(competitions).set({ summary: summary || null, prize: prize || null, rules: rules || null, openRegistration: !!input.openRegistration && c.status === "draft", maxPlayers: max, registrationClosesOn: closes, ...(win !== undefined ? { pointsWin: win } : {}), ...(loss !== undefined ? { pointsLoss: loss } : {}), ...(input.seasonId !== undefined ? { seasonId: input.seasonId } : {}) }).where(eq(competitions.id, id));
+    if (ruleSet) {
+      // The rules can change until a match has been played; matches not yet played follow the new rules, played ones never change.
+      const [played] = await tx.select({ n: sql<number>`count(*)::int` }).from(matches).where(and(eq(matches.competitionId, id), eq(matches.status, "completed")));
+      if ((played?.n ?? 0) > 0) return "played";
+      await tx.update(competitions).set(ruleColumns(ruleSet)).where(eq(competitions.id, id));
+      await tx.update(matches).set(ruleColumns(ruleSet)).where(and(eq(matches.competitionId, id), sql`${matches.status} NOT IN ('completed','walkover')`));
+    }
     await tx.execute(sql`select app.promote_waitlist(${id})`); // a higher limit fills from the queue
     return "ok";
   });
   if (done === "missing") return fail("We couldn’t find that competition.");
+  if (done === "played") return fail("A match has already been played, so the match rules can no longer change.");
   if (done === "below") return fail("More players than that have already registered. Remove some first, or allow more spots.");
   revalidatePath("/", "layout");
   return { ok: true };

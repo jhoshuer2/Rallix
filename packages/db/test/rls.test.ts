@@ -1529,3 +1529,37 @@ describe("hardening from the security review", () => {
     expect(def).toMatch(/pg_advisory_xact_lock/);
   });
 });
+
+describe("match rules", () => {
+  const mkMatch = async (extra: string) => svc.execute(sql.raw(`insert into matches (club_id, competition_id, round, player1_id, player2_id${extra ? ", " + extra.split("=")[0] : ""}) values ('${ids.A}', '${ids.compA}', 'Rules test', '${ids.mP1}', '${ids.mP2}'${extra ? ", " + extra.split("=")[1] : ""})`));
+  it("existing and new matches default to best of 5, first to 11, win by two", async () => {
+    const m = ((await svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id) values (${ids.A}, ${ids.compA}, 'Default rules', ${ids.mP1}, ${ids.mP2}) returning best_of, game_points, win_by, point_cap`)).rows[0]) as Record<string, unknown>;
+    expect(m).toEqual({ best_of: 5, game_points: 11, win_by: 2, point_cap: null });
+  });
+  it("matches and competitions accept 1 to 9 games, 5 to 30 points, win by 1 or 2, and a cap only with win by two", async () => {
+    await svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id, best_of, game_points, win_by, point_cap) values (${ids.A}, ${ids.compA}, 'Rules ok', ${ids.mP1}, ${ids.mP2}, 7, 21, 2, 25)`);
+    await svc.execute(sql`insert into matches (club_id, competition_id, round, player1_id, player2_id, best_of, game_points, win_by) values (${ids.A}, ${ids.compA}, 'Rules ok 2', ${ids.mP1}, ${ids.mP2}, 1, 11, 1)`);
+    for (const bad of ["best_of = 2", "best_of = 11", "best_of = 0", "game_points = 4", "game_points = 31", "win_by = 3", "win_by = 1, point_cap = 15", "point_cap = 11", "point_cap = 40"]) {
+      const sets = bad.includes("win_by = 1,") ? "best_of, win_by, point_cap) values (" : "";
+      const cols = bad.split(",").map((x) => x.split("=")[0]!.trim()).join(", "), vals = bad.split(",").map((x) => x.split("=")[1]!.trim()).join(", ");
+      void sets;
+      expect(await denied(svc.execute(sql.raw(`insert into matches (club_id, competition_id, round, player1_id, player2_id, ${cols}) values ('${ids.A}', '${ids.compA}', 'Bad rules', '${ids.mP1}', '${ids.mP2}', ${vals})`))), bad).toBe("23514");
+    }
+  });
+  it("competitions carry the same rules and checks", async () => {
+    await svc.execute(sql`update competitions set best_of = 3, game_points = 21, win_by = 1, point_cap = null where id = ${ids.compA}`);
+    expect(await denied(svc.execute(sql`update competitions set win_by = 1, point_cap = 25 where id = ${ids.compA}`))).toBe("23514");
+    expect(await denied(svc.execute(sql`update competitions set best_of = 4 where id = ${ids.compA}`))).toBe("23514");
+    await svc.execute(sql`update competitions set best_of = 5, game_points = 11, win_by = 2, point_cap = null where id = ${ids.compA}`);
+  });
+  it("the club default is readable by members and changeable only by a club admin", async () => {
+    const r = await rows(app, { userId: "playerA1", clubId: ids.A }, sql`select default_best_of, default_game_points, default_win_by, default_point_cap from clubs where id = ${ids.A}`);
+    expect(r[0]).toEqual({ default_best_of: 5, default_game_points: 11, default_win_by: 2, default_point_cap: null });
+    await withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set default_best_of = 1, default_game_points = 21 where id = ${ids.A}`));
+    expect(String((await svc.execute(sql`select default_game_points from clubs where id = ${ids.A}`)).rows[0]!.default_game_points)).toBe("21");
+    const byPlayer = await withTenant(app, { userId: "playerA1", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set default_game_points = 15 where id = ${ids.A} returning id`));
+    expect(byPlayer.rows).toHaveLength(0);
+    expect(await denied(withTenant(app, { userId: "adminA", clubId: ids.A }, (tx) => tx.execute(sql`update clubs set default_best_of = 2 where id = ${ids.A}`)))).toBe("23514");
+    await svc.execute(sql`update clubs set default_best_of = 5, default_game_points = 11 where id = ${ids.A}`);
+  });
+});

@@ -3,19 +3,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Panel, SelectSheet, Switch, TextField, useToast } from "@rallix/ui";
 import { saveCompetitionDetails } from "../../../../../lib/competition-actions";
+import { MatchRulesPicker, rulesSentence, type MatchRulesValue } from "../../../../../components/MatchRulesPicker";
 
 type Init = { summary: string; prize: string; rules: string; openRegistration: boolean; maxPlayers: string; closesOn: string; pointsWin: string; pointsLoss: string; seasonId: string };
 
-export function DetailsForm({ id, draft, initial, seasons, league }: { id: string; draft: boolean; initial: Init; seasons: Array<{ value: string; label: string }>; /** Points only matter where a table is shown (not for a knockout). */ league: boolean }) {
+export function DetailsForm({ id, draft, initial, seasons, matchRules, rulesLocked, league }: { id: string; draft: boolean; initial: Init; seasons: Array<{ value: string; label: string }>; matchRules: MatchRulesValue; /** True once a match has been played: the rules can no longer change. */ rulesLocked: boolean; /** Points only matter where a table is shown (not for a knockout). */ league: boolean }) {
   const router = useRouter();
   const [v, setV] = useState(initial);
+  const [rules, setRules] = useState<MatchRulesValue>(matchRules);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const set = <K extends keyof Init>(k: K, val: Init[K]) => setV((p) => ({ ...p, [k]: val }));
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true);
-    const r = await saveCompetitionDetails(id, { summary: v.summary, prize: v.prize, rules: v.rules, openRegistration: v.openRegistration, maxPlayers: v.maxPlayers ? Number(v.maxPlayers) : null, closesOn: v.closesOn || null, pointsWin: Number(v.pointsWin), pointsLoss: Number(v.pointsLoss), seasonId: v.seasonId || null });
+    const r = await saveCompetitionDetails(id, { summary: v.summary, prize: v.prize, rules: v.rules, openRegistration: v.openRegistration, maxPlayers: v.maxPlayers ? Number(v.maxPlayers) : null, closesOn: v.closesOn || null, matchRules: rulesLocked ? undefined : { bestOf: rules.bestOf, points: rules.points, winBy: rules.winBy, cap: rules.cap }, pointsWin: Number(v.pointsWin), pointsLoss: Number(v.pointsLoss), seasonId: v.seasonId || null });
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.success("Saved."); router.refresh();
@@ -28,6 +30,9 @@ export function DetailsForm({ id, draft, initial, seasons, league }: { id: strin
         <label className="rx-field"><span className="rx-label">Rules (optional)</span>
           <textarea className="rx-input" rows={8} maxLength={8000} placeholder="Best of five games. Matches start on time. Be kind to the umpire." value={v.rules} onChange={(e) => set("rules", e.target.value)} style={{ minHeight: 160, padding: 12, resize: "vertical" }} />
         </label>
+      </Panel>
+      <Panel title="How a match is played">
+        {rulesLocked ? <p className="rx-muted" style={{ margin: 0 }}>{rulesSentence(rules)} A match has already been played, so this can no longer change.</p> : <MatchRulesPicker value={rules} onChange={setRules} />}
       </Panel>
       {draft ? (
         <Panel title="Sign-up">

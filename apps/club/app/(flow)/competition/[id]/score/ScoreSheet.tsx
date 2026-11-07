@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, PlayerSlot, ScoreTile } from "@rallix/ui";
-import { enqueue, gamePointFor, isDeuce, isValidGame, newItem, resolveMatch, type GameScore } from "@rallix/stats";
+import { DEFAULT_GAME_RULES, enqueue, gamePointFor, isDeuce, isValidGame, newItem, resolveMatch, rulesLabel, tieNote, type GameRules, type GameScore } from "@rallix/stats";
 import { announceOutbox, deleteDraft, getDraft, listOutbox, newClientRef, putOutbox, saveDraft, saveMatchContext } from "../../../../../lib/offline-store";
 import { syncNow } from "../../../../../lib/offline-sync";
 
@@ -12,7 +12,7 @@ type P = { id: string; name: string; photo: string | null; rank: number };
 type Last = { n: number; p1: number; p2: number; stopped: boolean };
 type Snap = { done: GameScore[]; cur: [number, number]; last: Last | null };
 
-export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: { competitionId: string; clubId: string; matchId: string; bestOf: number; p1: P; p2: P }) {
+export function ScoreSheet({ competitionId, clubId, matchId, bestOf, rules = DEFAULT_GAME_RULES, p1, p2 }: { competitionId: string; clubId: string; matchId: string; bestOf: number; /** What decides a game (points, win by, limit). Old saved matches have none: the usual 11, win by two. */ rules?: GameRules; p1: P; p2: P }) {
   const router = useRouter();
   const [s, setS] = useState<Snap>({ done: [], cur: [0, 0], last: null });
   const [history, setHistory] = useState<Snap[]>([]);
@@ -23,14 +23,14 @@ export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: {
 
   // Keep what this phone needs to score this match with no signal: the names and the half-played score.
   useEffect(() => {
-    void saveMatchContext({ matchId, competitionId, clubId, bestOf, savedAt: Date.now(), p1, p2 });
+    void saveMatchContext({ matchId, competitionId, clubId, bestOf, rules, savedAt: Date.now(), p1, p2 });
     void getDraft(matchId).then((d) => { if (d && (d.done.length || d.cur[0] || d.cur[1])) setS({ done: d.done, cur: d.cur, last: null }); });
     // Warm the offline copy of the scoring screen while there is a signal.
     try { navigator.serviceWorker?.controller?.postMessage({ type: "prepare-offline" }); } catch { /* ignore */ }
     
   }, []);
   useEffect(() => { if (!queued && (s.done.length || s.cur[0] || s.cur[1])) void saveDraft({ matchId, done: s.done, cur: s.cur, savedAt: Date.now() }); }, [s, matchId, queued]);
-  const outcome = resolveMatch(s.done, bestOf);
+  const outcome = resolveMatch(s.done, bestOf, rules);
   const finished = outcome.valid;
   const players = [p1, p2];
   const gameNo = finished ? s.done.length : s.done.length + 1;
@@ -43,7 +43,7 @@ export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: {
     cur[who] += 1;
     const game = { p1: cur[0], p2: cur[1] };
     // A game ends by itself at 11 (or by two clear points after 10-10). The next one starts at 0-0 straight away.
-    if (isValidGame(game)) push({ done: [...s.done, game], cur: [0, 0], last: { n: s.done.length + 1, p1: game.p1, p2: game.p2, stopped: false } });
+    if (isValidGame(game, rules)) push({ done: [...s.done, game], cur: [0, 0], last: { n: s.done.length + 1, p1: game.p1, p2: game.p2, stopped: false } });
     else push({ done: s.done, cur, last: null });
   }
   /** The umpire ends the game now. Whoever is ahead wins it; the score is kept as it stood. */
@@ -74,13 +74,15 @@ export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: {
   }
   const wins = [s.done.filter((g) => g.p1 > g.p2).length, s.done.filter((g) => g.p2 > g.p1).length];
   const winner = outcome.valid ? (outcome.winnerSide === 1 ? p1 : p2) : null;
-  const gp = gamePointFor(s.cur[0], s.cur[1]);
+  const gp = gamePointFor(s.cur[0], s.cur[1], rules);
+  const deuce = isDeuce(s.cur[0], s.cur[1], rules);
   const leader = s.cur[0] === s.cur[1] ? null : s.cur[0] > s.cur[1] ? 0 : 1;
   const lastWinner = s.last ? players[s.last.p1 > s.last.p2 ? 0 : 1]! : null;
   const status = winner ? `Winner: ${winner.name}`
     : s.last && lastWinner ? `Game ${s.last.n} ${s.last.stopped ? "stopped" : "finished"}: ${lastWinner.name} wins ${Math.max(s.last.p1, s.last.p2)}–${Math.min(s.last.p1, s.last.p2)}${s.last.stopped ? " (ended by the umpire)" : ""}. Game ${gameNo} starts at 0–0.`
-    : isDeuce(s.cur[0], s.cur[1]) && gp === null ? "Deuce: first to lead by two wins the game"
-    : gp !== null ? `Game point: ${players[gp]!.name}${isDeuce(s.cur[0], s.cur[1]) ? " (deuce: a lead of two wins)" : ""}`
+    : deuce && gp === null ? "Deuce: first to lead by two wins the game"
+    : gp === 2 ? "Game point for both: the next point wins the game"
+    : gp !== null ? `Game point: ${players[gp]!.name}${deuce ? " (deuce: a lead of two wins)" : ""}`
     : "Tap a number to award a point";
 
   return (
@@ -92,7 +94,8 @@ export function ScoreSheet({ competitionId, clubId, matchId, bestOf, p1, p2 }: {
           <Link className="rx-btn rx-btn--surface" href={`/competition/${competitionId}/groups`}>Exit</Link>
         </span>
       </div>
-      <p style={{ margin: 0, textAlign: "center", fontSize: 13, color: "#c8ccd6" }}>First to 11, win by 2 · best of {bestOf}</p>
+      <p style={{ margin: 0, textAlign: "center", fontSize: 13, color: "#c8ccd6" }}>{rulesLabel(bestOf, rules)}</p>
+      {s.cur[0] >= rules.points - 2 || s.cur[1] >= rules.points - 2 ? <p style={{ margin: 0, textAlign: "center", fontSize: 13, color: "#c8ccd6" }}>{tieNote(rules)}</p> : null}
       <PlayerSlot slot={{ rank: p1.rank, name: p1.name, photo: p1.photo ?? undefined, scores: s.done.map((g) => g.p1), winner: outcome.valid && outcome.winnerSide === 1 }} />
       <ScoreTile name={p1.name} score={s.cur[0]} dim={finished} onPoint={() => point(0)} />
       <ScoreTile name={p2.name} score={s.cur[1]} dim={finished} onPoint={() => point(1)} />

@@ -113,6 +113,11 @@ export const competitions = pgTable("competitions", {
   /* League points: what a win and a loss are worth in this competition. */
   pointsWin: smallint("points_win").notNull().default(3),
   pointsLoss: smallint("points_loss").notNull().default(0),
+  /* The match rules new fixtures get. */
+  bestOf: smallint("best_of").notNull().default(5),
+  gamePoints: smallint("game_points").notNull().default(11),
+  winBy: smallint("win_by").notNull().default(2),
+  pointCap: smallint("point_cap"),
   seasonId: uuid("season_id"),
   maxPlayers: smallint("max_players"),
   registrationClosesOn: date("registration_closes_on"),
@@ -122,6 +127,10 @@ export const competitions = pgTable("competitions", {
 }, (t) => [
   unique("competitions_id_club_uq").on(t.id, t.clubId),
   index("competitions_club_status_idx").on(t.clubId, t.status),
+  check("competitions_best_of", sql`${t.bestOf} IN (1,3,5,7,9)`),
+  check("competitions_game_points", sql`${t.gamePoints} BETWEEN 5 AND 30`),
+  check("competitions_win_by", sql`${t.winBy} IN (1,2)`),
+  check("competitions_point_cap", sql`${t.pointCap} IS NULL OR (${t.winBy} = 2 AND ${t.pointCap} > ${t.gamePoints} AND ${t.pointCap} <= ${t.gamePoints} + 20)`),
   check("competitions_dates", sql`${t.endsOn} IS NULL OR ${t.startsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
   check("competitions_summary", sql`${t.summary} IS NULL OR char_length(${t.summary}) <= 140`),
   check("competitions_prize", sql`${t.prize} IS NULL OR char_length(${t.prize}) <= 100`),
@@ -159,6 +168,10 @@ export const matches = pgTable("matches", {
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   status: matchStatus("status").notNull().default("scheduled"),
   bestOf: smallint("best_of").notNull().default(5),
+  /* What decides a game in this match (a copy of the competition rules when it was made). win_by 1 = the next point wins. */
+  gamePoints: smallint("game_points").notNull().default(11),
+  winBy: smallint("win_by").notNull().default(2),
+  pointCap: smallint("point_cap"),
   winnerId: uuid("winner_id"),
   gamesP1: smallint("games_p1").notNull().default(0),
   gamesP2: smallint("games_p2").notNull().default(0),
@@ -184,7 +197,10 @@ export const matches = pgTable("matches", {
   check("matches_client_ref_len", sql`${t.clientRef} IS NULL OR char_length(${t.clientRef}) BETWEEN 8 AND 64`),
   check("matches_distinct_players", sql`${t.player1Id} IS NULL OR ${t.player2Id} IS NULL OR ${t.player1Id} <> ${t.player2Id}`),
   check("matches_winner_is_player", sql`${t.winnerId} IS NULL OR ${t.winnerId} = ${t.player1Id} OR ${t.winnerId} = ${t.player2Id}`),
-  check("matches_best_of_odd", sql`${t.bestOf} > 0 AND ${t.bestOf} % 2 = 1`),
+  check("matches_best_of_odd", sql`${t.bestOf} IN (1,3,5,7,9)`),
+  check("matches_game_points", sql`${t.gamePoints} BETWEEN 5 AND 30`),
+  check("matches_win_by", sql`${t.winBy} IN (1,2)`),
+  check("matches_point_cap", sql`${t.pointCap} IS NULL OR (${t.winBy} = 2 AND ${t.pointCap} > ${t.gamePoints} AND ${t.pointCap} <= ${t.gamePoints} + 20)`),
   check("matches_completed_has_winner", sql`${t.status} NOT IN ('completed','walkover') OR ${t.winnerId} IS NOT NULL`),
 ]);
 

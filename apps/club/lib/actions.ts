@@ -5,13 +5,14 @@ import { and, eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { competitionEntries, competitions, dues, games, globalRatings, invites, matches, memberships, plans, ratingEvents, ratings, users, withTenant } from "@rallix/db";
-import { applyElo, resolveMatch, roundRobin, snakeGroups, START_RATING, type GameScore } from "@rallix/stats";
+import { applyElo, resolveMatch, roundRobin, snakeGroups, START_RATING, validateRules, type GameScore } from "@rallix/stats";
 import { normalizePhone } from "@rallix/config/phone";
 import { CLUB_COOKIE, canScore, getCtx, inClub, can, requireClub } from "./context";
 import { appDb, serviceDb } from "./db";
 import { listMembers } from "./queries";
 import { savePhone } from "./contact";
 import { seedAndGenerate } from "./competition-core";
+import { clubRules, ruleColumns, type RuleSet } from "./match-rules";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -130,6 +131,8 @@ export async function createCompetition(input: {
   name: string; level: "junior" | "intermediate" | "senior" | null; format: "group_stage" | "one_on_one" | "knockout"; drawMethod?: "seeded" | "raffle"; startsOn: string; endsOn: string; memberIds: string[];
   /** Players sign up themselves; the competition stays a draft until an admin starts it. */
   openRegistration?: boolean; maxPlayers?: number | null; closesOn?: string | null;
+  /** How many games and what decides a game. Left out = the club's usual rules. */
+  matchRules?: { bestOf: number; points: number; winBy: number; cap: number | null };
 }): Promise<Result<{ id: string; draft: boolean }>> {
   const ctx = await requireClub();
   if (!can(ctx.club, "competitions")) return fail("Only club admins can create competitions.");
@@ -144,12 +147,19 @@ export async function createCompetition(input: {
   if (max !== null && ids.length > max) return fail("You picked more players than there are spots.");
   const closes = open && input.closesOn ? input.closesOn : null;
   if (closes !== null && !/^\d{4}-\d{2}-\d{2}$/.test(closes)) return fail("Choose a valid closing date.");
+  let chosen: RuleSet | null = null;
+  if (input.matchRules) {
+    const v = validateRules(input.matchRules);
+    if (!v.ok) return fail(v.error);
+    chosen = { bestOf: v.bestOf, rules: v.rules };
+  }
   try {
     const id = await inClub(ctx, async (tx) => {
+      const ruleSet = chosen ?? await clubRules(tx, ctx.club.clubId);
       const roster = await listMembers(tx, ctx.club.clubId); // RLS-scoped; also gives seed order by rating
       const valid = roster.filter((m) => ids.includes(m.id));
       if (valid.length !== ids.length) throw new Error("INVALID_PLAYERS");
-      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, drawMethod: input.drawMethod === "raffle" ? "raffle" : "seeded", status: open ? "draft" : "active", openRegistration: open, maxPlayers: max, registrationClosesOn: closes, startsOn: input.startsOn, endsOn: input.endsOn, createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
+      const [c] = await tx.insert(competitions).values({ clubId: ctx.club.clubId, name, level: input.level, format: input.format, drawMethod: input.drawMethod === "raffle" ? "raffle" : "seeded", status: open ? "draft" : "active", openRegistration: open, maxPlayers: max, registrationClosesOn: closes, startsOn: input.startsOn, endsOn: input.endsOn, ...ruleColumns(ruleSet), createdBy: ctx.club.membershipId }).returning({ id: competitions.id });
       if (open) { if (valid.length) await tx.insert(competitionEntries).values(valid.map((m) => ({ clubId: ctx.club.clubId, competitionId: c!.id, membershipId: m.id }))); }
       else await seedAndGenerate(tx, ctx.club.clubId, c!.id, input.format, valid, { drawMethod: input.drawMethod === "raffle" ? "raffle" : "seeded" });
       return c!.id;
@@ -180,7 +190,7 @@ async function recordResult(ctx: Awaited<ReturnType<typeof requireClub>>, input:
         return { error: "This match has already been recorded.", conflict: true };
       }
       if (!m.player1Id || !m.player2Id) return { error: "Both players must be set before scoring." };
-      const r = resolveMatch(input.games, m.bestOf);
+      const r = resolveMatch(input.games, m.bestOf, { points: m.gamePoints, winBy: m.winBy === 1 ? 1 : 2, cap: m.pointCap });
       if (!r.valid) return { error: r.reason };
       const p1 = m.player1Id, p2 = m.player2Id;
       const winnerId = r.winnerSide === 1 ? p1 : p2;

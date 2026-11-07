@@ -4,10 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { BackButton, CheckRow, ChoiceToggle, ListGroup, PageShell, Panel, Photo, Switch, TextField, EmptyState } from "@rallix/ui";
 import { createCompetition } from "../../../../../../lib/actions";
+import { MatchRulesPicker, type MatchRulesValue } from "../../../../../../components/MatchRulesPicker";
 
 type M = { id: string; name: string; rank: number; photo: string | null };
 
-export function SelectionForm({ level, members }: { level: string; members: M[] }) {
+export function SelectionForm({ level, members, defaults }: { level: string; members: M[]; defaults: MatchRulesValue }) {
   const router = useRouter();
   const manual = useSearchParams().get("manual") === "1";
   const [name, setName] = useState("");
@@ -16,6 +17,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
   const [format, setFormat] = useState<"group_stage" | "one_on_one" | "knockout">("group_stage");
   const [raffle, setRaffle] = useState(false);
   const [picked, setPicked] = useState<Record<string, boolean>>(() => Object.fromEntries(members.map((p) => [p.id, !manual])));
+  const [matchRules, setMatchRules] = useState<MatchRulesValue>(defaults);
   const [openReg, setOpenReg] = useState(false);
   const [spots, setSpots] = useState("");
   const [closes, setCloses] = useState("");
@@ -34,7 +36,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
     e.preventDefault(); setTried(true); setError(undefined);
     if (!valid) return;
     setBusy(true);
-    const r = await createCompetition({ name, level: level === "combined" ? null : (level as "junior" | "intermediate" | "senior"), format, drawMethod: format === "knockout" && raffle ? "raffle" : "seeded", startsOn: start, endsOn: end, memberIds: ids, openRegistration: openReg, maxPlayers: openReg ? spotsNum : null, closesOn: openReg && closes ? closes : null });
+    const r = await createCompetition({ name, level: level === "combined" ? null : (level as "junior" | "intermediate" | "senior"), format, drawMethod: format === "knockout" && raffle ? "raffle" : "seeded", startsOn: start, endsOn: end, matchRules: { bestOf: matchRules.bestOf, points: matchRules.points, winBy: matchRules.winBy, cap: matchRules.cap }, memberIds: ids, openRegistration: openReg, maxPlayers: openReg ? spotsNum : null, closesOn: openReg && closes ? closes : null });
     if (!r.ok) { setBusy(false); return setError(r.error); }
     router.push(r.draft || !shuffles ? `/competition/${r.id}/groups` : `/competition/${r.id}/shuffle`);
   }
@@ -70,6 +72,7 @@ export function SelectionForm({ level, members }: { level: string; members: M[] 
             </div>
           ) : null}
         </Panel>
+        <Panel title="How a match is played"><MatchRulesPicker value={matchRules} onChange={setMatchRules} /></Panel>
         <h2 className="rx-panel__title" style={{ margin: "32px 0 0" }}>{openReg ? `Players already in (${ids.length})` : `Players (${ids.length})`}</h2>
         {members.length === 0 ? <EmptyState compact title="No players at this level yet" hint="Share your invite link, or pick “Combine levels”." /> : (
           <ListGroup label="Players participating in the competition">

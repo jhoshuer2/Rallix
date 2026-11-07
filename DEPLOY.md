@@ -92,6 +92,7 @@ Every push to the branch deploys by itself, so **apply the migrations first, the
 | Username sign-in | 0037 | 38 |
 | Birthday visibility | 0038 | 39 |
 | Security hardening (seats, `club_room`, owner lock) | 0039 | 40 |
+| Match rules (games, points, win by) | 0040 | 41 |
 
 Check in the Supabase SQL editor (the migration count is the first number; the rest must read `true`):
 ```sql

@@ -11,5 +11,5 @@ export function OfflineScore() {
   }, []);
   if (ctx === undefined) return <p role="status">Opening…</p>;
   if (!ctx) return <p>This match is not saved on this phone. Open it once with a signal and it will work without one.</p>;
-  return <ScoreSheet competitionId={ctx.competitionId} clubId={ctx.clubId} matchId={ctx.matchId} bestOf={ctx.bestOf} p1={ctx.p1} p2={ctx.p2} />;
+  return <ScoreSheet competitionId={ctx.competitionId} clubId={ctx.clubId} matchId={ctx.matchId} bestOf={ctx.bestOf} rules={ctx.rules} p1={ctx.p1} p2={ctx.p2} />;
 }

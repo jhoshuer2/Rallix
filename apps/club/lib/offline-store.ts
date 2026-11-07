@@ -3,10 +3,10 @@
  * Everything the phone keeps so a scorer can work without a signal: the match being scored (names, best-of) and the outbox of
  * finished results waiting to send. IndexedDB only; every call fails soft (private windows or blocked storage return nothing).
  */
-import type { GameScore, OutboxItem } from "@rallix/stats";
+import type { GameRules, GameScore, OutboxItem } from "@rallix/stats";
 
 export type MatchContext = {
-  matchId: string; competitionId: string; clubId: string; bestOf: number; savedAt: number;
+  matchId: string; competitionId: string; clubId: string; bestOf: number; /** Absent on matches saved before match rules existed. */ rules?: GameRules; savedAt: number;
   p1: { id: string; name: string; photo: string | null; rank: number };
   p2: { id: string; name: string; photo: string | null; rank: number };
 };

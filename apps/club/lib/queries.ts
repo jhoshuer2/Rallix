@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { competitionEntries, competitionWaitlist, competitions, dues, games, matches, memberships, payments, plans, playerProfiles, ratings, users, type Tx } from "@rallix/db";
-import { computeRecord, headToHead, type PlayedMatch } from "@rallix/stats";
+import { computeRecord, headToHead, type GameRules, type PlayedMatch } from "@rallix/stats";
 
 export type MemberView = {
   id: string; userId: string; name: string; photo: string | null; level: "junior" | "intermediate" | "senior";
@@ -26,7 +26,7 @@ export async function listMembers(tx: Tx, clubId: string): Promise<MemberView[]>
 export const ageOf = (dob: string | null) => (dob ? Math.floor((Date.now() - new Date(dob).getTime()) / 31557600000) : null);
 
 export type MatchView = {
-  id: string; competitionId: string; competitionName: string; round: string; status: string; bestOf: number;
+  id: string; competitionId: string; competitionName: string; round: string; status: string; bestOf: number; rules: GameRules;
   scheduledAt: Date | null; confirmedAt: Date | null;
   p1: { id: string; name: string; photo: string | null } | null; p2: { id: string; name: string; photo: string | null } | null;
   winnerId: string | null; gamesP1: number; gamesP2: number; games: Array<{ no: number; p1: number; p2: number; stopped: boolean }>;
@@ -48,7 +48,7 @@ export async function listMatches(tx: Tx, clubId: string, f: { competitionId?: s
   const byId = new Map(people.map((p) => [p.id, { id: p.id, name: p.name, photo: p.photo ?? null }]));
   const gs = await tx.select().from(games).where(inArray(games.matchId, rows.map((r) => r.matches.id))).orderBy(asc(games.gameNo));
   return rows.map(({ matches: m, competitions: c }) => ({
-    id: m.id, competitionId: m.competitionId, competitionName: c.name, round: m.round, status: m.status, bestOf: m.bestOf,
+    id: m.id, competitionId: m.competitionId, competitionName: c.name, round: m.round, status: m.status, bestOf: m.bestOf, rules: { points: m.gamePoints, winBy: m.winBy === 1 ? 1 : 2, cap: m.pointCap },
     scheduledAt: m.scheduledAt, confirmedAt: m.confirmedAt,
     p1: m.player1Id ? byId.get(m.player1Id) ?? null : null, p2: m.player2Id ? byId.get(m.player2Id) ?? null : null,
     winnerId: m.winnerId, gamesP1: m.gamesP1, gamesP2: m.gamesP2,
