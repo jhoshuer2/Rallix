@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Segmented, TextField } from "@rallix/ui";
+import { ChipChoice, TextField } from "@rallix/ui";
 import { BEST_OF_CHOICES, RULE_PRESETS, presetKey, tieNote, validateRules } from "@rallix/stats";
 
 export type MatchRulesValue = { bestOf: number; points: number; winBy: 1 | 2; cap: number | null };
@@ -20,9 +20,8 @@ export function MatchRulesPicker({ value, onChange }: { value: MatchRulesValue; 
   const check = validateRules(value);
   return (
     <div className="rx-matchrules">
-      <Segmented
+      <ChipChoice
         label="Match format"
-        scroll
         value={shown}
         onChange={(k) => {
           if (k === "custom") return setCustom(true);
@@ -35,10 +34,10 @@ export function MatchRulesPicker({ value, onChange }: { value: MatchRulesValue; 
       {custom ? (
         <div style={{ display: "grid", gap: 4, marginTop: 12 }}>
           <p className="rx-label" style={{ margin: "4px 0" }}>Games in a match</p>
-          <Segmented label="Games in a match" value={String(value.bestOf)} onChange={(v) => onChange({ ...value, bestOf: Number(v) })} options={BEST_OF_CHOICES.map((n) => ({ value: String(n), label: n === 1 ? "1 game" : `Best of ${n}` }))} scroll />
+          <ChipChoice label="Games in a match" value={String(value.bestOf)} onChange={(v) => onChange({ ...value, bestOf: Number(v) })} options={BEST_OF_CHOICES.map((n) => ({ value: String(n), label: n === 1 ? "1 game" : `Best of ${n}` }))} />
           <TextField label="Points to win a game" type="number" inputMode="numeric" min={5} max={30} value={String(value.points)} onChange={(e) => { const n = Number(e.target.value); onChange({ ...value, points: Number.isFinite(n) ? n : 0, cap: null }); }} />
           <p className="rx-label" style={{ margin: "4px 0" }}>When both players are one point short ({value.points - 1}–{value.points - 1})</p>
-          <Segmented label="At the tie" value={String(value.winBy)} onChange={(v) => onChange({ ...value, winBy: v === "1" ? 1 : 2, cap: v === "1" ? null : value.cap })} options={[{ value: "2", label: "Win by two points" }, { value: "1", label: "Next point wins" }]} />
+          <ChipChoice label="At the tie" value={String(value.winBy)} onChange={(v) => onChange({ ...value, winBy: v === "1" ? 1 : 2, cap: v === "1" ? null : value.cap })} options={[{ value: "2", label: "Win by two points" }, { value: "1", label: "Next point wins" }]} />
           {value.winBy === 2 ? (
             <TextField label="Stop at (optional)" type="number" inputMode="numeric" placeholder="No limit" value={value.cap === null ? "" : String(value.cap)} onChange={(e) => onChange({ ...value, cap: e.target.value === "" ? null : Number(e.target.value) })} />
           ) : null}

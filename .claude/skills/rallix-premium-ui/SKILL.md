@@ -89,6 +89,10 @@ Under about 150 visible words per screen, including the tab bar. Prefer "Sat 3 N
 ## Motion
 Transform and opacity only, 120 to 320 ms (`--rx-dur-*`). Skeleton shimmer, LIVE pulse and story progress stop under `prefers-reduced-motion`.
 
+## Choices in a form: chips, not tabs
+- A single choice inside a form (how a match is played, how long it lasts) is `ChipChoice`: separate pills that wrap onto as many rows as needed, each rounded like the container it sits in (`--rx-chip-radius`), at least 44px tall, the selected pill filled blue with a check. Never a scrolling strip.
+- `Segmented` is only for switching a VIEW of the same screen (Today / This week / This month, All / Due / Paid). If options do not fit on one row, it is not a Segmented.
+
 ## Feedback after an action: toasts
 - Every save, send, join, remove or failure shows a toast with `useToast()` from `@rallix/ui` (`toast.success("Saved.")`, `toast.error(message)`). The provider is mounted once in the root layout, so a toast survives a navigation.
 - Never a small muted line under the button, and never `setMsg({ ok, text })`: it is easy to miss and the keyboard can cover it. `design-system.test.ts` fails on both.

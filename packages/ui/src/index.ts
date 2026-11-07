@@ -9,3 +9,4 @@ export { placeholderColors, initials, countdown, scoreLine, coverScale, clampOff
 export { PasswordField } from "./password-field";
 export { ToastProvider, useToast } from "./toast";
 export { pushToast, dismissToast, toastSeconds, MAX_TOASTS, type ToastItem, type ToastTone } from "./toast-queue";
+export { ChipChoice, type ChipOption } from "./chip-choice";

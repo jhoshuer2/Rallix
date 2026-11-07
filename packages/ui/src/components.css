@@ -830,3 +830,11 @@ fieldset { min-width: 0; }
 
 /* Native select inside the field box (birthday month and day) */
 .rx-input select { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 16px; min-height: var(--rx-tap); }
+
+/* Chips: a single choice as separate pills that wrap. Each pill is rounded like the container it sits in (--rx-chip-radius, the card radius). */
+.rx-chips { display: flex; flex-wrap: wrap; gap: 8px; --rx-chip-radius: var(--rx-card-radius, var(--rx-radius-card)); }
+.rx-chip { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; min-width: 44px; padding: 0 16px; border: 1px solid var(--rx-line); border-radius: var(--rx-chip-radius); background: var(--rx-surface); color: var(--rx-ink); font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+.rx-chip:hover { border-color: var(--rx-blue); }
+.rx-chip[aria-checked="true"] { background: var(--rx-blue); border-color: var(--rx-blue); color: #fff; }
+.rx-chip:focus-visible { outline: 3px solid var(--rx-blue); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .rx-chip { transition: none; } }

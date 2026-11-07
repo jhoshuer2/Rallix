@@ -1,5 +1,5 @@
 "use client";
-import { useToast, ActionButton, AttentionTile, Carousel, ClubBanner, CompetitionBanner, EmptyState, HeroMatch, IconBadge, ListGroup, ListRow, MediaCard, MemberCard, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, ResultCard, SectionTitle, SelectSheet, Skeleton, SpotsBar, Stories, TileLink, type StoryItem } from "@rallix/ui";
+import { ChipChoice, useToast, ActionButton, AttentionTile, Carousel, ClubBanner, CompetitionBanner, EmptyState, HeroMatch, IconBadge, ListGroup, ListRow, MediaCard, MemberCard, MetricCard, MetricGrid, PageShell, Panel, Photo, Pill, ResultCard, SectionTitle, SelectSheet, Skeleton, SpotsBar, Stories, TileLink, type StoryItem } from "@rallix/ui";
 import { useState } from "react";
 
 const a = { name: "Ada Obi" }, b = { name: "Tunde Bello" };
@@ -12,6 +12,7 @@ const stories: StoryItem[] = [
 export function Demo() {
   const [v, setV] = useState("");
   const toast = useToast();
+  const [chip, setChip] = useState("bo5");
   return (
     <PageShell title="UI kit" band={<Stories items={stories} />}>
       <HeroMatch competition="League night" whenLabel="Sat, 7 Nov, 15:00" startsAt={new Date(Date.now() + 3 * 86400000)} a={a} b={b} href="#" cta="Match details" />
@@ -23,6 +24,8 @@ export function Demo() {
       <SpotsBar percent={60} />
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>EmptyState</h3>
       <Panel><div id="kit-empty"><EmptyState title="No competitions yet" hint="Create your first one in a minute." action={<a className="rx-btn" href="#">Create a competition</a>} /></div></Panel>
+      <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ChipChoice (a choice in a form: separate pills that wrap)</h3>
+      <Panel><ChipChoice label="Match format" value={chip} onChange={setChip} options={[{ value: "bo3", label: "Best of 3, to 11" }, { value: "bo5", label: "Best of 5, to 11" }, { value: "bo7", label: "Best of 7, to 11" }, { value: "bo1", label: "1 game, to 21" }, { value: "custom", label: "Custom" }]} /></Panel>
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>Toast (every save and failure)</h3>
       <Panel><div style={{ display: "grid", gap: 8 }}><button type="button" className="rx-btn" onClick={() => toast.success("Saved. Carry on with what you were doing.")}>Show a success toast</button><button type="button" className="rx-btn rx-btn--ghost" onClick={() => toast.error("That didn’t save. Check your connection and try again.")}>Show an error toast</button></div></Panel>
       <h3 className="rx-panel__title" style={{ marginTop: 24 }}>ListRow</h3>

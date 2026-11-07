@@ -31,6 +31,8 @@ describe("every club screen follows the design system", () => {
       const imports = [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*"@rallix\/ui"/g)].flatMap((m) => m[1]!.split(",").map((x) => x.trim().split(/\s+as\s+/)[0]!));
       expect(imports.filter((n) => LEGACY.includes(n))).toEqual([]);
       expect(/<p className="rx-muted"[^>]*>\s*(No (?!one matches)|Nothing )/.test(src), "empty list text must use EmptyState").toBe(false);
+      // The match rules picker is made of chips (separate pills that wrap), never a Segmented tab strip.
+      if (f.endsWith("components/MatchRulesPicker.tsx")) expect(/<Segmented\b/.test(src), "MatchRulesPicker must use ChipChoice").toBe(false);
       // Feedback after an action is a toast (useToast), never a small line under the button that can be missed.
       expect(/setMsg\(\{\s*ok:\s*(true|false)/.test(src), "use useToast().success / .error, not an inline message state").toBe(false);
       expect(/<p role=\{?[^>]*aria-live="polite"[^>]*>\{(msg|note|saved|done)\b/.test(src), "a status line for a saved action must be a toast").toBe(false);
