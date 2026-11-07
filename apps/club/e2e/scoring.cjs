@@ -21,7 +21,7 @@ const tile=i=>p.locator('button.rx-score').nth(i);
 const text=async()=>p.locator('body').innerText();
 
 ok(/Game 1 of 3/.test(await text())&&/Games 0–0/.test(await text()),'the header names the game: "Game 1 of 3 · Games 0–0"');
-ok(/First to 11, win by 2 · best of 3/.test(await text()),'the rule is on screen');
+ok(/Best of 3 · first to 11, win by 2/.test(await text()),'the rule is on screen');
 ok(await p.getByRole('button',{name:/End game/}).count()===0,'no "End game" at 0–0 (nothing to end)');
 
 // Game 1: p1 wins 11–0 by itself
